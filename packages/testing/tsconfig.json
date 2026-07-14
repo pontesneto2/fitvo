@@ -1,0 +1,5 @@
+{
+  "extends": "@fitvo/typescript-config/node.json",
+  "include": ["src/**/*.ts", "vitest.base.ts", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

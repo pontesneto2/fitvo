@@ -1,0 +1,28 @@
+{
+  "name": "@fitvo/testing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vitest-config": "./vitest.base.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "vitest": "^3.0.0"
+  },
+  "devDependencies": {
+    "@fitvo/eslint-config": "workspace:*",
+    "@fitvo/typescript-config": "workspace:*",
+    "@types/node": "^20.16.0",
+    "eslint": "^9.13.0",
+    "typescript": "^5.6.2"
+  }
+}

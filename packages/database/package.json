@@ -1,0 +1,32 @@
+{
+  "name": "@fitvo/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "lint": "eslint .",
+    "typecheck": "prisma generate && tsc --noEmit",
+    "build": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.1.0"
+  },
+  "devDependencies": {
+    "@fitvo/eslint-config": "workspace:*",
+    "@fitvo/typescript-config": "workspace:*",
+    "@types/node": "^20.16.0",
+    "eslint": "^9.13.0",
+    "prisma": "^6.1.0",
+    "typescript": "^5.6.2"
+  }
+}

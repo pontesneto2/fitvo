@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/.next
+**/build
+**/coverage
+**/.turbo
+pnpm-lock.yaml
+
+# Documentacao de planejamento (preservar formatacao original)
+CLAUDE.md
+CONTRIBUTING.md
+README.md
+decisions.md
+docs/

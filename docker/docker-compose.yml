@@ -1,0 +1,38 @@
+name: fitvo-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fitvo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fitvo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fitvo}
+      POSTGRES_DB: ${POSTGRES_DB:-fitvo}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - fitvo-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-fitvo} -d ${POSTGRES_DB:-fitvo}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: fitvo-redis
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - fitvo-redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  fitvo-postgres-data:
+  fitvo-redis-data:

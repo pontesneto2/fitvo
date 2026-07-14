@@ -1,0 +1,6 @@
+{
+  "name": "@fitvo/web-admin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Super Admin FITVO (Next.js). Deploy proprio, separado do web-personal."
+}

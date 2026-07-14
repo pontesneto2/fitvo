@@ -33,7 +33,52 @@ importers:
         specifier: ^2.5.6
         version: 2.10.5
 
+  packages/ai:
+    devDependencies:
+      '@fitvo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@fitvo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      eslint:
+        specifier: ^9.13.0
+        version: 9.39.5(jiti@2.6.1)
+      typescript:
+        specifier: ^5.6.2
+        version: 5.9.3
+
+  packages/auth:
+    devDependencies:
+      '@fitvo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@fitvo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      eslint:
+        specifier: ^9.13.0
+        version: 9.39.5(jiti@2.6.1)
+      typescript:
+        specifier: ^5.6.2
+        version: 5.9.3
+
   packages/brand-tokens:
+    devDependencies:
+      '@fitvo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@fitvo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      eslint:
+        specifier: ^9.13.0
+        version: 9.39.5(jiti@2.6.1)
+      typescript:
+        specifier: ^5.6.2
+        version: 5.9.3
+
+  packages/cache:
     devDependencies:
       '@fitvo/eslint-config':
         specifier: workspace:*
@@ -106,6 +151,81 @@ importers:
       eslint:
         specifier: ^9.13.0
         version: 9.39.5(jiti@2.6.1)
+
+  packages/notifications:
+    devDependencies:
+      '@fitvo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@fitvo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      eslint:
+        specifier: ^9.13.0
+        version: 9.39.5(jiti@2.6.1)
+      typescript:
+        specifier: ^5.6.2
+        version: 5.9.3
+
+  packages/observability:
+    devDependencies:
+      '@fitvo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@fitvo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      eslint:
+        specifier: ^9.13.0
+        version: 9.39.5(jiti@2.6.1)
+      typescript:
+        specifier: ^5.6.2
+        version: 5.9.3
+
+  packages/payments:
+    devDependencies:
+      '@fitvo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@fitvo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      eslint:
+        specifier: ^9.13.0
+        version: 9.39.5(jiti@2.6.1)
+      typescript:
+        specifier: ^5.6.2
+        version: 5.9.3
+
+  packages/queue:
+    devDependencies:
+      '@fitvo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@fitvo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      eslint:
+        specifier: ^9.13.0
+        version: 9.39.5(jiti@2.6.1)
+      typescript:
+        specifier: ^5.6.2
+        version: 5.9.3
+
+  packages/storage:
+    devDependencies:
+      '@fitvo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@fitvo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      eslint:
+        specifier: ^9.13.0
+        version: 9.39.5(jiti@2.6.1)
+      typescript:
+        specifier: ^5.6.2
+        version: 5.9.3
 
   packages/testing:
     dependencies:

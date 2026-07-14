@@ -1,0 +1,8 @@
+pnpm exec lint-staged
+
+# Gate local de segredos (best-effort). O gate obrigatorio roda no CI (gitleaks).
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner
+else
+  echo "[husky] gitleaks nao instalado localmente — scan de segredos pulado (o CI aplica o gate)."
+fi

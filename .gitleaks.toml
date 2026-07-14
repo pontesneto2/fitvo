@@ -1,0 +1,18 @@
+title = "FITVO gitleaks config"
+
+# Usa o conjunto de regras padrao do gitleaks como base.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders de .env.example nao sao segredos reais"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''.*\.env\.example$''',
+]
+regexes = [
+  '''(?i)change[-_]?me''',
+  '''(?i)your[-_].*[-_]here''',
+  '''(?i)placeholder''',
+  '''USER:PASSWORD''',
+]

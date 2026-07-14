@@ -14,7 +14,7 @@ const connection = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
  * compartilhamento entram nas fases seguintes — D-017/D-027/D-028).
  */
 const worker = new Worker(
-  'fitvo:default',
+  'fitvo-default',
   (job) => {
     logger.info({ jobId: job.id, name: job.name }, 'job recebido (no-op na Fase 1)');
     return Promise.resolve(job.data);

@@ -1,0 +1,23 @@
+{
+  "name": "fitvo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "FITVO — SaaS multi-especialidade de saude e fitness (monorepo).",
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.6"
+  }
+}

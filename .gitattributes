@@ -1,0 +1,23 @@
+# Normaliza fim de linha para LF em todo o repositório (consistência entre SOs).
+* text=auto eol=lf
+
+# Arquivos binários — nunca aplicar normalização de texto.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp4 binary
+*.zip binary
+
+# Scripts shell sempre LF (execução em CI/containers).
+*.sh text eol=lf
+
+# Lockfile: gerado por ferramenta, marcar para diffs mais limpos.
+pnpm-lock.yaml linguist-generated=true -diff

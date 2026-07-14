@@ -1,0 +1,101 @@
+# ==========================================================================
+# FITVO — .gitignore
+# Repositório PÚBLICO: higiene de segredos é prioridade máxima.
+# Regra: nada de segredo aqui. Use .env.example (placeholders) para documentar.
+# ==========================================================================
+
+# ----- Dependências -----
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ----- Variáveis de ambiente e segredos (mantém apenas os *.env.example) -----
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.local
+
+# ----- Credenciais / chaves / certificados / keystores -----
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.cer
+*.crt
+*.der
+*.mobileprovision
+secrets/
+credentials/
+serviceAccount*.json
+gha-creds-*.json
+google-services.json
+GoogleService-Info.plist
+
+# ----- Artefatos de build -----
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# ----- Expo / React Native (saída de prebuild nativo) -----
+.expo/
+.expo-shared/
+/apps/mobile/ios/
+/apps/mobile/android/
+*.orig.*
+web-build/
+
+# ----- Turborepo / caches -----
+.turbo/
+.cache/
+.eslintcache
+.prettiercache
+
+# ----- Testes / cobertura -----
+coverage/
+*.lcov
+.nyc_output/
+
+# ----- Prisma (client gerado fora de node_modules, se houver) -----
+packages/database/src/generated/
+
+# ----- Logs -----
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# ----- SO / editores -----
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# ----- Temporários -----
+tmp/
+temp/
+*.tmp
+*.pid
+*.seed

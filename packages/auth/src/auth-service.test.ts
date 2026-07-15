@@ -55,4 +55,24 @@ describe('DefaultAuthService', () => {
       code: 'SESSION_REVOKED',
     });
   });
+
+  it('revoga todas as sessoes da conta (troca de senha)', async () => {
+    const auth = makeService();
+    const first = await auth.issueTokens({ accountId: 'acc_9', sessionId: 'sess_a' });
+    const second = await auth.issueTokens({ accountId: 'acc_9', sessionId: 'sess_b' });
+    // outra conta nao pode ser afetada
+    const other = await auth.issueTokens({ accountId: 'acc_10', sessionId: 'sess_c' });
+
+    await auth.revokeAllSessions('acc_9');
+
+    await expect(auth.rotateRefreshToken(first.refreshToken)).rejects.toMatchObject({
+      code: 'SESSION_REVOKED',
+    });
+    await expect(auth.rotateRefreshToken(second.refreshToken)).rejects.toMatchObject({
+      code: 'SESSION_REVOKED',
+    });
+    // a sessao de outra conta segue ativa
+    const rotated = await auth.rotateRefreshToken(other.refreshToken);
+    expect(rotated.tokens.refreshToken).toBeTruthy();
+  });
 });

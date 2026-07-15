@@ -25,7 +25,7 @@ export class DefaultAuthService implements AuthService {
       this.jwt.signAccessToken(input),
       this.jwt.signRefreshToken({ ...input, jti }),
     ]);
-    await this.store.startSession(input.sessionId, jti, this.refreshTtlSeconds);
+    await this.store.startSession(input.sessionId, input.accountId, jti, this.refreshTtlSeconds);
     return {
       accessToken: access.token,
       refreshToken: refresh.token,
@@ -79,5 +79,9 @@ export class DefaultAuthService implements AuthService {
 
   revokeSession(sessionId: string): Promise<void> {
     return this.store.revoke(sessionId);
+  }
+
+  revokeAllSessions(accountId: string): Promise<void> {
+    return this.store.revokeAllForAccount(accountId);
   }
 }

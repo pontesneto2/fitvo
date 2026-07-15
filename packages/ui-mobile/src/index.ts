@@ -5,6 +5,8 @@
  * visuais entrarao aqui conforme o design-system-components.md for implementado.
  */
 export * from './button';
+export * from './card';
+export * from './card-variants';
 export * from './checkbox';
 export * from './field';
 export * from './input';

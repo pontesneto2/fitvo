@@ -6,6 +6,8 @@
  */
 export * from './badge';
 export * from './badge-variants';
+export * from './breadcrumb';
+export * from './breadcrumb-variants';
 export * from './button';
 export * from './card';
 export * from './card-variants';

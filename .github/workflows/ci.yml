@@ -39,25 +39,28 @@ jobs:
   dependency-scan:
     name: dependency-scan
     runs-on: ubuntu-latest
+    # osv-scanner le o pnpm-lock.yaml direto (base OSV). Evita o endpoint de
+    # audit legado do npm, que foi aposentado (410) e quebra o `pnpm audit`.
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --audit-level=high
+      - name: Install osv-scanner
+        run: |
+          curl -sSfL "https://github.com/google/osv-scanner/releases/download/v2.4.0/osv-scanner_linux_amd64" -o osv-scanner
+          chmod +x osv-scanner
+      - name: Scan dependencies (OSV)
+        run: ./osv-scanner scan --lockfile=pnpm-lock.yaml
 
   secret-scan:
     name: secret-scan
     runs-on: ubuntu-latest
+    # Roda o gitleaks CLI sobre o historico completo. A gitleaks-action tenta
+    # diferenciar <root>^..HEAD e falha no primeiro push (root nao tem pai).
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITLEAKS_CONFIG: .gitleaks.toml
-          # GITLEAKS_LICENSE nao e necessario em repositorios publicos.
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz" | tar -xz gitleaks
+      - name: Scan for secrets (full history)
+        run: ./gitleaks detect --source . --redact -v --config .gitleaks.toml

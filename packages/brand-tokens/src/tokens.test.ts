@@ -6,10 +6,12 @@ import { black, colors, stops, white } from './colors';
 import { shadows, shadowToCss, shadowToNative } from './elevation';
 import { accentRamp, environments } from './environments';
 import { focusRing } from './focus';
+import { iconFamily, iconSize, iconStroke } from './icons';
 import type { SemanticColorName } from './semantic-colors';
 import { cssVarNames, semanticColors } from './semantic-colors';
 import { cssVarRef, resolveTheme, toCssVariables } from './theme';
 import type { Environment } from './types';
+import { fontFamily, fontWeight, textStyles } from './typography';
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 const colorNames = Object.keys(colors) as ColorName[];
@@ -105,5 +107,37 @@ describe('elevacao', () => {
 
   it('shadowToNative expoe a elevation dp do Android', () => {
     expect(shadowToNative(shadows.overlay.light).elevation).toBe(8);
+  });
+});
+
+// Decisoes de design fechadas em 2026-07-15 (design-system.md §9). Estes testes
+// travam os valores OFICIAIS — mudar exige decisao explicita, nao acidente.
+describe('decisoes de design oficiais', () => {
+  it('tipografia: Poppins (titulos) 500/600 e Inter (corpo) 400/500/600', () => {
+    expect(fontFamily.heading).toBe('Poppins');
+    expect(fontFamily.body).toBe('Inter');
+    expect(fontWeight.regular).toBe(400);
+    expect(fontWeight.medium).toBe(500);
+    expect(fontWeight.semibold).toBe(600);
+    // Poppins so nos pesos 500 (H3) e 600 (display/H1/H2); Inter no corpo (400).
+    expect(textStyles.h3.fontWeight).toBe(500);
+    expect(textStyles.display.fontWeight).toBe(600);
+    expect(textStyles.body.fontWeight).toBe(400);
+  });
+
+  it('icones: familia Lucide, tamanhos 16/20/24, stroke 1.5', () => {
+    expect(iconFamily).toBe('lucide');
+    expect(iconSize.sm).toBe(16);
+    expect(iconSize.md).toBe(20);
+    expect(iconSize.lg).toBe(24);
+    expect(iconStroke).toBe(1.5);
+  });
+
+  it('dark fino: superficies sobem 900->800->700, foco em brand-400', () => {
+    expect(semanticColors.surfaceBase.dark).toBe(colors.neutral[900]);
+    expect(semanticColors.surfaceRaised.dark).toBe(colors.neutral[800]);
+    expect(semanticColors.surfaceOverlay.dark).toBe(colors.neutral[700]);
+    expect(semanticColors.borderFocus.dark).toBe(colors.brand[400]);
+    expect(focusRing.color.dark).toBe(colors.brand[400]);
   });
 });

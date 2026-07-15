@@ -22,6 +22,8 @@ export * from './select-variants';
 export * from './side-nav';
 export * from './side-nav-variants';
 export * from './switch';
+export * from './table';
+export * from './table-variants';
 export * from './tabs';
 export * from './tabs-variants';
 export * from './textarea';

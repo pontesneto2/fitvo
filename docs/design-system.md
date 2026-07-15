@@ -209,9 +209,19 @@ mais respiro) para o tom mais sóbrio que o contexto clínico pede.
 
 ## 9. Pendências de design
 
+**Decisões fechadas (2026-07-15)** — refletidas nos tokens:
+- **Tipografia:** pesos definitivos (§5) — Poppins 500/600; Inter 400/500/600.
+- **Elevação:** valores definitivos (§6); no dark, superfície mais clara + sombra
+  a metade da opacidade.
+- **Iconografia:** família **Lucide** (`lucide-react` / `lucide-react-native`,
+  MIT). Tokens em `design-system-components.md` §19.
+- **Dark fino:** superfícies, hover, foco e estados de input em
+  `design-system-components.md` §21.
+
+**Ainda em aberto:**
 - **Logo:** ainda não definida. Símbolo em exploração; wordmark será Poppins com
   "FIT" em peso alto (`brand-800` `#08543E`) e "VO" em peso leve (`brand-500`
   `#0FA678`). Cor primária da marca: `#0FA678`.
-- Iconografia (família de ícones a escolher: Lucide / Phosphor / Heroicons).
 - Ilustrações e imagens de marca.
-- Avaliar adoção de shadcn/ui + MCP para a camada web (ver CLAUDE.md).
+- **shadcn/ui + MCP** para a camada web — decisão **ADIADA**. O preset Tailwind
+  permanece neutro (ver CLAUDE.md); não adotar sem ordem.

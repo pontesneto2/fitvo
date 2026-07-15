@@ -1,7 +1,7 @@
 import { colors, white } from '@fitvo/brand-tokens';
 import { describe, expect, it } from 'vitest';
 
-import { resolveCheckboxColors, resolveRadioColors } from './toggle-variants';
+import { resolveCheckboxColors, resolveRadioColors, resolveSwitchColors } from './toggle-variants';
 
 describe('resolveCheckboxColors (§4)', () => {
   it('normal: transparente, borda neutral-300 (light) / neutral-600 (dark)', () => {
@@ -75,5 +75,27 @@ describe('resolveRadioColors (§5)', () => {
     expect(resolveRadioColors('light', false, false, true, false).borderColor).toBe(
       colors.danger[400],
     );
+  });
+});
+
+describe('resolveSwitchColors (§6)', () => {
+  it('ligado: trilho brand-500, botao branco', () => {
+    expect(resolveSwitchColors('light', true, false)).toMatchObject({
+      trackColor: colors.brand[500],
+      thumbColor: white,
+    });
+  });
+
+  it('desligado: trilho neutral-300 (light) / neutral-600 (dark), botao branco', () => {
+    expect(resolveSwitchColors('light', false, false).trackColor).toBe(colors.neutral[300]);
+    expect(resolveSwitchColors('dark', false, false).trackColor).toBe(colors.neutral[600]);
+  });
+
+  it('disabled: trilho e botao esmaecidos (§6)', () => {
+    expect(resolveSwitchColors('light', true, true)).toMatchObject({
+      trackColor: colors.brand[200],
+      thumbColor: colors.neutral[50],
+    });
+    expect(resolveSwitchColors('light', false, true).trackColor).toBe(colors.neutral[200]);
   });
 });

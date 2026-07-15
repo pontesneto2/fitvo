@@ -98,3 +98,28 @@ export function resolveRadioColors(
     dotColor: 'transparent',
   };
 }
+
+export interface SwitchColors {
+  readonly trackColor: string;
+  readonly thumbColor: string;
+}
+
+/**
+ * Cores do Switch (§6). Trilho neutro quando desligado (sobe na rampa no dark),
+ * `brand-500` quando ligado; botao branco. Sem hover no touch. Disabled esmaece
+ * trilho e botao (§6: neutral-200/brand-200 no trilho, neutral-100/50 no botao).
+ */
+export function resolveSwitchColors(mode: ThemeMode, on: boolean, disabled: boolean): SwitchColors {
+  const dark = mode === 'dark';
+  if (disabled) {
+    return on
+      ? { trackColor: colors.brand[200], thumbColor: colors.neutral[50] }
+      : {
+          trackColor: dark ? colors.neutral[700] : colors.neutral[200],
+          thumbColor: dark ? colors.neutral[800] : colors.neutral[100],
+        };
+  }
+  return on
+    ? { trackColor: colors.brand[500], thumbColor: white }
+    : { trackColor: dark ? colors.neutral[600] : colors.neutral[300], thumbColor: white };
+}

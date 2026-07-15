@@ -12,6 +12,10 @@ const apiEnvSchema = baseEnvSchema.extend({
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   JWT_REFRESH_TTL_SECONDS: z.coerce.number().int().positive().default(2_592_000),
   JWT_ISSUER: z.string().default('fitvo-api'),
+  // Verificacao de e-mail: 24h (padrao da industria; ainda expira). Recuperacao
+  // de senha: 1h (curta duracao — D-029). Ambos configuraveis por ambiente.
+  EMAIL_VERIFICATION_TTL_SECONDS: z.coerce.number().int().positive().default(86_400),
+  PASSWORD_RESET_TTL_SECONDS: z.coerce.number().int().positive().default(3_600),
 });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;

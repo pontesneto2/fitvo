@@ -13,6 +13,7 @@ const ACCOUNT_PROJECTION = {
   email: true,
   passwordHash: true,
   name: true,
+  emailVerifiedAt: true,
 } as const;
 
 /** Implementacao Prisma (infra) do repositorio de identidade. */
@@ -21,6 +22,10 @@ export class PrismaAccountRepository implements AccountRepository {
 
   findByEmail(email: string): Promise<AccountRecord | null> {
     return this.db.account.findUnique({ where: { email }, select: ACCOUNT_PROJECTION });
+  }
+
+  findById(id: string): Promise<AccountRecord | null> {
+    return this.db.account.findUnique({ where: { id }, select: ACCOUNT_PROJECTION });
   }
 
   createProfessional(input: CreateProfessionalInput): Promise<AccountRecord> {
@@ -54,5 +59,13 @@ export class PrismaAccountRepository implements AccountRepository {
       },
       select: ACCOUNT_PROJECTION,
     });
+  }
+
+  async markEmailVerified(id: string): Promise<void> {
+    await this.db.account.update({ where: { id }, data: { emailVerifiedAt: new Date() } });
+  }
+
+  async updatePassword(id: string, passwordHash: string): Promise<void> {
+    await this.db.account.update({ where: { id }, data: { passwordHash } });
   }
 }

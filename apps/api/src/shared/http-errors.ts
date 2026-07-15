@@ -43,3 +43,14 @@ export class UnauthorizedError extends AppError {
     this.name = 'UnauthorizedError';
   }
 }
+
+/** Token de verificacao/recuperacao invalido, expirado ou ja usado (D-029). */
+export class InvalidVerificationTokenError extends AppError {
+  readonly status = 400;
+  readonly problemType = 'https://fitvo.dev/problems/invalid-token';
+  readonly title = 'Token invalido ou expirado';
+  constructor() {
+    super('Token invalido, expirado ou ja utilizado.');
+    this.name = 'InvalidVerificationTokenError';
+  }
+}

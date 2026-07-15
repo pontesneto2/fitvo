@@ -3,11 +3,17 @@ import type { FastifyPluginAsync } from 'fastify';
 import { UnauthorizedError } from '../../shared/http-errors';
 import type { AuthApplicationService } from './auth-application-service';
 import {
+  forgotPasswordSchema,
   loginSchema,
   refreshSchema,
   registerPatientSchema,
   registerProfessionalSchema,
+  requestEmailVerificationSchema,
+  resetPasswordSchema,
+  verifyEmailSchema,
 } from './auth-schemas';
+
+const ACCEPTED = { status: 'accepted' as const };
 
 function bearerToken(header: string | undefined): string {
   if (!header?.startsWith('Bearer ')) {
@@ -18,7 +24,8 @@ function bearerToken(header: string | undefined): string {
 
 /**
  * Vertical slice de autenticacao (D-034: versao na URL /v1). Registro por papel
- * (D-045/D-006), login (rate limited — D-029), refresh (rotacao) e logout.
+ * (D-045/D-006), login (rate limited — D-029), refresh (rotacao), logout,
+ * verificacao de e-mail, recuperacao de senha e conta atual (/me).
  */
 export function authRoutes(service: AuthApplicationService): FastifyPluginAsync {
   return (app) => {
@@ -48,6 +55,44 @@ export function authRoutes(service: AuthApplicationService): FastifyPluginAsync 
 
     app.post('/logout', async (request, reply) => {
       await service.logout(bearerToken(request.headers.authorization));
+      return reply.code(204).send();
+    });
+
+    app.get('/me', async (request, reply) => {
+      return reply.send(await service.getMe(bearerToken(request.headers.authorization)));
+    });
+
+    // (Re)envio da verificacao de e-mail — sempre 202 (nao vaza existencia).
+    app.post(
+      '/verify-email/request',
+      { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
+      async (request, reply) => {
+        const body = requestEmailVerificationSchema.parse(request.body);
+        await service.requestEmailVerification(body.email);
+        return reply.code(202).send(ACCEPTED);
+      },
+    );
+
+    app.post('/verify-email', async (request, reply) => {
+      const body = verifyEmailSchema.parse(request.body);
+      await service.verifyEmail(body.token);
+      return reply.send({ verified: true });
+    });
+
+    // Recuperacao de senha — sempre 202 (nao vaza existencia de conta).
+    app.post(
+      '/forgot-password',
+      { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
+      async (request, reply) => {
+        const body = forgotPasswordSchema.parse(request.body);
+        await service.forgotPassword(body.email);
+        return reply.code(202).send(ACCEPTED);
+      },
+    );
+
+    app.post('/reset-password', async (request, reply) => {
+      const body = resetPasswordSchema.parse(request.body);
+      await service.resetPassword(body.token, body.password);
       return reply.code(204).send();
     });
 

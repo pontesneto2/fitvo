@@ -2,7 +2,9 @@ import {
   Argon2PasswordHasher,
   DefaultAuthService,
   JwtTokenService,
+  LoggingAuthEmailSender,
   RedisRefreshTokenStore,
+  RedisVerificationTokenStore,
 } from '@fitvo/auth';
 import { prisma } from '@fitvo/database';
 import { Redis } from 'ioredis';
@@ -34,10 +36,20 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     new RedisRefreshTokenStore(redis),
     env.JWT_REFRESH_TTL_SECONDS,
   );
+  // Stub de envio: registra o token no log estruturado (console = JSON de dev)
+  // ate integrarmos um provedor real. O `console` satisfaz o sink `info(details,
+  // message)` sem acoplar @fitvo/auth a uma implementacao concreta.
+  const emailSender = new LoggingAuthEmailSender(console);
   const authService = new AuthApplicationService(
     new PrismaAccountRepository(prisma),
     new Argon2PasswordHasher(),
     authCore,
+    new RedisVerificationTokenStore(redis),
+    emailSender,
+    {
+      emailVerificationTtlSeconds: env.EMAIL_VERIFICATION_TTL_SECONDS,
+      passwordResetTtlSeconds: env.PASSWORD_RESET_TTL_SECONDS,
+    },
   );
 
   return {

@@ -6,6 +6,7 @@ import {
   shadows,
   shadowToNative,
 } from '@fitvo/brand-tokens';
+import { Check, ChevronDown } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
@@ -21,6 +22,7 @@ import {
   View,
 } from 'react-native';
 
+import { Icon } from './icon';
 import type { InputStatus } from './input-variants';
 import { INPUT_DIMS, resolveInputColors } from './input-variants';
 import {
@@ -82,7 +84,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   triggerLabel: { flexShrink: 1, fontFamily: fontFamily.body, fontSize: INPUT_DIMS.fontSize },
-  chevron: { width: 8, height: 8, borderRightWidth: 1.5, borderBottomWidth: 1.5, marginTop: -3 },
   backdrop: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
   menu: {
     borderWidth: SELECT_MENU_DIMS.borderWidth,
@@ -114,14 +115,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.small,
     paddingVertical: SELECT_MENU_DIMS.itemPaddingV,
     paddingHorizontal: SELECT_MENU_DIMS.itemPaddingH,
-  },
-  check: {
-    width: 6,
-    height: 11,
-    borderRightWidth: 2,
-    borderBottomWidth: 2,
-    marginTop: -2,
-    transform: [{ rotate: '45deg' }],
   },
 });
 
@@ -204,15 +197,9 @@ export function Select({
         >
           {selectedOption ? selectedOption.label : placeholder}
         </Text>
-        <View
-          style={[
-            styles.chevron,
-            {
-              borderColor: theme.colors.textAuxiliar,
-              transform: [{ rotate: open ? '225deg' : '45deg' }],
-            },
-          ]}
-        />
+        <View style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
+          <Icon icon={ChevronDown} size="sm" color={theme.colors.textAuxiliar} />
+        </View>
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={closeMenu}>
@@ -281,7 +268,7 @@ export function Select({
                               {o.label}
                             </Text>
                             {isSelected ? (
-                              <View style={[styles.check, { borderColor: c.checkColor }]} />
+                              <Icon icon={Check} size="sm" color={c.checkColor} />
                             ) : null}
                           </View>
                         );

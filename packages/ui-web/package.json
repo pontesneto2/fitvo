@@ -18,7 +18,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fitvo/brand-tokens": "workspace:*"
+    "@fitvo/brand-tokens": "workspace:*",
+    "lucide-react": "^0.469.0"
   },
   "peerDependencies": {
     "react": ">=18"

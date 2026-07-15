@@ -1,9 +1,11 @@
+import { Check, ChevronDown, Search } from 'lucide-react';
 import type { ChangeEvent, KeyboardEvent, ReactNode } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { cn } from './cn';
 import type { FieldStatus } from './field-styles';
 import { fieldBase, fieldStatusClasses } from './field-styles';
+import { Icon } from './icon';
 
 /**
  * Select / Dropdown WEB (design-system-components.md §3 + dark §21). Primeiro
@@ -118,57 +120,23 @@ function itemClasses(active: boolean, selected: boolean, disabled: boolean): str
 
 function ChevronIcon({ open }: { readonly open: boolean }): ReactNode {
   return (
-    <svg
-      viewBox="0 0 20 20"
+    <Icon
+      icon={ChevronDown}
+      size="md"
       className={cn(
-        'h-5 w-5 shrink-0 text-fg-muted transition-transform duration-fast ease-standard',
+        'shrink-0 text-fg-muted transition-transform duration-fast ease-standard',
         open && 'rotate-180',
       )}
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M6 8l4 4 4-4"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    />
   );
 }
 
 function CheckIcon(): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      className="h-4 w-4 shrink-0 text-brand-500"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M13 4.5 6.5 11 3 7.5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <Icon icon={Check} size="sm" className="shrink-0 text-brand-500" />;
 }
 
 function SearchIcon(): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      className="h-4 w-4 shrink-0 text-fg-subtle"
-      fill="none"
-      aria-hidden="true"
-    >
-      <circle cx="7" cy="7" r="4.25" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
+  return <Icon icon={Search} size="sm" className="shrink-0 text-fg-subtle" />;
 }
 
 export function Select({

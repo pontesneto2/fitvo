@@ -1,7 +1,9 @@
+import { Check, Minus } from 'lucide-react';
 import type { ChangeEvent, InputHTMLAttributes, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 
 import { cn } from './cn';
+import { Icon } from './icon';
 
 /**
  * Checkbox WEB (design-system-components.md §4). 20px, raio `sm`. Input nativo
@@ -35,28 +37,6 @@ function boxState(active: boolean, disabled: boolean, error: boolean): string {
     return 'border-brand-500 bg-brand-500 group-hover:border-brand-600 group-hover:bg-brand-600';
   if (error) return 'border-danger-400 group-hover:border-danger-400';
   return 'border-line-hover bg-transparent group-hover:border-brand-400 group-hover:bg-brand-50 peer-focus-visible:border-line-focus';
-}
-
-function CheckIcon(): ReactNode {
-  return (
-    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-      <path
-        d="M13 4.5 6.5 11 3 7.5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function DashIcon(): ReactNode {
-  return (
-    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-      <path d="M3.5 8h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
 }
 
 export function Checkbox({
@@ -111,7 +91,11 @@ export function Checkbox({
           disabled ? 'text-neutral-50' : 'text-white',
         )}
       >
-        {indeterminate ? <DashIcon /> : isChecked ? <CheckIcon /> : null}
+        {indeterminate ? (
+          <Icon icon={Minus} size="sm" />
+        ) : isChecked ? (
+          <Icon icon={Check} size="sm" />
+        ) : null}
       </span>
       {children ? (
         <span className={cn('text-small text-fg', disabled && 'text-fg-subtle')}>{children}</span>

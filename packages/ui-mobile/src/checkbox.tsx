@@ -1,9 +1,11 @@
 import { fontFamily, fontSize, radius } from '@fitvo/brand-tokens';
+import { Check, Minus } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from './icon';
 import { useTheme } from './theme-context';
 import { resolveCheckboxColors } from './toggle-variants';
 
@@ -11,7 +13,7 @@ import { resolveCheckboxColors } from './toggle-variants';
  * Checkbox MOBILE (design-system-components.md §4). 20px, raio `sm`. Sem checkbox
  * nativo no RN: Pressable + View. Controlavel (usa `checked` se dado, senao estado
  * interno). No touch nao ha hover — o "hover" do doc vira `pressed`. Cores em
- * `toggle-variants.ts` (testavel sem RN); check/dash desenhados com View.
+ * `toggle-variants.ts` (testavel sem RN); check/dash via `Icon` (§19).
  */
 export interface CheckboxProps {
   readonly checked?: boolean;
@@ -35,15 +37,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  check: {
-    width: 6,
-    height: 11,
-    borderRightWidth: 2,
-    borderBottomWidth: 2,
-    marginTop: -2,
-    transform: [{ rotate: '45deg' }],
-  },
-  dash: { width: 10, height: 2, borderRadius: 1 },
   label: { fontFamily: fontFamily.body, fontSize: fontSize.small },
 });
 
@@ -86,9 +79,9 @@ export function Checkbox({
           <>
             <View style={boxStyle}>
               {indeterminate ? (
-                <View style={[styles.dash, { backgroundColor: c.markColor }]} />
+                <Icon icon={Minus} size="sm" color={c.markColor} />
               ) : isChecked ? (
-                <View style={[styles.check, { borderColor: c.markColor }]} />
+                <Icon icon={Check} size="sm" color={c.markColor} />
               ) : null}
             </View>
             {children != null ? (

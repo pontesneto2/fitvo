@@ -1,6 +1,8 @@
+import { X } from 'lucide-react';
 import type { HTMLAttributes, ReactNode } from 'react';
 
 import { cn } from './cn';
+import { Icon } from './icon';
 
 /**
  * Badge / Tag WEB (design-system-components.md §8). Chip de status/rotulo.
@@ -71,14 +73,6 @@ const removeHoverClasses: Record<BadgeVariant, string> = {
   medicine: 'hover:bg-clinic-200',
 };
 
-function XIcon(): ReactNode {
-  return (
-    <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" aria-hidden="true">
-      <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 export function Badge({
   variant = 'neutral',
   removable = false,
@@ -103,7 +97,7 @@ export function Badge({
             removeHoverClasses[variant],
           )}
         >
-          <XIcon />
+          <Icon icon={X} size="sm" />
         </button>
       ) : null}
     </span>

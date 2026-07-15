@@ -1,10 +1,12 @@
 import { fontFamily, fontSize, fontWeight, space } from '@fitvo/brand-tokens';
+import { X } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { BadgeVariant } from './badge-variants';
 import { BADGE_DIMS, resolveBadgeColors } from './badge-variants';
+import { Icon } from './icon';
 import { useTheme } from './theme-context';
 
 /**
@@ -46,19 +48,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: -space[1],
   },
-  x: { width: 8, height: 8 },
-  xLine: { position: 'absolute', top: 3.25, left: 0, width: 8, height: 1.5, borderRadius: 1 },
 });
-
-/** `×` desenhado com duas barras cruzadas (SVG inline evitado; §19 usa desenho). */
-function RemoveX({ color }: { readonly color: string }): ReactNode {
-  return (
-    <View style={styles.x}>
-      <View style={[styles.xLine, { backgroundColor: color, transform: [{ rotate: '45deg' }] }]} />
-      <View style={[styles.xLine, { backgroundColor: color, transform: [{ rotate: '-45deg' }] }]} />
-    </View>
-  );
-}
 
 export function Badge({
   variant = 'neutral',
@@ -86,7 +76,7 @@ export function Badge({
         >
           {({ pressed }): ReactNode => (
             <View style={[styles.remove, pressed ? { backgroundColor: c.removePressColor } : null]}>
-              <RemoveX color={c.textColor} />
+              <Icon icon={X} size="sm" color={c.textColor} />
             </View>
           )}
         </Pressable>

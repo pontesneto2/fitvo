@@ -1,6 +1,8 @@
+import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { cn } from './cn';
+import { Icon } from './icon';
 
 /**
  * Tabela WEB (design-system-components.md §16). Superficie de listagem dos paineis
@@ -56,6 +58,12 @@ const alignClass: Record<ColumnAlign, string> = {
   center: 'text-center',
 };
 
+/**
+ * Nao ordenado: `ChevronsUpDown` (indica coluna ordenavel). Ordenado: seta unica
+ * na direcao ativa (`ArrowUp`/`ArrowDown`) — mais legivel que o par de chevrons
+ * com opacidade do desenho original, mesma informacao (§16: icone `brand-500` +
+ * `aria-sort` no cabecalho da coluna, ja aplicado pelo chamador).
+ */
 function SortIcon({
   active,
   direction,
@@ -63,33 +71,13 @@ function SortIcon({
   readonly active: boolean;
   readonly direction: SortDirection;
 }): ReactNode {
+  const glyph = !active ? ChevronsUpDown : direction === 'asc' ? ArrowUp : ArrowDown;
   return (
-    <svg
-      viewBox="0 0 16 16"
-      className={cn(
-        'ml-1 inline-block h-3.5 w-3.5 align-middle',
-        active ? 'text-brand-500' : 'text-fg-subtle',
-      )}
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M5 6.5 8 3.5l3 3"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={cn(active && direction === 'desc' && 'opacity-30')}
-      />
-      <path
-        d="M5 9.5 8 12.5l3-3"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={cn(active && direction === 'asc' && 'opacity-30')}
-      />
-    </svg>
+    <Icon
+      icon={glyph}
+      size="sm"
+      className={cn('ml-1 inline-block align-middle', active ? 'text-brand-500' : 'text-fg-subtle')}
+    />
   );
 }
 

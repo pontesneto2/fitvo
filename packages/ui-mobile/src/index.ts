@@ -4,6 +4,8 @@
  * (design-system.md §8): temas resolvidos + ThemeProvider/useTheme. Componentes
  * visuais entrarao aqui conforme o design-system-components.md for implementado.
  */
+export * from './badge';
+export * from './badge-variants';
 export * from './button';
 export * from './card';
 export * from './card-variants';

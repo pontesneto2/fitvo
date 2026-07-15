@@ -24,7 +24,7 @@ jobs:
       matrix:
         task: [lint, typecheck, test, build]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: pnpm run ${{ matrix.task }}
 
@@ -32,7 +32,7 @@ jobs:
     name: format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: pnpm run format:check
 
@@ -42,7 +42,7 @@ jobs:
     # osv-scanner le o pnpm-lock.yaml direto (base OSV). Evita o endpoint de
     # audit legado do npm, que foi aposentado (410) e quebra o `pnpm audit`.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install osv-scanner
         run: |
           curl -sSfL "https://github.com/google/osv-scanner/releases/download/v2.4.0/osv-scanner_linux_amd64" -o osv-scanner
@@ -56,7 +56,7 @@ jobs:
     # Roda o gitleaks CLI sobre o historico completo. A gitleaks-action tenta
     # diferenciar <root>^..HEAD e falha no primeiro push (root nao tem pai).
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Install gitleaks

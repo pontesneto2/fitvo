@@ -5,10 +5,12 @@
  * entrarao aqui conforme o design-system-components.md for implementado.
  */
 export * from './button';
+export * from './checkbox';
 export * from './cn';
 export * from './css-variables';
 export * from './field';
 export * from './field-styles';
 export * from './input';
+export * from './radio';
 export * from './tailwind-preset';
 export * from './textarea';

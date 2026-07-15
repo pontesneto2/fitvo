@@ -25,8 +25,14 @@ trabalho: `worktree-brand-tokens`.
     `@testing-library/react`+jsdom, sem jest-dom, asserts com `toBeTruthy()`).
   - Mobile: `packages/ui-mobile/src/<nome>-variants.ts` (lógica de cor/dimensão
     PURA, sem `react-native`) + `<nome>-variants.test.ts` (vitest, env node) +
-    `<nome>.tsx` (componente RN). **Render RN completo não é montado** — exige
-    harness próprio (jest + preset RN), decisão de infra separada e PENDENTE.
+    `<nome>.tsx` (componente RN). **Render RN real**: `<nome>.test.tsx`, via
+    `@testing-library/react-native` + `jest` (preset `react-native`), separado do
+    vitest (`jest.config.cjs`/`babel.config.cjs` do pacote — `.cjs` porque o
+    pacote é `"type": "module"`); usar `renderWithTheme` de `test-utils.tsx`
+    (a maioria dos componentes lê `useTheme()`, exige `<ThemeProvider>`). Ambos
+    rodam em sequência via `"test": "vitest run && jest"`. Cobertura ainda
+    parcial (Button/Badge/Card) — estender aos demais componentes conforme
+    forem revisitados, não é bloqueante.
 - **Controlável:** usa a prop de valor se dada (`value !== undefined`), senão
   estado interno.
 - **Overlays** (Select, Modal, Toast, Tooltip): web = elemento posicionado +
@@ -97,6 +103,4 @@ Cada item: web + mobile + testes + galeria (artifact HTML light/dark), um commit
 - **§20 restante** — ilustrações, gráficos avançados, componentes de domínio,
   onboarding, impressão: DEFERIDO (dependem de decisões que ainda não existem).
   A **logo** já foi definida (símbolo isolado ainda provisório).
-- **Harness de render RN** (jest + preset RN) — implementar para tornar os testes
-  de mobile completos (hoje cobrem só a lógica pura dos `*-variants`).
 - Cola do preset num app real (Next) + `content` do Tailwind apontando p/ ui-web.

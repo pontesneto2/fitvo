@@ -126,3 +126,32 @@ export class BondAlreadyExistsError extends AppError {
     this.name = 'BondAlreadyExistsError';
   }
 }
+
+/**
+ * Ja existe um consentimento ATIVO para a tripla paciente+grantee+especialidade
+ * (unico — ADR-0003/D-016). Reconceder um consentimento ativo e no-op explicito.
+ */
+export class ConsentAlreadyExistsError extends AppError {
+  readonly status = 409;
+  readonly problemType = 'https://fitvo.dev/problems/consent-exists';
+  readonly title = 'Consentimento ativo ja existe';
+  constructor() {
+    super('Ja existe um consentimento ativo para este profissional nesta especialidade.');
+    this.name = 'ConsentAlreadyExistsError';
+  }
+}
+
+/**
+ * O paciente tentou consentir o compartilhamento de dados de uma especialidade
+ * na qual nao possui vinculo ATIVO — nao ha dado a compartilhar (ADR-0003/D-016).
+ * 422: requisicao bem-formada, mas viola uma pre-condicao de negocio.
+ */
+export class ConsentRequiresActiveBondError extends AppError {
+  readonly status = 422;
+  readonly problemType = 'https://fitvo.dev/problems/consent-requires-bond';
+  readonly title = 'Sem vinculo ativo na especialidade';
+  constructor() {
+    super('So e possivel consentir o compartilhamento de uma especialidade com vinculo ativo.');
+    this.name = 'ConsentRequiresActiveBondError';
+  }
+}

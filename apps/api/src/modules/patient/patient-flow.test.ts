@@ -1,3 +1,4 @@
+import { BOND_CREATED_EVENT, type BondCreatedEvent, SHARING_QUEUE } from '@fitvo/queue';
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
@@ -97,6 +98,25 @@ describe('fluxo de paciente e vinculo (E2E via inject)', () => {
       patientName: 'Novo Paciente',
       specialtyId: SPECIALTY,
       status: 'ACTIVE',
+    });
+
+    await harness.app.close();
+  });
+
+  it('publica o evento bond.created no aceite (alimenta o motor de compartilhamento — D-017)', async () => {
+    const harness = await buildTestHarness();
+    const pro = await setupProfessional(harness);
+    const { token } = (await createInvite(harness.app, pro.token, 'paciente@fitvo.dev')).json();
+    const accepted = (await accept(harness.app, token)).json();
+
+    const jobs = harness.queue.enqueuedJobs<BondCreatedEvent>(SHARING_QUEUE);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.name).toBe(BOND_CREATED_EVENT);
+    expect(jobs[0]?.data).toMatchObject({
+      patientProfileId: accepted.patient.patientProfileId,
+      professionalProfileId: pro.professionalProfileId,
+      specialtyId: SPECIALTY,
+      tenantId: PRO_TENANT,
     });
 
     await harness.app.close();

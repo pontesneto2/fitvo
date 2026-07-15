@@ -1,5 +1,6 @@
 import type { PasswordHasher } from '@fitvo/auth';
 import type { BondStatus, InviteStatus } from '@fitvo/database';
+import { BOND_CREATED_EVENT, type BondCreatedEvent, type Queue } from '@fitvo/queue';
 
 import type { AccessTokenVerifier } from '../../shared/auth-context';
 import { requireAuth } from '../../shared/auth-context';
@@ -104,6 +105,13 @@ export class PatientApplicationService {
     private readonly hasher: PasswordHasher,
     private readonly tokenVerifier: AccessTokenVerifier,
     private readonly inviteTtlSeconds: number,
+    /**
+     * Fila de eventos do motor de compartilhamento (D-017). O aceite publica
+     * `bond.created` para alimentar a deteccao de sobreposicao no worker. O tipo
+     * `Queue` (porta de @fitvo/queue) basta como EventPublisher — sem acoplar a
+     * slice a uma implementacao concreta (BullMQ em prod, in-memory nos testes).
+     */
+    private readonly bondEvents: Queue<BondCreatedEvent>,
   ) {}
 
   /** Profissional convida um paciente para UMA especialidade. Devolve o token 1x. */
@@ -222,6 +230,17 @@ export class PatientApplicationService {
     if (outcome.status === 'bond-conflict') {
       throw new BondAlreadyExistsError();
     }
+
+    // Motor de compartilhamento (D-017): o vinculo recem-aberto pode gerar uma
+    // sobreposicao de profissionais para o paciente. Publicamos o evento e o
+    // worker decide (deteccao + sugestao). Publicar apos o commit do aceite.
+    await this.bondEvents.enqueue(BOND_CREATED_EVENT, {
+      patientProfileId: outcome.patientProfileId,
+      professionalProfileId: outcome.professionalProfileId,
+      specialtyId: outcome.specialtyId,
+      tenantId: outcome.tenantId,
+    });
+
     return {
       patient: {
         accountId: outcome.accountId,

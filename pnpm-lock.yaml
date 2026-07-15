@@ -65,6 +65,9 @@ importers:
       '@fitvo/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@fitvo/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
       fastify:
         specifier: ^5.1.0
         version: 5.10.0
@@ -110,6 +113,12 @@ importers:
       '@fitvo/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@fitvo/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@fitvo/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
       bullmq:
         specifier: ^5.28.0
         version: 5.80.2
@@ -141,6 +150,9 @@ importers:
       typescript:
         specifier: ^5.6.2
         version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@20.19.43)(jiti@2.6.1)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/ai:
     devDependencies:
@@ -348,6 +360,13 @@ importers:
         version: 5.9.3
 
   packages/queue:
+    dependencies:
+      bullmq:
+        specifier: ^5.28.0
+        version: 5.80.2
+      ioredis:
+        specifier: ^5.11.1
+        version: 5.11.1
     devDependencies:
       '@fitvo/eslint-config':
         specifier: workspace:*
@@ -355,12 +374,18 @@ importers:
       '@fitvo/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@types/node':
+        specifier: ^20.16.0
+        version: 20.19.43
       eslint:
         specifier: ^9.13.0
         version: 9.39.5(jiti@2.6.1)
       typescript:
         specifier: ^5.6.2
         version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@20.19.43)(jiti@2.6.1)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/storage:
     devDependencies:

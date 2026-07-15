@@ -30,6 +30,40 @@ crítica, não opcional. Bots varrem repositórios públicos em minutos.
 
 ---
 
+## Política de Merge — revisão humana obrigatória em áreas críticas
+
+O CI verde prova que o código compila e passa nos testes. NÃO prova que a regra
+de negócio está correta. Por isso, o auto-merge com `--admin` é permitido apenas
+em áreas de baixo risco.
+
+**AUTO-MERGE PERMITIDO (CI verde é gate suficiente):**
+- Infraestrutura, tooling, configs, CI
+- Design system, tokens, primitivos de UI
+- Documentação
+- Refactors sem mudança de comportamento
+- Upgrades de dependência
+
+**REVISÃO HUMANA OBRIGATÓRIA ANTES DO MERGE (nunca auto-mergear):**
+- **Financeiro** — qualquer coisa em `payments`, billing, split, subconta, fee,
+  cobrança, assinatura, webhook de pagamento, reembolso/estorno. Erro aqui custa
+  dinheiro real de terceiros.
+- **Consentimento e compartilhamento** — Consent, motor de compartilhamento,
+  qualquer regra que decida quem vê dado de quem. Erro aqui é violação de LGPD.
+- **Autenticação e autorização** — auth, RBAC, isolamento de tenant, guards de
+  repositório. Erro aqui é vazamento entre tenants.
+- **Dado clínico** — qualquer acesso a anamnese, avaliação, prontuário,
+  prescrição. Erro aqui é sigilo médico.
+- **Migrations destrutivas** — qualquer migration que remova ou altere coluna
+  com dado existente.
+
+Nessas áreas: abra o PR, apresente o diff e AGUARDE aprovação explícita do
+responsável. Não use `--admin`. Não mergeie por conta própria mesmo com CI verde.
+
+Se uma mudança tocar área crítica E não-crítica ao mesmo tempo, trate como
+crítica.
+
+---
+
 ## Missão
 
 FITVO é um SaaS premium multi-especialidade de saúde e fitness — um ecossistema
@@ -211,26 +245,10 @@ comportamentais e verificáveis — devem ser seguidas sem exceção.
   NÃO adotar antes dessa decisão. Não se aplica ao mobile (React Native/Expo).
 ---
 
-## Próximo Passo — FASE 1 (Fundação Técnica, sem regra de negócio)
+## Plano de Execução
 
-O planejamento estrutural está completo (ver `docs/adr/`). A Fase 1 monta o
-esqueleto. Ordem sugerida de execução:
-
-1. Inicializar o monorepo (Turborepo + pnpm workspaces) com a estrutura de
-   `apps/` e `packages/` acima — pastas e `package.json` de cada workspace,
-   ainda vazios de regra de negócio.
-2. Configurar tooling base: TypeScript strict (`typescript-config`), ESLint
-   (`eslint-config`), Prettier, EditorConfig, Husky + lint-staged.
-3. Configurar Docker (Postgres + Redis locais) e o `docker-compose` de dev.
-4. Estruturar variáveis de ambiente e secrets por ambiente (dev/staging/prod),
-   sem valores reais versionados.
-5. Configurar o pipeline de CI (GitHub Actions): lint, typecheck, testes, build,
-   security scan, dependency scan — com bloqueio de merge.
-6. Preparar os packages de abstração como esqueleto (interfaces primeiro):
-   `auth`, `payments`, `ai`, `storage`, `cache`, `queue`, `notifications`,
-   `observability`.
-7. Configurar o `database` (Prisma) com o client e a base de migrations — sem
-   modelar entidades de negócio ainda.
-
-**Nenhuma regra de negócio nesta fase.** O repositório é público — nenhum segredo pode ser commitado (ver aviso no topo). Ao final da Fase 1, revisar com o responsável antes de abrir a Fase 2
-(autenticação e usuários).
+A Fase 1 (fundação técnica) está concluída. O plano de execução completo — o
+que está feito (com PR), em andamento, pendente (com ordem), e o que está
+bloqueado por decisão do responsável ou por terceiros (jurídico, credenciais,
+design) — vive em **`docs/roadmap.md`**. É a fonte única do plano; nenhum
+backlog interno de sessão o substitui.

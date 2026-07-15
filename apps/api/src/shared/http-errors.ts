@@ -155,3 +155,47 @@ export class ConsentRequiresActiveBondError extends AppError {
     this.name = 'ConsentRequiresActiveBondError';
   }
 }
+
+/** Plano inexistente ou inativo no catalogo da plataforma (Fluxo A — ADR-0004). */
+export class PlanNotFoundError extends AppError {
+  readonly status = 404;
+  readonly problemType = 'https://fitvo.dev/problems/plan-not-found';
+  readonly title = 'Plano nao encontrado';
+  constructor() {
+    super('Plano inexistente ou inativo.');
+    this.name = 'PlanNotFoundError';
+  }
+}
+
+/**
+ * O plano nao tem preco configurado para a periodicidade pedida. Os precos
+ * comerciais reais sao um input GATED (decisao humana — D-060/ADR-0004): ate o
+ * catalogo ser populado, nao ha valor a cobrar. 422: pre-condicao de negocio.
+ */
+export class PlanPriceUnavailableError extends AppError {
+  readonly status = 422;
+  readonly problemType = 'https://fitvo.dev/problems/plan-price-unavailable';
+  readonly title = 'Preco do plano indisponivel';
+  constructor() {
+    super(
+      'O plano nao possui preco configurado para esta periodicidade (input comercial pendente).',
+    );
+    this.name = 'PlanPriceUnavailableError';
+  }
+}
+
+/**
+ * O tenant ja possui uma assinatura NAO-terminal (TRIALING/ACTIVE/PAST_DUE).
+ * Uma assinatura ativa por tenant (default documentado — ADR-0004). Reenviar a
+ * MESMA idempotencyKey e idempotente (devolve a existente); uma chave nova com
+ * assinatura vigente e conflito.
+ */
+export class SubscriptionAlreadyExistsError extends AppError {
+  readonly status = 409;
+  readonly problemType = 'https://fitvo.dev/problems/subscription-exists';
+  readonly title = 'Assinatura ja existe';
+  constructor() {
+    super('Este tenant ja possui uma assinatura vigente.');
+    this.name = 'SubscriptionAlreadyExistsError';
+  }
+}

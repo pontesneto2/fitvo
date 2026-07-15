@@ -22,6 +22,15 @@ const apiEnvSchema = baseEnvSchema.extend({
   // Convite profissional->paciente: 7 dias (D-055/ADR-0002), reenviavel.
   // Configuravel por ambiente.
   PATIENT_INVITE_TTL_SECONDS: z.coerce.number().int().positive().default(604_800),
+  // Financeiro / Asaas (ADR-0004) — LIVE GATED. Todas OPCIONAIS: a app SOBE sem
+  // credenciais Asaas, caindo para o FakePaymentGateway (deterministico). Nunca
+  // colocar segredos reais no repo publico — apenas placeholders no .env.example.
+  ASAAS_API_KEY: z.string().optional(),
+  ASAAS_BASE_URL: z.string().default('https://sandbox.asaas.com/api/v3'),
+  ASAAS_WEBHOOK_SECRET: z.string().optional(),
+  // Wallet do FITVO que recebe a taxa por split (Fluxo B). Opcional/GATED: sem
+  // ela nenhum split e emitido (a taxa fica capturada como dado no Charge).
+  ASAAS_PLATFORM_WALLET_ID: z.string().optional(),
 });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;

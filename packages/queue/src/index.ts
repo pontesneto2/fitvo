@@ -1,7 +1,9 @@
 /**
  * @fitvo/queue — contrato de filas sobre BullMQ (D-026): enfileirar e
  * processar jobs (notificacoes, webhooks Asaas, IA async, motor de
- * compartilhamento — D-017). Interfaces apenas na Fase 1.
+ * compartilhamento — D-017). Alem das interfaces do dominio, expoe a
+ * implementacao concreta BullMQ (`BullMqQueueFactory`) e uma fabrica em memoria
+ * (`InMemoryQueueFactory`) para testes, alem dos contratos de evento.
  */
 
 export interface JobOptions {
@@ -25,3 +27,7 @@ export interface QueueFactory {
   createQueue<TData>(queueName: string): Queue<TData>;
   createWorker<TData>(queueName: string, handler: JobHandler<TData>): Worker;
 }
+
+export { BullMqQueueFactory } from './bullmq-queue-factory';
+export { BOND_CREATED_EVENT, type BondCreatedEvent, SHARING_QUEUE } from './events';
+export { type CollectedJob, InMemoryQueueFactory } from './in-memory-queue-factory';

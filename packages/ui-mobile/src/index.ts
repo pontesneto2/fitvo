@@ -30,4 +30,6 @@ export * from './themes';
 export * from './toast';
 export * from './toast-variants';
 export * from './toggle-variants';
+export * from './tooltip';
+export * from './tooltip-variants';
 export * from './use-field';

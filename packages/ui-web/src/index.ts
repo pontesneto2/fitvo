@@ -23,3 +23,4 @@ export * from './tabs';
 export * from './tailwind-preset';
 export * from './textarea';
 export * from './toast';
+export * from './tooltip';

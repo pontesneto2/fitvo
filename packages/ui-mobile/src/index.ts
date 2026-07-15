@@ -14,6 +14,8 @@ export * from './card-variants';
 export * from './checkbox';
 export * from './field';
 export * from './input';
+export * from './modal';
+export * from './modal-variants';
 export * from './radio';
 export * from './select';
 export * from './select-variants';

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 
-import { UnauthorizedError } from '../../shared/http-errors';
+import { extractBearerToken } from '../../shared/auth-context';
 import type { AuthApplicationService } from './auth-application-service';
 import {
   forgotPasswordRouteSchema,
@@ -26,13 +26,6 @@ import {
 } from './auth-schemas';
 
 const ACCEPTED = { status: 'accepted' as const };
-
-function bearerToken(header: string | undefined): string {
-  if (!header?.startsWith('Bearer ')) {
-    throw new UnauthorizedError('Token de acesso ausente ou malformado.');
-  }
-  return header.slice('Bearer '.length);
-}
 
 /**
  * Vertical slice de autenticacao (D-034: versao na URL /v1). Registro por papel
@@ -75,12 +68,12 @@ export function authRoutes(service: AuthApplicationService): FastifyPluginAsync 
     });
 
     app.post('/logout', { schema: logoutRouteSchema }, async (request, reply) => {
-      await service.logout(bearerToken(request.headers.authorization));
+      await service.logout(extractBearerToken(request.headers.authorization));
       return reply.code(204).send();
     });
 
     app.get('/me', { schema: meRouteSchema }, async (request, reply) => {
-      return reply.send(await service.getMe(bearerToken(request.headers.authorization)));
+      return reply.send(await service.getMe(extractBearerToken(request.headers.authorization)));
     });
 
     // (Re)envio da verificacao de e-mail — sempre 202 (nao vaza existencia).

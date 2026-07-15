@@ -16,6 +16,9 @@ const apiEnvSchema = baseEnvSchema.extend({
   // de senha: 1h (curta duracao — D-029). Ambos configuraveis por ambiente.
   EMAIL_VERIFICATION_TTL_SECONDS: z.coerce.number().int().positive().default(86_400),
   PASSWORD_RESET_TTL_SECONDS: z.coerce.number().int().positive().default(3_600),
+  // Convite admin->profissional: 7 dias, espelhando a convencao do convite de
+  // paciente (D-055/ADR-0002). Configuravel por ambiente.
+  PROFESSIONAL_INVITE_TTL_SECONDS: z.coerce.number().int().positive().default(604_800),
 });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;

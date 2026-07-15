@@ -13,6 +13,25 @@ import { colors, radius, space, white } from '@fitvo/brand-tokens';
  * espelha o §21); item pressionado sobe um stop no dark (`neutral-700`, regra §21).
  * Marca/perigo sao agnosticos de tema.
  */
+/** Item minimo para filtragem (o componente passa suas proprias options). */
+export interface FilterableOption {
+  readonly label: string;
+}
+
+/**
+ * Filtra por substring do rotulo (case-insensitive) — logica de busca do modo
+ * `searchable` (combobox). Query vazia devolve a lista inteira. Pura/testavel,
+ * compartilhada pela web via reimplementacao identica (pacotes separados).
+ */
+export function filterOptions<T extends FilterableOption>(
+  options: readonly T[],
+  query: string,
+): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [...options];
+  return options.filter((o) => o.label.toLowerCase().includes(q));
+}
+
 export const SELECT_MENU_DIMS = {
   borderRadius: radius.md, // 12 (§3)
   borderWidth: 1,

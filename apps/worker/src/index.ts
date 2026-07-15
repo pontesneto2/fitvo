@@ -1,34 +1,40 @@
-import { Worker } from 'bullmq';
-import { Redis } from 'ioredis';
+import { prisma } from '@fitvo/database';
+import { type BondCreatedEvent, BullMqQueueFactory, SHARING_QUEUE } from '@fitvo/queue';
 import pino from 'pino';
 
 import { env } from './env';
+import { OverlapDetectionService } from './sharing/overlap-detection-service';
+import { PrismaSharingRepository } from './sharing/prisma-sharing-repository';
 
 const logger = pino({ level: env.LOG_LEVEL, name: 'worker' });
 
-const connection = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
-
 /**
- * Worker BullMQ da FITVO. Fase 1: apenas a conexao e o loop de processamento;
- * sem jobs de negocio (notificacoes, webhooks Asaas, IA async e motor de
- * compartilhamento entram nas fases seguintes — D-017/D-027/D-028).
+ * Worker BullMQ da FITVO. Consome a fila do motor de compartilhamento (D-017):
+ * cada `bond.created` roda a deteccao de sobreposicao e, se o paciente passou a
+ * ter >=2 profissionais distintos, persiste uma SharingSuggestion PENDING. A
+ * ENTREGA por notificacao e gated (D-028) — ver TODO no OverlapDetectionService.
+ * Boot-safe: a conexao Redis so e criada aqui (o motor e testavel sem infra).
  */
-const worker = new Worker(
-  'fitvo-default',
-  (job) => {
-    logger.info({ jobId: job.id, name: job.name }, 'job recebido (no-op na Fase 1)');
-    return Promise.resolve(job.data);
-  },
-  { connection },
-);
+const queueFactory = new BullMqQueueFactory(env.REDIS_URL);
+const overlapService = new OverlapDetectionService(new PrismaSharingRepository(prisma));
 
-worker.on('ready', () => logger.info('worker pronto (conectado ao Redis)'));
-worker.on('error', (error) => logger.error({ err: error }, 'erro no worker'));
+const worker = queueFactory.createWorker<BondCreatedEvent>(SHARING_QUEUE, async (data) => {
+  // A fila carrega apenas bond.created nesta fase; ao adicionar outros eventos,
+  // ramificar por nome do job (a porta Queue expoe o nome no enqueue).
+  const suggestions = await overlapService.handleBondCreated(data);
+  logger.info(
+    { patientProfileId: data.patientProfileId, suggestions: suggestions.length },
+    'bond.created processado (motor de compartilhamento)',
+  );
+});
+
+logger.info('worker pronto (motor de compartilhamento — D-017)');
 
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'encerrando worker');
   await worker.close();
-  connection.disconnect();
+  await queueFactory.close();
+  await prisma.$disconnect();
   process.exit(0);
 }
 

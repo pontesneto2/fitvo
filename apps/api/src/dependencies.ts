@@ -7,6 +7,7 @@ import {
   RedisVerificationTokenStore,
 } from '@fitvo/auth';
 import { prisma } from '@fitvo/database';
+import { type BondCreatedEvent, BullMqQueueFactory, SHARING_QUEUE } from '@fitvo/queue';
 import { Redis } from 'ioredis';
 
 import type { ApiEnv } from './env';
@@ -14,6 +15,8 @@ import { AuthApplicationService } from './modules/auth/auth-application-service'
 import { PrismaAccountRepository } from './modules/auth/prisma-account-repository';
 import { ClinicApplicationService } from './modules/clinic/clinic-application-service';
 import { PrismaClinicRepository } from './modules/clinic/prisma-clinic-repository';
+import { ConsentApplicationService } from './modules/consent/consent-application-service';
+import { PrismaConsentRepository } from './modules/consent/prisma-consent-repository';
 import { PatientApplicationService } from './modules/patient/patient-application-service';
 import { PrismaPatientRepository } from './modules/patient/prisma-patient-repository';
 
@@ -24,12 +27,18 @@ export interface AppDependencies {
   authService: AuthApplicationService;
   clinicService: ClinicApplicationService;
   patientService: PatientApplicationService;
+  consentService: ConsentApplicationService;
   onClose?: () => Promise<void>;
 }
 
 /** Monta as dependencias reais (Prisma + Redis + Argon2 + JWT) a partir do env. */
 export function buildProductionDependencies(env: ApiEnv): AppDependencies {
   const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
+  // Fabrica de filas BullMQ (D-017/D-026). A API atua como PRODUTOR: publica
+  // bond.created na fila de compartilhamento; o worker consome (deteccao +
+  // sugestao). Conexao Redis propria da fila (separada do Redis de auth).
+  const queueFactory = new BullMqQueueFactory(env.REDIS_URL);
+  const bondEvents = queueFactory.createQueue<BondCreatedEvent>(SHARING_QUEUE);
   const jwt = new JwtTokenService({
     accessSecret: env.JWT_ACCESS_SECRET,
     refreshSecret: env.JWT_REFRESH_SECRET,
@@ -73,6 +82,13 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     passwordHasher,
     authCore,
     env.PATIENT_INVITE_TTL_SECONDS,
+    bondEvents,
+  );
+  // authCore satisfaz AccessTokenVerifier — a slice de consentimento reusa o
+  // mesmo verificador de access token para o guard do paciente (titular).
+  const consentService = new ConsentApplicationService(
+    new PrismaConsentRepository(prisma),
+    authCore,
   );
 
   return {
@@ -81,7 +97,9 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     authService,
     clinicService,
     patientService,
+    consentService,
     onClose: async () => {
+      await queueFactory.close();
       await redis.quit();
       await prisma.$disconnect();
     },

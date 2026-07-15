@@ -5,6 +5,7 @@ import {
   InMemoryVerificationTokenStore,
   JwtTokenService,
 } from '@fitvo/auth';
+import { type BondCreatedEvent, InMemoryQueueFactory, SHARING_QUEUE } from '@fitvo/queue';
 import type { FastifyInstance } from 'fastify';
 
 import { buildApp } from '../app';
@@ -12,6 +13,8 @@ import { AuthApplicationService } from '../modules/auth/auth-application-service
 import { InMemoryAccountRepository } from '../modules/auth/in-memory-account-repository';
 import { ClinicApplicationService } from '../modules/clinic/clinic-application-service';
 import { InMemoryClinicRepository } from '../modules/clinic/in-memory-clinic-repository';
+import { ConsentApplicationService } from '../modules/consent/consent-application-service';
+import { InMemoryConsentRepository } from '../modules/consent/in-memory-consent-repository';
 import { InMemoryPatientRepository } from '../modules/patient/in-memory-patient-repository';
 import { PatientApplicationService } from '../modules/patient/patient-application-service';
 import { FakeAuthEmailSender } from './fake-auth-email-sender';
@@ -23,6 +26,10 @@ export interface TestHarness {
   clinic: InMemoryClinicRepository;
   /** Repositorio de paciente/vinculo em memoria — expoe `seed*` para arranjar profissionais/especialidades. */
   patient: InMemoryPatientRepository;
+  /** Repositorio de consentimento em memoria — expoe `seed*` para arranjar pacientes/profissionais/vinculos. */
+  consent: InMemoryConsentRepository;
+  /** Fabrica de filas em memoria — coleta os eventos publicados (ex.: bond.created). */
+  queue: InMemoryQueueFactory;
 }
 
 /** Monta a app com dependencias em memoria (sem Postgres/Redis) e expoe o
@@ -48,16 +55,21 @@ export async function buildTestHarness(): Promise<TestHarness> {
   );
   const clinic = new InMemoryClinicRepository();
   const clinicService = new ClinicApplicationService(clinic, hasher, authCore, 3600);
+  const queue = new InMemoryQueueFactory();
+  const bondEvents = queue.createQueue<BondCreatedEvent>(SHARING_QUEUE);
   const patient = new InMemoryPatientRepository();
-  const patientService = new PatientApplicationService(patient, hasher, authCore, 3600);
+  const patientService = new PatientApplicationService(patient, hasher, authCore, 3600, bondEvents);
+  const consent = new InMemoryConsentRepository();
+  const consentService = new ConsentApplicationService(consent, authCore);
   const app = await buildApp({
     logLevel: 'silent',
     corsOrigin: '*',
     authService,
     clinicService,
     patientService,
+    consentService,
   });
-  return { app, emails, clinic, patient };
+  return { app, emails, clinic, patient, consent, queue };
 }
 
 /** Atalho para os testes que so precisam da instancia da app. */

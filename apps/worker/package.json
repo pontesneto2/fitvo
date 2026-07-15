@@ -9,10 +9,13 @@
     "start": "tsx src/index.ts",
     "build": "tsc --noEmit",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@fitvo/config": "workspace:*",
+    "@fitvo/database": "workspace:*",
+    "@fitvo/queue": "workspace:*",
     "bullmq": "^5.28.0",
     "ioredis": "^5.4.1",
     "pino": "^9.5.0",
@@ -24,6 +27,7 @@
     "@types/node": "^20.16.0",
     "eslint": "^9.13.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "vitest": "^3.0.0"
   }
 }

@@ -64,6 +64,25 @@ enum BondStatus {
   ARCHIVED // encerrado: dados preservados, paciente segue vendo o historico
 }
 
+/// Estado da autorizacao de compartilhamento do paciente (D-016/ADR-0003). O
+/// paciente concede (ACTIVE) e revoga (REVOKED) granularmente. Default minimo:
+/// so dois estados — o "grant" e sempre um ato explicito do paciente.
+enum ConsentStatus {
+  ACTIVE // autorizacao vigente
+  REVOKED // revogada pelo paciente (revokedAt preenchido)
+}
+
+/// Estado de uma sugestao de compartilhamento emitida pelo motor (D-017). A
+/// sugestao NAO compartilha nada por si — ela apenas convida o paciente a
+/// autorizar. PENDING ao ser criada; DISMISSED se o paciente ignora; ACTED se
+/// leva a um consentimento. (Transicoes DISMISSED/ACTED ficam para a fase de
+/// notificacoes — D-028; aqui o motor so cria PENDING.)
+enum SuggestionStatus {
+  PENDING
+  DISMISSED
+  ACTED
+}
+
 // ---------------------------------------------------------------------------
 // Identidade
 // ---------------------------------------------------------------------------
@@ -157,11 +176,14 @@ model ProfessionalProfile {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  account        Account                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  specialties    ProfessionalSpecialty[]
-  patientInvites PatientInvite[]
-  bonds          Bond[]
+  account          Account                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tenant           Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  specialties      ProfessionalSpecialty[]
+  patientInvites   PatientInvite[]
+  bonds            Bond[]
+  consentsReceived Consent[] // consentimentos em que este profissional e o grantee (D-016)
+  suggestionsAsA   SharingSuggestion[]     @relation("SuggestionProfessionalA")
+  suggestionsAsB   SharingSuggestion[]     @relation("SuggestionProfessionalB")
 
   @@index([tenantId])
   @@map("professional_profile")
@@ -173,9 +195,11 @@ model Specialty {
   code SpecialtyCode @unique
   name String
 
-  professionals  ProfessionalSpecialty[]
-  patientInvites PatientInvite[]
-  bonds          Bond[]
+  professionals      ProfessionalSpecialty[]
+  patientInvites     PatientInvite[]
+  bonds              Bond[]
+  consents           Consent[]
+  sharingSuggestions SharingSuggestion[]
 
   @@map("specialty")
 }
@@ -207,8 +231,10 @@ model PatientProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  bonds   Bond[]
+  account            Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  bonds              Bond[]
+  consents           Consent[] // autorizacoes que ESTE paciente concedeu (D-016)
+  sharingSuggestions SharingSuggestion[] // sugestoes do motor para este paciente (D-017)
 
   @@map("patient_profile")
 }
@@ -302,4 +328,82 @@ model Bond {
   @@index([professionalProfileId, status])
   @@index([patientProfileId, status])
   @@map("bond")
+}
+
+// ---------------------------------------------------------------------------
+// Consentimento + motor de compartilhamento (D-016/D-017/D-054 — ADR-0003)
+// ---------------------------------------------------------------------------
+
+/// Consentimento = autorizacao do PACIENTE para que um profissional (o
+/// "grantee") acesse seus dados numa especialidade (D-016). Dominio de primeira
+/// classe: compartilhamento entre profissionais e SEMPRE autorizado pelo
+/// paciente, nunca automatico (ADR-0003).
+///
+/// DEFAULTS documentados:
+/// - Granularidade = por (paciente + profissional que recebe + especialidade).
+///   E o escopo minimo que a ADR pede ("granular, por profissional") somado a
+///   dimensao de especialidade do produto multi-especialidade.
+/// - Titularidade = o paciente. Diferente das demais entidades, o Consent NAO e
+///   escopado por tenant: e o ato do proprio paciente e pode CRUZAR tenants (os
+///   profissionais do paciente podem viver em tenants distintos). A chave de
+///   escopo aqui e o patientProfileId, nao um tenantId. O isolamento de tenant
+///   (D-002) continua valendo em toda OUTRA query do sistema.
+/// - Unicidade = um consentimento por tripla (paciente, grantee, especialidade).
+///   Revogar + reconceder REUSA/REABRE a MESMA linha (ACTIVE<->REVOKED), em vez
+///   de inserir varias — escolha mais simples e sem historico duplicado nesta
+///   fase (o historico fino de consentimento fica para uma fase futura).
+/// Datas em UTC (D-067).
+model Consent {
+  id                           String        @id @default(cuid())
+  patientProfileId             String // titular do dado (chave de escopo — nao ha tenantId aqui de proposito)
+  granteeProfessionalProfileId String // profissional que RECEBE o acesso
+  specialtyId                  String // escopo do que pode ser compartilhado (granular por especialidade)
+  status                       ConsentStatus @default(ACTIVE)
+  grantedAt                    DateTime      @default(now())
+  revokedAt                    DateTime? // preenchido na revogacao (UTC), null enquanto ACTIVE
+  createdAt                    DateTime      @default(now())
+  updatedAt                    DateTime      @updatedAt
+
+  patientProfile      PatientProfile      @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  granteeProfessional ProfessionalProfile @relation(fields: [granteeProfessionalProfileId], references: [id], onDelete: Cascade)
+  specialty           Specialty           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+
+  @@unique([patientProfileId, granteeProfessionalProfileId, specialtyId])
+  @@index([patientProfileId])
+  @@index([granteeProfessionalProfileId, status])
+  @@map("consent")
+}
+
+/// Sugestao de compartilhamento = saida do motor orientado a eventos (D-017). Ao
+/// abrir um vinculo (bond.created), o worker detecta a SOBREPOSICAO (o paciente
+/// passa a ter >=2 profissionais distintos) e cria uma sugestao PENDING para o
+/// par recem-sobreposto. IMPORTANTE: a sugestao NAO compartilha nada — a entrega
+/// por notificacao (D-028) e o ato de consentir sao passos posteriores.
+///
+/// DEFAULTS documentados:
+/// - O par (professionalA, professionalB) e NORMALIZADO por ordem estavel dos
+///   ids (A < B) para que (X,Y) e (Y,X) sejam a mesma sugestao — habilita dedupe.
+/// - specialtyId = a especialidade do vinculo que DISPAROU a sobreposicao (o
+///   contexto do evento). E o gatilho, nao um escopo de compartilhamento.
+/// - Dedupe = a nivel de aplicacao (nao ha PENDING duplicado para o mesmo
+///   par+especialidade do mesmo paciente); nao ha unique no banco porque o
+///   status faz parte da identidade de negocio (um par ACTED pode voltar a ser
+///   sugerido no futuro). Datas em UTC (D-067).
+model SharingSuggestion {
+  id               String           @id @default(cuid())
+  patientProfileId String
+  professionalAId  String // par normalizado: professionalAId < professionalBId
+  professionalBId  String
+  specialtyId      String // especialidade do vinculo que disparou a sugestao
+  status           SuggestionStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  patientProfile PatientProfile      @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  professionalA  ProfessionalProfile @relation("SuggestionProfessionalA", fields: [professionalAId], references: [id], onDelete: Cascade)
+  professionalB  ProfessionalProfile @relation("SuggestionProfessionalB", fields: [professionalBId], references: [id], onDelete: Cascade)
+  specialty      Specialty           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+
+  @@index([patientProfileId, status])
+  @@map("sharing_suggestion")
 }

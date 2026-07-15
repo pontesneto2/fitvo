@@ -58,6 +58,8 @@ export type AcceptPatientInviteOutcome =
       tenantId: string;
       accountId: string;
       patientProfileId: string;
+      /** Profissional do convite — necessario para o evento bond.created (D-017). */
+      professionalProfileId: string;
       bondId: string;
       specialtyId: string;
       /** `true` se uma conta nova foi criada; `false` se anexada a conta existente. */

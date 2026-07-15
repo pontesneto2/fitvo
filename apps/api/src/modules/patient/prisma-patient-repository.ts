@@ -258,6 +258,7 @@ export class PrismaPatientRepository implements PatientRepository {
         tenantId: invite.tenantId,
         accountId,
         patientProfileId,
+        professionalProfileId: invite.professionalProfileId,
         bondId: bond.id,
         specialtyId: invite.specialtyId,
         created,

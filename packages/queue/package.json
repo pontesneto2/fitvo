@@ -15,7 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "bullmq": "^5.28.0",
+    "bullmq": "^5.80.4",
     "ioredis": "^5.11.1"
   },
   "devDependencies": {
@@ -24,6 +24,6 @@
     "@types/node": "^20.16.0",
     "eslint": "^9.13.0",
     "typescript": "^5.6.2",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.10"
   }
 }

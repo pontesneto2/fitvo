@@ -1,9 +1,27 @@
 /**
- * @fitvo/brand-tokens — tokens de marca compartilhados (cores, tipografia,
- * espacamento), consumidos por ui-web e ui-mobile.
+ * @fitvo/brand-tokens — tokens de marca compartilhados (rampas de cor, niveis de
+ * texto, tipografia, espacamento, raio, elevacao, movimento, foco, icones,
+ * densidade, acento por ambiente). Fonte da verdade: docs/design-system.md e
+ * docs/design-system-components.md.
  *
- * ATENCAO (D-039): design system, LOGO e paleta ainda NAO estao definidos.
- * Qualquer valor aqui e PROVISORIO. Definir formalmente em bloco de design
- * proprio antes de qualquer UI final. Esqueleto vazio na Fase 1.
+ * Framework-neutro: consumido como TS cru por ui-web (Tailwind/React) e ui-mobile
+ * (React Native). A cola de framework (preset Tailwind, ThemeProvider RN, injecao
+ * de CSS) mora nesses pacotes (design-system.md §8). Todo token de cor semantico
+ * tem par light/dark; o dark e resolvido por token (theme.ts), nunca por inversao
+ * manual no componente.
  */
-export {};
+export * from './charts';
+export * from './colors';
+export * from './density';
+export * from './elevation';
+export * from './environments';
+export * from './focus';
+export * from './icons';
+export * from './motion';
+export * from './radius';
+export * from './semantic-colors';
+export * from './sizing';
+export * from './spacing';
+export * from './theme';
+export * from './types';
+export * from './typography';

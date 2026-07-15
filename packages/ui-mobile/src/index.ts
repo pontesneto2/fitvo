@@ -9,6 +9,8 @@ export * from './checkbox';
 export * from './field';
 export * from './input';
 export * from './radio';
+export * from './select';
+export * from './select-variants';
 export * from './switch';
 export * from './textarea';
 export * from './theme-context';

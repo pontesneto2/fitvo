@@ -15,6 +15,7 @@ export * from './field-styles';
 export * from './input';
 export * from './radio';
 export * from './select';
+export * from './side-nav';
 export * from './switch';
 export * from './tabs';
 export * from './tailwind-preset';

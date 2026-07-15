@@ -31,6 +31,25 @@ const apiEnvSchema = baseEnvSchema.extend({
   // Wallet do FITVO que recebe a taxa por split (Fluxo B). Opcional/GATED: sem
   // ela nenhum split e emitido (a taxa fica capturada como dado no Charge).
   ASAAS_PLATFORM_WALLET_ID: z.string().optional(),
+  // Storage S3-compatible (ADR-0005) — LIVE GATED. Todas OPCIONAIS: sem elas a
+  // app sobe e usa o InMemoryStorage. "S3-compatible" != AWS (endpoint/path-style
+  // para MinIO/R2/Backblaze). Nunca colocar segredos reais no repo publico.
+  S3_ENDPOINT: z.string().optional(),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  S3_FORCE_PATH_STYLE: z.coerce.boolean().default(false),
+  // IA (ADR-0005/D-024) — LIVE GATED. Sem ANTHROPIC_API_KEY a app usa o
+  // FakeAIProvider deterministico. Provider inicial: Anthropic (REST via fetch).
+  ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_BASE_URL: z.string().default('https://api.anthropic.com'),
+  AI_MODEL: z.string().default('claude-3-5-sonnet-latest'),
+  // Notificacoes (ADR-0005/D-027) — providers externos GATED. Sem chaves, os
+  // canais push/email/sms caem no LoggingNotificationSender; in-app persiste.
+  FCM_SERVER_KEY: z.string().optional(),
+  EMAIL_PROVIDER_API_KEY: z.string().optional(),
+  SMS_PROVIDER_API_KEY: z.string().optional(),
 });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;

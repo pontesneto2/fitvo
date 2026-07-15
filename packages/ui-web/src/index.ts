@@ -12,6 +12,7 @@ export * from './field';
 export * from './field-styles';
 export * from './input';
 export * from './radio';
+export * from './select';
 export * from './switch';
 export * from './tailwind-preset';
 export * from './textarea';

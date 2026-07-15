@@ -10,6 +10,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 
 import type { AppDependencies } from './dependencies';
 import { authRoutes } from './modules/auth/auth-routes';
+import { clinicRoutes } from './modules/clinic/clinic-routes';
 import { registerErrorHandler } from './shared/error-handler';
 
 function firstHeader(value: string | string[] | undefined): string | undefined {
@@ -20,7 +21,8 @@ function firstHeader(value: string | string[] | undefined): string | undefined {
  * Monta a instancia Fastify da API a partir das dependencias injetadas.
  * - Seguranca de sistema grande: Helmet, CORS restrito, rate limiting (D-033).
  * - Erros RFC 7807 (D-031); logger JSON + correlation ID (D-073).
- * - Slice de auth em /v1/auth; /health e /docs (Swagger, D-032/D-034).
+ * - Slices em /v1: auth (/v1/auth) e clinica (/v1/clinic); /health e /docs
+ *   (Swagger, D-032/D-034).
  */
 export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({
@@ -60,6 +62,7 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
   }));
 
   await app.register(authRoutes(deps.authService), { prefix: '/v1/auth' });
+  await app.register(clinicRoutes(deps.clinicService), { prefix: '/v1/clinic' });
 
   if (deps.onClose) {
     const { onClose } = deps;

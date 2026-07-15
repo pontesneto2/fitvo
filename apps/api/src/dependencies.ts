@@ -7,6 +7,7 @@ import {
   RedisVerificationTokenStore,
 } from '@fitvo/auth';
 import { prisma } from '@fitvo/database';
+import { type Logger, PinoLogger } from '@fitvo/observability';
 import { AsaasPaymentGateway, FakePaymentGateway, type PaymentGateway } from '@fitvo/payments';
 import { type BondCreatedEvent, BullMqQueueFactory, SHARING_QUEUE } from '@fitvo/queue';
 import { Redis } from 'ioredis';
@@ -40,7 +41,7 @@ export interface AppDependencies {
  * usa o adaptador LIVE; sem elas (caso deste repo publico), cai para o
  * FakePaymentGateway deterministico e registra um aviso claro. A app SEMPRE sobe.
  */
-function buildPaymentGateway(env: ApiEnv): PaymentGateway {
+function buildPaymentGateway(env: ApiEnv, logger: Logger): PaymentGateway {
   if (env.ASAAS_API_KEY && env.ASAAS_WEBHOOK_SECRET) {
     return new AsaasPaymentGateway({
       apiKey: env.ASAAS_API_KEY,
@@ -48,18 +49,18 @@ function buildPaymentGateway(env: ApiEnv): PaymentGateway {
       webhookSecret: env.ASAAS_WEBHOOK_SECRET,
     });
   }
-  // eslint-disable-next-line no-console
-  console.warn(
-    JSON.stringify({
-      level: 'warn',
-      msg: 'Asaas nao configurado (ASAAS_API_KEY/ASAAS_WEBHOOK_SECRET ausentes) — usando FakePaymentGateway.',
-    }),
+  logger.warn(
+    'Asaas nao configurado (ASAAS_API_KEY/ASAAS_WEBHOOK_SECRET ausentes) — usando FakePaymentGateway.',
   );
   return new FakePaymentGateway();
 }
 
 /** Monta as dependencias reais (Prisma + Redis + Argon2 + JWT) a partir do env. */
 export function buildProductionDependencies(env: ApiEnv): AppDependencies {
+  // Logger estruturado (JSON) do adaptador de observabilidade — consumido aqui
+  // para os avisos de boot (ex.: fallback do gateway quando o Asaas nao esta
+  // configurado), no lugar de console cru.
+  const logger = PinoLogger.create({ level: env.LOG_LEVEL, name: 'api' });
   const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
   // Fabrica de filas BullMQ (D-017/D-026). A API atua como PRODUTOR: publica
   // bond.created na fila de compartilhamento; o worker consome (deteccao +
@@ -121,7 +122,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
   // verificador. O gateway e Asaas (LIVE) ou Fake conforme a config (GATED).
   const billingService = new BillingApplicationService(
     new PrismaBillingRepository(prisma),
-    buildPaymentGateway(env),
+    buildPaymentGateway(env, logger),
     authCore,
     env.ASAAS_PLATFORM_WALLET_ID ?? null,
   );

@@ -1,7 +1,8 @@
 /**
  * @fitvo/observability — contratos de log estruturado, contexto de requisicao
- * e health checks (D-073). Interfaces apenas; adaptadores (pino/OTel/Sentry)
- * entram em fase posterior.
+ * e health checks (D-073). Alem das interfaces do dominio, expoe o adaptador
+ * concreto pino (`PinoLogger`), um `NoopLogger` para testes e o agregador de
+ * health checks (`runHealthChecks`). OTel/Sentry ficam para fase posterior.
  */
 
 export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
@@ -41,3 +42,9 @@ export interface HealthCheck {
   readonly name: string;
   check(): Promise<HealthCheckResult>;
 }
+
+// Adaptadores concretos e helpers (D-073). O dominio depende das interfaces
+// acima; pino fica confinado ao PinoLogger.
+export { runHealthChecks, worstStatus } from './health';
+export { NoopLogger } from './noop-logger';
+export { PinoLogger, type PinoLoggerOptions } from './pino-logger';

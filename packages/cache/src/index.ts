@@ -1,6 +1,8 @@
 /**
  * @fitvo/cache — contrato de cache sobre Redis (D-026): get/set/delete e
- * invalidacao por padrao. Interfaces apenas; adaptador em fase posterior.
+ * invalidacao por padrao. Alem do contrato, expoe o adaptador concreto
+ * (`RedisCacheStore`, SCAN em vez de KEYS) e a store em memoria
+ * (`InMemoryCacheStore`) para testes e dev local.
  */
 
 export interface CacheSetOptions {
@@ -14,3 +16,8 @@ export interface CacheStore {
   /** Invalida chaves por padrao (ex.: "user:*"). */
   invalidate(pattern: string): Promise<void>;
 }
+
+// Adaptadores concretos (D-026). O dominio depende apenas de `CacheStore`.
+export { InMemoryCacheStore } from './in-memory-cache-store';
+export { globToRegExp } from './pattern';
+export { RedisCacheStore } from './redis-cache-store';

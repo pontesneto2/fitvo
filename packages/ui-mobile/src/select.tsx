@@ -17,12 +17,18 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
 import type { InputStatus } from './input-variants';
 import { INPUT_DIMS, resolveInputColors } from './input-variants';
-import { resolveMenuColors, resolveSelectItemColors, SELECT_MENU_DIMS } from './select-variants';
+import {
+  filterOptions,
+  resolveMenuColors,
+  resolveSelectItemColors,
+  SELECT_MENU_DIMS,
+} from './select-variants';
 import { useTheme } from './theme-context';
 
 /**
@@ -36,6 +42,9 @@ import { useTheme } from './theme-context';
  *   RN); entrada fade + slide 4px (`Animated`, `duration-fast`/`ease-out`).
  * - A11y: RN nao tem `listbox`/`option` — mapeio trigger -> `button` (state
  *   `expanded`) e item -> `menuitem` (state `selected`/`disabled`), o mais proximo.
+ * - Modo `searchable` (combobox — extensao do §3): `TextInput` no topo do menu
+ *   filtra por substring (via `filterOptions`, testavel); sem resultado, estado
+ *   vazio (§15). Sem navegacao por teclado no touch: filtra e toca.
  *
  * Controlavel: usa `value` se dado, senao estado interno.
  */
@@ -51,6 +60,11 @@ export interface SelectProps {
   readonly defaultValue?: string;
   readonly onValueChange?: (value: string) => void;
   readonly placeholder?: string;
+  /** Habilita o campo de busca no topo do menu (combobox). */
+  readonly searchable?: boolean;
+  readonly searchPlaceholder?: string;
+  /** Mensagem quando a busca nao retorna itens (estado vazio, §15). */
+  readonly emptyLabel?: string;
   readonly status?: InputStatus;
   readonly disabled?: boolean;
   readonly accessibilityLabel?: string;
@@ -87,6 +101,20 @@ const styles = StyleSheet.create({
     borderRadius: SELECT_MENU_DIMS.itemRadius,
   },
   itemLabel: { flexShrink: 1, fontFamily: fontFamily.body, fontSize: fontSize.small },
+  search: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.small,
+    paddingVertical: SELECT_MENU_DIMS.itemPaddingV,
+    paddingHorizontal: SELECT_MENU_DIMS.itemPaddingH,
+    borderBottomWidth: 1,
+    marginBottom: SELECT_MENU_DIMS.padding,
+  },
+  empty: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.small,
+    paddingVertical: SELECT_MENU_DIMS.itemPaddingV,
+    paddingHorizontal: SELECT_MENU_DIMS.itemPaddingH,
+  },
   check: {
     width: 6,
     height: 11,
@@ -103,6 +131,9 @@ export function Select({
   defaultValue,
   onValueChange,
   placeholder = 'Selecione…',
+  searchable = false,
+  searchPlaceholder = 'Buscar…',
+  emptyLabel = 'Nenhum resultado',
   status = 'default',
   disabled = false,
   accessibilityLabel,
@@ -114,6 +145,13 @@ export function Select({
   const selectedOption = options.find((o) => o.value === selected);
 
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const visible = searchable ? filterOptions(options, query) : options;
+
+  const closeMenu = (): void => {
+    setOpen(false);
+    setQuery('');
+  };
 
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -139,7 +177,7 @@ export function Select({
     if (o.disabled) return;
     if (!isControlled) setInternal(o.value);
     onValueChange?.(o.value);
-    setOpen(false);
+    closeMenu();
   };
 
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [4, 0] });
@@ -177,8 +215,8 @@ export function Select({
         />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={closeMenu}>
+        <Pressable style={styles.backdrop} onPress={closeMenu}>
           <Animated.View
             style={[
               styles.menu,
@@ -192,8 +230,27 @@ export function Select({
           >
             {/* Pressable "vazio" para o toque no painel nao vazar para o backdrop. */}
             <Pressable onPress={() => undefined}>
+              {searchable ? (
+                <TextInput
+                  autoFocus
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder={searchPlaceholder}
+                  placeholderTextColor={theme.colors.textSutil}
+                  accessibilityLabel={searchPlaceholder}
+                  style={[
+                    styles.search,
+                    { color: theme.colors.textPrincipal, borderBottomColor: menu.borderColor },
+                  ]}
+                />
+              ) : null}
               <ScrollView bounces={false}>
-                {options.map((o): ReactNode => {
+                {searchable && visible.length === 0 ? (
+                  <Text style={[styles.empty, { color: theme.colors.textSutil }]}>
+                    {emptyLabel}
+                  </Text>
+                ) : null}
+                {visible.map((o): ReactNode => {
                   const isSelected = o.value === selected;
                   return (
                     <Pressable

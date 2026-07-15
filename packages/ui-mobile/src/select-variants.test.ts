@@ -2,6 +2,7 @@ import { colors, white } from '@fitvo/brand-tokens';
 import { describe, expect, it } from 'vitest';
 
 import {
+  filterOptions,
   resolveMenuColors,
   resolveSelectItemColors,
   type SelectItemTextColors,
@@ -57,5 +58,28 @@ describe('resolveSelectItemColors (§3)', () => {
       textColor: TEXT.sutil,
       checkColor: 'transparent',
     });
+  });
+});
+
+describe('filterOptions (busca do modo searchable)', () => {
+  const OPTS = [
+    { value: 'a', label: 'Abacaxi' },
+    { value: 'b', label: 'Banana' },
+    { value: 'c', label: 'Cereja' },
+  ];
+
+  it('query vazia devolve tudo (copia, nao a mesma referencia)', () => {
+    const out = filterOptions(OPTS, '   ');
+    expect(out).toHaveLength(3);
+    expect(out).not.toBe(OPTS);
+  });
+
+  it('filtra por substring case-insensitive', () => {
+    expect(filterOptions(OPTS, 'an').map((o) => o.value)).toEqual(['b']);
+    expect(filterOptions(OPTS, 'AB').map((o) => o.value)).toEqual(['a']);
+  });
+
+  it('sem correspondencia devolve lista vazia', () => {
+    expect(filterOptions(OPTS, 'zzz')).toEqual([]);
   });
 });

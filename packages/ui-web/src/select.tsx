@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from 'react';
+import type { ChangeEvent, KeyboardEvent, ReactNode } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { cn } from './cn';
@@ -19,6 +19,13 @@ import { fieldBase, fieldStatusClasses } from './field-styles';
  *   (`brand-50`+`brand-700`, com check `brand-500`) / disabled.
  * - A11y: `role="listbox"`/`option`, foco gerenciado no menu com
  *   `aria-activedescendant`, setas/Home/End/Enter/Esc/Tab + typeahead.
+ *
+ * Modo `searchable` (combobox — extensao do §3, nao um 2o componente): um campo de
+ * busca no topo do menu filtra os itens por substring do rotulo. O campo vira o
+ * `role="combobox"` (foco + `aria-activedescendant` migram para ele; a lista some do
+ * fluxo de foco); sem resultado, mostra o estado vazio obrigatorio (§15). Busca nao
+ * especificada no §3 -> UI construida so com tokens do sistema (campo transparente
+ * `fg`/`line`, itens iguais aos do §3).
  *
  * Controlavel: usa `value` se dado, senao um estado interno. Integra com `Field`
  * (recebe `id`/`aria-describedby`/`status` via clone).
@@ -46,6 +53,12 @@ export interface SelectProps {
   readonly onValueChange?: (value: string) => void;
   /** Texto exibido quando nada esta selecionado. */
   readonly placeholder?: string;
+  /** Habilita o campo de busca no topo do menu (combobox). */
+  readonly searchable?: boolean;
+  /** Placeholder do campo de busca (quando `searchable`). */
+  readonly searchPlaceholder?: string;
+  /** Mensagem quando a busca nao retorna itens (estado vazio, §15). */
+  readonly emptyLabel?: string;
   readonly status?: SelectStatus;
   readonly disabled?: boolean;
   /** Quando dado, emite um `<input type="hidden">` para envio em formularios. */
@@ -88,6 +101,13 @@ function typeaheadIndex(options: readonly SelectOption[], buffer: string, from: 
     if (o && !o.disabled && o.label.toLowerCase().startsWith(lower)) return i;
   }
   return -1;
+}
+
+/** Filtra por substring do rotulo (case-insensitive). Query vazia -> lista inteira. */
+function filterOptions(options: readonly SelectOption[], query: string): readonly SelectOption[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return options;
+  return options.filter((o) => o.label.toLowerCase().includes(q));
 }
 
 function itemClasses(active: boolean, selected: boolean, disabled: boolean): string {
@@ -137,12 +157,29 @@ function CheckIcon(): ReactNode {
   );
 }
 
+function SearchIcon(): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="h-4 w-4 shrink-0 text-fg-subtle"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="7" cy="7" r="4.25" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function Select({
   options,
   value,
   defaultValue,
   onValueChange,
   placeholder = 'Selecione…',
+  searchable = false,
+  searchPlaceholder = 'Buscar…',
+  emptyLabel = 'Nenhum resultado',
   status = 'default',
   disabled = false,
   name,
@@ -159,6 +196,7 @@ export function Select({
   const [open, setOpen] = useState(false);
   const [entered, setEntered] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [query, setQuery] = useState('');
 
   const autoId = useId();
   const rootId = id ?? autoId;
@@ -168,43 +206,50 @@ export function Select({
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const typeahead = useRef<{ buffer: string; timer: number | undefined }>({
     buffer: '',
     timer: undefined,
   });
 
-  const selectedIndex = options.findIndex((o) => o.value === selected);
-  const selectedOption = selectedIndex >= 0 ? options[selectedIndex] : undefined;
+  // Itens visiveis: filtrados pela busca quando `searchable`; senao, todos.
+  const visible = searchable ? filterOptions(options, query) : options;
+
+  // Rotulo do trigger vem de TODAS as opcoes (o selecionado pode estar filtrado fora).
+  const selectedOption = options.find((o) => o.value === selected);
+  const selectedVisibleIndex = visible.findIndex((o) => o.value === selected);
 
   const openMenu = (): void => {
     if (disabled) return;
-    setActiveIndex(selectedIndex >= 0 ? selectedIndex : firstEnabled(options));
+    setActiveIndex(selectedVisibleIndex >= 0 ? selectedVisibleIndex : firstEnabled(visible));
     setOpen(true);
   };
 
   const closeMenu = (focusTrigger: boolean): void => {
     setOpen(false);
+    setQuery('');
     if (focusTrigger) buttonRef.current?.focus();
   };
 
   const choose = (i: number): void => {
-    const o = options[i];
+    const o = visible[i];
     if (!o || o.disabled) return;
     if (!isControlled) setInternal(o.value);
     onValueChange?.(o.value);
     closeMenu(true);
   };
 
-  // Entrada animada + foco no menu ao abrir.
+  // Entrada animada + foco no menu ao abrir (campo de busca ou a propria lista).
   useEffect(() => {
     if (!open) {
       setEntered(false);
       return;
     }
-    listRef.current?.focus();
+    if (searchable) searchRef.current?.focus();
+    else listRef.current?.focus();
     const raf = requestAnimationFrame(() => setEntered(true));
     return () => cancelAnimationFrame(raf);
-  }, [open]);
+  }, [open, searchable]);
 
   // Fecha ao clicar fora (sem roubar foco de volta ao trigger).
   useEffect(() => {
@@ -220,34 +265,41 @@ export function Select({
     const t = typeahead.current;
     if (t.timer !== undefined) clearTimeout(t.timer);
     t.buffer += char;
-    const from = activeIndex >= 0 ? activeIndex : selectedIndex >= 0 ? selectedIndex : 0;
-    const idx = typeaheadIndex(options, t.buffer, from);
+    const from =
+      activeIndex >= 0 ? activeIndex : selectedVisibleIndex >= 0 ? selectedVisibleIndex : 0;
+    const idx = typeaheadIndex(visible, t.buffer, from);
     if (idx >= 0) setActiveIndex(idx);
     t.timer = window.setTimeout(() => {
       t.buffer = '';
     }, 500);
   };
 
-  const onListKeyDown = (e: KeyboardEvent<HTMLUListElement>): void => {
+  const onQueryChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const next = e.target.value;
+    setQuery(next);
+    setActiveIndex(firstEnabled(filterOptions(options, next)));
+  };
+
+  /** Navegacao por teclado. `typing=true` no campo de busca: espaco/letras digitam. */
+  const handleNav = (e: KeyboardEvent<HTMLElement>, typing: boolean): void => {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setActiveIndex((i) => nextEnabled(options, i, 1));
+        setActiveIndex((i) => nextEnabled(visible, i, 1));
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setActiveIndex((i) => nextEnabled(options, i, -1));
+        setActiveIndex((i) => nextEnabled(visible, i, -1));
         break;
       case 'Home':
         e.preventDefault();
-        setActiveIndex(firstEnabled(options));
+        setActiveIndex(firstEnabled(visible));
         break;
       case 'End':
         e.preventDefault();
-        setActiveIndex(lastEnabled(options));
+        setActiveIndex(lastEnabled(visible));
         break;
       case 'Enter':
-      case ' ':
         e.preventDefault();
         if (activeIndex >= 0) choose(activeIndex);
         break;
@@ -258,8 +310,14 @@ export function Select({
       case 'Tab':
         closeMenu(false);
         break;
+      case ' ':
+        if (!typing) {
+          e.preventDefault();
+          if (activeIndex >= 0) choose(activeIndex);
+        }
+        break;
       default:
-        if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (!typing && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
           e.preventDefault();
           runTypeahead(e.key);
         }
@@ -273,6 +331,9 @@ export function Select({
       openMenu();
     }
   };
+
+  const activeDescendant =
+    activeIndex >= 0 && visible.length > 0 ? optionId(activeIndex) : undefined;
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
@@ -305,44 +366,75 @@ export function Select({
       {name ? <input type="hidden" name={name} value={selected ?? ''} /> : null}
 
       {open ? (
-        <ul
-          ref={listRef}
-          id={listboxId}
-          role="listbox"
-          tabIndex={-1}
-          aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
-          aria-label={ariaLabel}
-          aria-labelledby={ariaLabelledby}
-          onKeyDown={onListKeyDown}
+        <div
           className={cn(
-            'absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-md border border-line bg-surface-raised p-1 shadow-raised',
-            'transition duration-fast ease-out focus:outline-none motion-reduce:transition-none',
+            'absolute left-0 right-0 z-50 mt-1 rounded-md border border-line bg-surface-raised p-1 shadow-raised',
+            'transition duration-fast ease-out motion-reduce:transition-none',
             entered ? 'translate-y-0 opacity-100' : '-translate-y-1 opacity-0',
           )}
         >
-          {options.map((o, i): ReactNode => {
-            const isSelected = o.value === selected;
-            const isActive = i === activeIndex;
-            return (
-              <li
-                key={o.value}
-                id={optionId(i)}
-                role="option"
-                aria-selected={isSelected}
-                aria-disabled={o.disabled || undefined}
-                onClick={() => choose(i)}
-                className={cn(
-                  'flex select-none items-center justify-between gap-2 rounded-sm px-3 py-2 text-small',
-                  o.disabled ? '' : 'cursor-pointer',
-                  itemClasses(isActive, isSelected, o.disabled ?? false),
-                )}
-              >
-                <span className="truncate">{o.label}</span>
-                {isSelected ? <CheckIcon /> : null}
+          {searchable ? (
+            <div className="mb-1 flex items-center gap-2 border-b border-line px-2 pb-1.5">
+              <SearchIcon />
+              <input
+                ref={searchRef}
+                type="text"
+                role="combobox"
+                aria-expanded
+                aria-controls={listboxId}
+                aria-activedescendant={activeDescendant}
+                aria-autocomplete="list"
+                aria-label={ariaLabel ?? searchPlaceholder}
+                value={query}
+                placeholder={searchPlaceholder}
+                onChange={onQueryChange}
+                onKeyDown={(e) => handleNav(e, true)}
+                className="w-full bg-transparent text-small text-fg placeholder:text-fg-subtle focus:outline-none"
+              />
+            </div>
+          ) : null}
+
+          <ul
+            ref={listRef}
+            id={listboxId}
+            role="listbox"
+            tabIndex={searchable ? undefined : -1}
+            aria-activedescendant={searchable ? undefined : activeDescendant}
+            aria-label={ariaLabel}
+            aria-labelledby={ariaLabelledby}
+            onKeyDown={searchable ? undefined : (e) => handleNav(e, false)}
+            className="max-h-60 overflow-auto focus:outline-none"
+          >
+            {visible.length === 0 ? (
+              <li role="presentation" className="px-3 py-2 text-small text-fg-subtle">
+                {emptyLabel}
               </li>
-            );
-          })}
-        </ul>
+            ) : (
+              visible.map((o, i): ReactNode => {
+                const isSelected = o.value === selected;
+                const isActive = i === activeIndex;
+                return (
+                  <li
+                    key={o.value}
+                    id={optionId(i)}
+                    role="option"
+                    aria-selected={isSelected}
+                    aria-disabled={o.disabled || undefined}
+                    onClick={() => choose(i)}
+                    className={cn(
+                      'flex select-none items-center justify-between gap-2 rounded-sm px-3 py-2 text-small',
+                      o.disabled ? '' : 'cursor-pointer',
+                      itemClasses(isActive, isSelected, o.disabled ?? false),
+                    )}
+                  >
+                    <span className="truncate">{o.label}</span>
+                    {isSelected ? <CheckIcon /> : null}
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
       ) : null}
     </div>
   );

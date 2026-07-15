@@ -114,3 +114,61 @@ describe('Select (web)', () => {
     );
   });
 });
+
+/** Rotulo apontado por `aria-activedescendant` do campo de busca (combobox). */
+function comboActiveLabel(): string | null {
+  const cb = screen.getByRole('combobox');
+  const id = cb.getAttribute('aria-activedescendant');
+  return id ? (document.getElementById(id)?.textContent ?? null) : null;
+}
+
+describe('Select searchable (combobox, extensao do §3)', () => {
+  it('abre com um campo role=combobox e filtra por substring do rotulo', () => {
+    render(<Select options={OPTIONS} aria-label="Fruta" searchable />);
+    fireEvent.click(screen.getByRole('button'));
+    const search = screen.getByRole('combobox');
+    expect(search).toBeTruthy();
+    expect(screen.getAllByRole('option')).toHaveLength(4);
+    fireEvent.change(search, { target: { value: 'da' } });
+    const opts = screen.getAllByRole('option');
+    expect(opts).toHaveLength(1);
+    expect(opts[0]?.textContent).toContain('Damasco');
+  });
+
+  it('busca sem resultado mostra o estado vazio e nenhuma option', () => {
+    render(<Select options={OPTIONS} aria-label="Fruta" searchable emptyLabel="Nada aqui" />);
+    fireEvent.click(screen.getByRole('button'));
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'zzz' } });
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(screen.getByText('Nada aqui')).toBeTruthy();
+  });
+
+  it('teclado no campo de busca: setas pulam disabled e Enter seleciona o filtrado', () => {
+    const onValueChange = vi.fn();
+    render(
+      <Select options={OPTIONS} aria-label="Fruta" searchable onValueChange={onValueChange} />,
+    );
+    fireEvent.click(screen.getByRole('button'));
+    const search = screen.getByRole('combobox');
+    // 'a' casa Abacaxi, Banana (disabled), Cereja e Damasco; ativo comeca em Abacaxi.
+    fireEvent.change(search, { target: { value: 'a' } });
+    expect(comboActiveLabel()).toBe('Abacaxi');
+    fireEvent.keyDown(search, { key: 'ArrowDown' }); // pula Banana (disabled)
+    expect(comboActiveLabel()).toBe('Cereja');
+    fireEvent.keyDown(search, { key: 'Enter' });
+    expect(onValueChange).toHaveBeenCalledWith('c');
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('espaco digita no campo de busca (nao seleciona)', () => {
+    const onValueChange = vi.fn();
+    render(
+      <Select options={OPTIONS} aria-label="Fruta" searchable onValueChange={onValueChange} />,
+    );
+    fireEvent.click(screen.getByRole('button'));
+    const search = screen.getByRole('combobox') as HTMLInputElement;
+    fireEvent.keyDown(search, { key: ' ' });
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('combobox')).toBeTruthy();
+  });
+});

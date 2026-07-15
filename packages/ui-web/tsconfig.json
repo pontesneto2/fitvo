@@ -1,5 +1,5 @@
 {
-  "extends": "@fitvo/typescript-config/base.json",
-  "include": ["src/**/*.ts"],
+  "extends": "@fitvo/typescript-config/react-library.json",
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist"]
 }

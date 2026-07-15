@@ -30,6 +30,40 @@ crítica, não opcional. Bots varrem repositórios públicos em minutos.
 
 ---
 
+## Política de Merge — revisão humana obrigatória em áreas críticas
+
+O CI verde prova que o código compila e passa nos testes. NÃO prova que a regra
+de negócio está correta. Por isso, o auto-merge com `--admin` é permitido apenas
+em áreas de baixo risco.
+
+**AUTO-MERGE PERMITIDO (CI verde é gate suficiente):**
+- Infraestrutura, tooling, configs, CI
+- Design system, tokens, primitivos de UI
+- Documentação
+- Refactors sem mudança de comportamento
+- Upgrades de dependência
+
+**REVISÃO HUMANA OBRIGATÓRIA ANTES DO MERGE (nunca auto-mergear):**
+- **Financeiro** — qualquer coisa em `payments`, billing, split, subconta, fee,
+  cobrança, assinatura, webhook de pagamento, reembolso/estorno. Erro aqui custa
+  dinheiro real de terceiros.
+- **Consentimento e compartilhamento** — Consent, motor de compartilhamento,
+  qualquer regra que decida quem vê dado de quem. Erro aqui é violação de LGPD.
+- **Autenticação e autorização** — auth, RBAC, isolamento de tenant, guards de
+  repositório. Erro aqui é vazamento entre tenants.
+- **Dado clínico** — qualquer acesso a anamnese, avaliação, prontuário,
+  prescrição. Erro aqui é sigilo médico.
+- **Migrations destrutivas** — qualquer migration que remova ou altere coluna
+  com dado existente.
+
+Nessas áreas: abra o PR, apresente o diff e AGUARDE aprovação explícita do
+responsável. Não use `--admin`. Não mergeie por conta própria mesmo com CI verde.
+
+Se uma mudança tocar área crítica E não-crítica ao mesmo tempo, trate como
+crítica.
+
+---
+
 ## Missão
 
 FITVO é um SaaS premium multi-especialidade de saúde e fitness — um ecossistema

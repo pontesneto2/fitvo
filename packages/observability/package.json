@@ -15,14 +15,14 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "pino": "^9.5.0"
+    "pino": "^10.3.1"
   },
   "devDependencies": {
     "@fitvo/eslint-config": "workspace:*",
     "@fitvo/typescript-config": "workspace:*",
-    "@types/node": "^20.16.0",
-    "eslint": "^9.13.0",
+    "@types/node": "^26.1.1",
+    "eslint": "^10.7.0",
     "typescript": "^5.6.2",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.10"
   }
 }

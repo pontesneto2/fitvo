@@ -31,8 +31,7 @@ const base = cn(
   'rounded-md font-body font-medium leading-none',
   'transition-[color,background-color,border-color,box-shadow,transform] duration-fast ease-standard',
   'active:scale-[0.98]',
-  'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-offset-2',
-  'focus-visible:ring-offset-white dark:focus-visible:ring-offset-neutral-900',
+  'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
   'disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none disabled:active:scale-100',
 );
 
@@ -47,34 +46,34 @@ const variantClasses: Record<ButtonVariant, string> = {
   primary: cn(
     'bg-brand-500 text-white shadow-subtle',
     'hover:bg-brand-600 active:bg-brand-700',
-    'focus-visible:ring-brand-300 dark:focus-visible:ring-brand-400',
-    'disabled:bg-neutral-200 disabled:text-text-sutil',
+    'focus-visible:ring-focus',
+    'disabled:bg-neutral-200 disabled:text-fg-subtle',
   ),
   energy: cn(
     'bg-energy-400 text-brand-900 shadow-subtle',
     'hover:bg-energy-500 active:bg-energy-600 active:text-white',
-    'focus-visible:ring-brand-300 dark:focus-visible:ring-brand-400',
-    'disabled:bg-neutral-200 disabled:text-text-sutil',
+    'focus-visible:ring-focus',
+    'disabled:bg-neutral-200 disabled:text-fg-subtle',
   ),
   secondary: cn(
-    'border border-neutral-200 bg-transparent text-brand-600',
+    'border border-line bg-transparent text-brand-600',
     'hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700',
     'active:border-brand-500 active:bg-brand-100 active:text-brand-800',
-    'focus-visible:border-brand-500 focus-visible:ring-brand-300 dark:focus-visible:ring-brand-400',
-    'disabled:border-neutral-200 disabled:bg-transparent disabled:text-text-sutil',
+    'focus-visible:border-brand-500 focus-visible:ring-focus',
+    'disabled:border-line disabled:bg-transparent disabled:text-fg-subtle',
   ),
   ghost: cn(
     'bg-transparent text-brand-600',
     'hover:bg-neutral-100 hover:text-brand-700',
     'active:bg-neutral-200 active:text-brand-800',
-    'focus-visible:ring-brand-300 dark:focus-visible:ring-brand-400',
-    'disabled:bg-transparent disabled:text-text-sutil',
+    'focus-visible:ring-focus',
+    'disabled:bg-transparent disabled:text-fg-subtle',
   ),
   destructive: cn(
     'bg-danger-400 text-white',
     'hover:bg-danger-500 active:bg-danger-600',
     'focus-visible:ring-danger-200',
-    'disabled:bg-neutral-200 disabled:text-text-sutil',
+    'disabled:bg-neutral-200 disabled:text-fg-subtle',
   ),
 };
 

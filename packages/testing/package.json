@@ -16,13 +16,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.10"
   },
   "devDependencies": {
     "@fitvo/eslint-config": "workspace:*",
     "@fitvo/typescript-config": "workspace:*",
     "@types/node": "^26.1.1",
     "eslint": "^10.7.0",
-    "typescript": "^7.0.2"
+    "typescript": "^5.6.2"
   }
 }

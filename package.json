@@ -6,7 +6,7 @@
   "description": "FITVO — SaaS multi-especialidade de saude e fitness (monorepo).",
   "packageManager": "pnpm@10.15.0",
   "engines": {
-    "node": ">=20",
+    "node": ">=22.12",
     "pnpm": ">=10"
   },
   "scripts": {

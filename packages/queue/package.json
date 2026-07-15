@@ -15,7 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "bullmq": "^5.28.0",
+    "bullmq": "^5.80.4",
     "ioredis": "^5.11.1"
   },
   "devDependencies": {
@@ -23,7 +23,7 @@
     "@fitvo/typescript-config": "workspace:*",
     "@types/node": "^26.1.1",
     "eslint": "^10.7.0",
-    "typescript": "^7.0.2",
-    "vitest": "^3.0.0"
+    "typescript": "^5.6.2",
+    "vitest": "^4.1.10"
   }
 }

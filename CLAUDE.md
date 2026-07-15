@@ -245,26 +245,10 @@ comportamentais e verificáveis — devem ser seguidas sem exceção.
   NÃO adotar antes dessa decisão. Não se aplica ao mobile (React Native/Expo).
 ---
 
-## Próximo Passo — FASE 1 (Fundação Técnica, sem regra de negócio)
+## Plano de Execução
 
-O planejamento estrutural está completo (ver `docs/adr/`). A Fase 1 monta o
-esqueleto. Ordem sugerida de execução:
-
-1. Inicializar o monorepo (Turborepo + pnpm workspaces) com a estrutura de
-   `apps/` e `packages/` acima — pastas e `package.json` de cada workspace,
-   ainda vazios de regra de negócio.
-2. Configurar tooling base: TypeScript strict (`typescript-config`), ESLint
-   (`eslint-config`), Prettier, EditorConfig, Husky + lint-staged.
-3. Configurar Docker (Postgres + Redis locais) e o `docker-compose` de dev.
-4. Estruturar variáveis de ambiente e secrets por ambiente (dev/staging/prod),
-   sem valores reais versionados.
-5. Configurar o pipeline de CI (GitHub Actions): lint, typecheck, testes, build,
-   security scan, dependency scan — com bloqueio de merge.
-6. Preparar os packages de abstração como esqueleto (interfaces primeiro):
-   `auth`, `payments`, `ai`, `storage`, `cache`, `queue`, `notifications`,
-   `observability`.
-7. Configurar o `database` (Prisma) com o client e a base de migrations — sem
-   modelar entidades de negócio ainda.
-
-**Nenhuma regra de negócio nesta fase.** O repositório é público — nenhum segredo pode ser commitado (ver aviso no topo). Ao final da Fase 1, revisar com o responsável antes de abrir a Fase 2
-(autenticação e usuários).
+A Fase 1 (fundação técnica) está concluída. O plano de execução completo — o
+que está feito (com PR), em andamento, pendente (com ordem), e o que está
+bloqueado por decisão do responsável ou por terceiros (jurídico, credenciais,
+design) — vive em **`docs/roadmap.md`**. É a fonte única do plano; nenhum
+backlog interno de sessão o substitui.

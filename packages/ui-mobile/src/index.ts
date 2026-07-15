@@ -16,6 +16,8 @@ export * from './radio';
 export * from './select';
 export * from './select-variants';
 export * from './switch';
+export * from './tabs';
+export * from './tabs-variants';
 export * from './textarea';
 export * from './theme-context';
 export * from './themes';

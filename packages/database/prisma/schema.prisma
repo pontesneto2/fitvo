@@ -144,6 +144,13 @@ model Tenant {
   paymentAccount PaymentAccount? // subconta Asaas + taxa por tenant (ADR-0004/D-058)
   subscriptions  Subscription[] // assinaturas de plano da plataforma (Fluxo A)
   charges        Charge[] // cobrancas paciente->profissional (Fluxo B, via split)
+  workouts       Workout[] // conteudo de treino escopado ao tenant (ADR-0006)
+  mealPlans      MealPlan[] // conteudo de nutricao escopado ao tenant (ADR-0006)
+  encounters     Encounter[] // atendimentos escopados ao tenant (ADR-0006)
+  medicalRecords MedicalRecord[] // prontuarios escopados ao tenant (ADR-0006)
+  prescriptions  Prescription[] // folhas de receita escopadas ao tenant (ADR-0006)
+  assessments    Assessment[] // anamnese/avaliacao escopadas ao tenant (ADR-0006)
+  progressPhotos ProgressPhoto[] // fotos de evolucao escopadas ao tenant (ADR-0006)
 
   @@map("tenant")
 }
@@ -187,6 +194,8 @@ model ProfessionalProfile {
   consentsReceived Consent[] // consentimentos em que este profissional e o grantee (D-016)
   suggestionsAsA   SharingSuggestion[]     @relation("SuggestionProfessionalA")
   suggestionsAsB   SharingSuggestion[]     @relation("SuggestionProfessionalB")
+  ownedExercises   Exercise[] // itens de biblioteca proprios do profissional (privados — ADR-0006)
+  ownedFoods       Food[] // itens de biblioteca proprios do profissional (privados — ADR-0006)
 
   @@index([tenantId])
   @@map("professional_profile")
@@ -203,6 +212,8 @@ model Specialty {
   bonds              Bond[]
   consents           Consent[]
   sharingSuggestions SharingSuggestion[]
+  exercises          Exercise[] // exercicios de biblioteca desta especialidade (ADR-0006)
+  foods              Food[] // alimentos de biblioteca desta especialidade (ADR-0006)
 
   @@map("specialty")
 }
@@ -326,6 +337,12 @@ model Bond {
   professionalProfile ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
   specialty           Specialty           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
   charges             Charge[] // cobrancas penduram no vinculo (Fluxo B — ADR-0004)
+  workouts            Workout[] // treinos isolados por vinculo (ADR-0006/ADR-0001)
+  mealPlans           MealPlan[] // planos alimentares isolados por vinculo (ADR-0006/ADR-0001)
+  encounters          Encounter[] // atendimentos isolados por vinculo (ADR-0006/ADR-0001)
+  medicalRecord       MedicalRecord? // prontuario (um por vinculo — ADR-0006/ADR-0001)
+  assessments         Assessment[] // anamnese/avaliacao isoladas por vinculo (ADR-0006/ADR-0001)
+  progressPhotos      ProgressPhoto[] // fotos de evolucao isoladas por vinculo (ADR-0006/ADR-0001)
 
   @@unique([patientProfileId, professionalProfileId, specialtyId])
   @@index([tenantId])
@@ -592,4 +609,260 @@ model WebhookEvent {
   createdAt    DateTime @default(now())
 
   @@map("webhook_event")
+}
+
+// ---------------------------------------------------------------------------
+// Conteudo (esqueleto — ADR-0006 "Dominios de conteudo: esqueleto, detalhar
+// por fase"). DISCIPLINA DELIBERADA: apenas ENTIDADES + RELACOES estruturais
+// (ids, escopo/owner FKs, titulo estrutural, visibilidade, timestamps). TODO o
+// detalhe fino por especialidade — series/reps/carga, composicao/macros, campos
+// de anamnese, conteudo de prontuario/receita — e DEFERIDO para `detail Json?`
+// com marcador TODO(D-063), NAO inventado aqui. Modelos ligados a vinculo (Bond)
+// carregam tenantId denormalizado para escopo (D-002) e sao isolados POR VINCULO
+// (ADR-0001). Bibliotecas (Exercise/Food) = base compartilhada da plataforma +
+// itens do profissional (privados por padrao). Datas em UTC (D-067).
+// ---------------------------------------------------------------------------
+
+/// Visibilidade de um item de biblioteca (D-063 / ADR-0006). PLATFORM = base
+/// compartilhada da plataforma (sem dono); PRIVATE = item proprio do profissional
+/// (privado por padrao). O owner FK + visibilidade juntos modelam a regra.
+enum LibraryVisibility {
+  PLATFORM // item da biblioteca compartilhada da plataforma (sem dono)
+  PRIVATE // item proprio do profissional, privado por padrao
+}
+
+// --- Treino ----------------------------------------------------------------
+
+/// Item da biblioteca de exercicios (D-063). Base compartilhada da plataforma
+/// (ownerProfessionalProfileId nulo + visibility PLATFORM) OU item proprio do
+/// profissional (owner preenchido + PRIVATE por padrao). specialtyId estrutural
+/// (ex.: TRAINING). Detalhe fino do exercicio deferido para `detail Json?`.
+model Exercise {
+  id                         String            @id @default(cuid())
+  ownerProfessionalProfileId String? // nulo = item da plataforma; preenchido = item do profissional
+  specialtyId                String? // especialidade a que o exercicio pertence (estrutural)
+  name                       String
+  visibility                 LibraryVisibility @default(PRIVATE) // itens do profissional privados por padrao
+  detail                     Json? // TODO(D-063): campos finos por fase — nao inventar
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
+
+  ownerProfessionalProfile ProfessionalProfile? @relation(fields: [ownerProfessionalProfileId], references: [id], onDelete: Cascade)
+  specialty                Specialty?           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+  workoutItems             WorkoutItem[]
+
+  @@index([ownerProfessionalProfileId])
+  @@index([specialtyId])
+  @@index([visibility])
+  @@map("exercise")
+}
+
+/// Treino de um paciente, atado a um VINCULO (Bond — D-052). tenantId
+/// denormalizado para escopo (D-002). A estrutura de series/reps/carga vive nos
+/// itens (WorkoutItem.detail), deferida (TODO D-063). Datas em UTC (D-067).
+model Workout {
+  id        String   @id @default(cuid())
+  tenantId  String // tenant do profissional (escopo denormalizado — D-002)
+  bondId    String // vinculo dono do treino (isolamento por vinculo — ADR-0001)
+  title     String
+  detail    Json? // TODO(D-063): campos finos por fase — nao inventar
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond   Bond          @relation(fields: [bondId], references: [id], onDelete: Cascade)
+  items  WorkoutItem[]
+
+  @@index([bondId])
+  @@index([tenantId])
+  @@map("workout")
+}
+
+/// Item de um treino: referencia opcional a um exercicio da biblioteca + ordem.
+/// series/reps/carga sao DETALHE deferido para `detail Json?` (TODO D-063). Nao
+/// modelamos campos de treino regulados aqui.
+model WorkoutItem {
+  id         String   @id @default(cuid())
+  workoutId  String
+  exerciseId String? // exercicio da biblioteca (opcional; item livre permitido)
+  position   Int      @default(0) // ordem estrutural dentro do treino
+  detail     Json? // TODO(D-063): series/reps/carga por fase — nao inventar
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  workout  Workout   @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise? @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+
+  @@index([workoutId])
+  @@index([exerciseId])
+  @@map("workout_item")
+}
+
+// --- Nutricao --------------------------------------------------------------
+
+/// Item da biblioteca de alimentos (D-063). Mesmo modelo de biblioteca do
+/// Exercise: base da plataforma (PLATFORM, sem dono) OU item do profissional
+/// (PRIVATE por padrao). Composicao/macros deferidos para `detail Json?`.
+model Food {
+  id                         String            @id @default(cuid())
+  ownerProfessionalProfileId String? // nulo = item da plataforma; preenchido = item do profissional
+  specialtyId                String? // especialidade (ex.: NUTRITION) — estrutural
+  name                       String
+  visibility                 LibraryVisibility @default(PRIVATE)
+  detail                     Json? // TODO(D-063): composicao/macros por fase — nao inventar
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
+
+  ownerProfessionalProfile ProfessionalProfile? @relation(fields: [ownerProfessionalProfileId], references: [id], onDelete: Cascade)
+  specialty                Specialty?           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+  mealPlanItems            MealPlanItem[]
+
+  @@index([ownerProfessionalProfileId])
+  @@index([specialtyId])
+  @@index([visibility])
+  @@map("food")
+}
+
+/// Plano alimentar de um paciente, atado a um VINCULO (Bond). tenantId
+/// denormalizado para escopo (D-002). Composicao/macros deferidos aos itens
+/// (MealPlanItem.detail — TODO D-063). Datas em UTC (D-067).
+model MealPlan {
+  id        String   @id @default(cuid())
+  tenantId  String // escopo denormalizado (D-002)
+  bondId    String // isolamento por vinculo (ADR-0001)
+  title     String
+  detail    Json? // TODO(D-063): campos finos por fase — nao inventar
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond   Bond           @relation(fields: [bondId], references: [id], onDelete: Cascade)
+  items  MealPlanItem[]
+
+  @@index([bondId])
+  @@index([tenantId])
+  @@map("meal_plan")
+}
+
+/// Item de um plano alimentar: referencia opcional a um alimento da biblioteca +
+/// ordem. Porcoes/macros sao DETALHE deferido para `detail Json?` (TODO D-063).
+model MealPlanItem {
+  id         String   @id @default(cuid())
+  mealPlanId String
+  foodId     String? // alimento da biblioteca (opcional; item livre permitido)
+  position   Int      @default(0) // ordem estrutural dentro do plano
+  detail     Json? // TODO(D-063): porcoes/macros por fase — nao inventar
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  mealPlan MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  food     Food?    @relation(fields: [foodId], references: [id], onDelete: SetNull)
+
+  @@index([mealPlanId])
+  @@index([foodId])
+  @@map("meal_plan_item")
+}
+
+// --- Medico ----------------------------------------------------------------
+
+/// Atendimento medico, atado a um VINCULO (Bond). Apenas estrutural: escopo +
+/// vinculo + quando ocorreu. Conteudo clinico deferido para `detail Json?`
+/// (TODO D-063). Isolado por vinculo (ADR-0001). Datas em UTC (D-067).
+model Encounter {
+  id         String    @id @default(cuid())
+  tenantId   String // escopo denormalizado (D-002)
+  bondId     String // isolamento por vinculo (ADR-0001)
+  occurredAt DateTime? // quando o atendimento ocorreu (estrutural; UTC)
+  detail     Json? // TODO(D-063): conteudo clinico por fase — nao inventar
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond          Bond           @relation(fields: [bondId], references: [id], onDelete: Cascade)
+  prescriptions Prescription[]
+
+  @@index([bondId])
+  @@index([tenantId])
+  @@map("encounter")
+}
+
+/// Prontuario, atado a um VINCULO (Bond) — um por vinculo (@unique bondId): o
+/// container acumula o historico; as entradas finas sao deferidas para
+/// `detail Json?` (TODO D-063). Nenhum campo clinico modelado aqui. Isolado por
+/// vinculo (ADR-0001). Datas em UTC (D-067).
+model MedicalRecord {
+  id        String   @id @default(cuid())
+  tenantId  String // escopo denormalizado (D-002)
+  bondId    String   @unique // um prontuario por vinculo (isolamento — ADR-0001)
+  detail    Json? // TODO(D-063): entradas do prontuario por fase — nao inventar
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("medical_record")
+}
+
+/// Folha de receita — estrutural apenas: pertence a um atendimento (Encounter).
+/// SEM PRESCRICAO ELETRONICA NO MVP — ADR-0003: nenhum campo de medicamento nem
+/// estrutura clinica de prescricao aqui; o conteudo e deferido para `detail Json?`
+/// (TODO D-063). tenantId denormalizado para escopo (D-002). Datas em UTC (D-067).
+model Prescription {
+  id          String   @id @default(cuid())
+  tenantId    String // escopo denormalizado (D-002)
+  encounterId String // atendimento dono da folha de receita
+  detail      Json? // TODO(D-063): conteudo da receita por fase — nao inventar
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  encounter Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+
+  @@index([encounterId])
+  @@index([tenantId])
+  @@map("prescription")
+}
+
+// --- Transversal (isolado por vinculo — ADR-0001) --------------------------
+
+/// Anamnese / avaliacao / medidas, atada a um VINCULO (Bond) e ISOLADA POR
+/// VINCULO (ADR-0001). Sem formulario generico unico: os campos POR ESPECIALIDADE
+/// sao deferidos para `detail Json?` (TODO D-063). tenantId denormalizado para
+/// escopo (D-002). Datas em UTC (D-067).
+model Assessment {
+  id        String   @id @default(cuid())
+  tenantId  String // escopo denormalizado (D-002)
+  bondId    String // isolamento por vinculo (ADR-0001)
+  detail    Json? // TODO(D-063): campos por especialidade — nao inventar
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
+
+  @@index([bondId])
+  @@index([tenantId])
+  @@map("assessment")
+}
+
+/// Foto de evolucao — apenas a referencia de storage (storageKey S3), ISOLADA POR
+/// VINCULO (ADR-0001). O binario vive no storage (S3-compatible); aqui so a chave.
+/// tenantId denormalizado para escopo (D-002). Datas em UTC (D-067).
+model ProgressPhoto {
+  id         String    @id @default(cuid())
+  tenantId   String // escopo denormalizado (D-002)
+  bondId     String // isolamento por vinculo (ADR-0001)
+  storageKey String // referencia do objeto no storage S3-compatible (sem binario aqui)
+  takenAt    DateTime? // quando a foto foi tirada (estrutural; UTC)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
+
+  @@index([bondId])
+  @@index([tenantId])
+  @@map("progress_photo")
 }

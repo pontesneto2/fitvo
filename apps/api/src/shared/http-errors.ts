@@ -112,3 +112,17 @@ export class ProfessionalProfileConflictError extends AppError {
     this.name = 'ProfessionalProfileConflictError';
   }
 }
+
+/**
+ * Ja existe um vinculo para a tripla paciente+profissional+especialidade
+ * (unica — ADR-0001/D-052). O aceite do convite nao reabre um vinculo existente.
+ */
+export class BondAlreadyExistsError extends AppError {
+  readonly status = 409;
+  readonly problemType = 'https://fitvo.dev/problems/bond-exists';
+  readonly title = 'Vinculo ja existe';
+  constructor() {
+    super('Ja existe um vinculo deste paciente com este profissional nesta especialidade.');
+    this.name = 'BondAlreadyExistsError';
+  }
+}

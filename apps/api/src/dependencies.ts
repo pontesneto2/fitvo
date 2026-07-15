@@ -14,6 +14,8 @@ import { AuthApplicationService } from './modules/auth/auth-application-service'
 import { PrismaAccountRepository } from './modules/auth/prisma-account-repository';
 import { ClinicApplicationService } from './modules/clinic/clinic-application-service';
 import { PrismaClinicRepository } from './modules/clinic/prisma-clinic-repository';
+import { PatientApplicationService } from './modules/patient/patient-application-service';
+import { PrismaPatientRepository } from './modules/patient/prisma-patient-repository';
 
 /** Dependencias injetadas na app (permite trocar por fakes nos testes). */
 export interface AppDependencies {
@@ -21,6 +23,7 @@ export interface AppDependencies {
   corsOrigin: string;
   authService: AuthApplicationService;
   clinicService: ClinicApplicationService;
+  patientService: PatientApplicationService;
   onClose?: () => Promise<void>;
 }
 
@@ -63,12 +66,21 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     authCore,
     env.PROFESSIONAL_INVITE_TTL_SECONDS,
   );
+  // authCore satisfaz AccessTokenVerifier — a slice de paciente reusa o mesmo
+  // verificador de access token da slice de auth para o guard do profissional.
+  const patientService = new PatientApplicationService(
+    new PrismaPatientRepository(prisma),
+    passwordHasher,
+    authCore,
+    env.PATIENT_INVITE_TTL_SECONDS,
+  );
 
   return {
     logLevel: env.LOG_LEVEL,
     corsOrigin: env.CORS_ORIGIN,
     authService,
     clinicService,
+    patientService,
     onClose: async () => {
       await redis.quit();
       await prisma.$disconnect();

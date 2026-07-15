@@ -19,6 +19,9 @@ const apiEnvSchema = baseEnvSchema.extend({
   // Convite admin->profissional: 7 dias, espelhando a convencao do convite de
   // paciente (D-055/ADR-0002). Configuravel por ambiente.
   PROFESSIONAL_INVITE_TTL_SECONDS: z.coerce.number().int().positive().default(604_800),
+  // Convite profissional->paciente: 7 dias (D-055/ADR-0002), reenviavel.
+  // Configuravel por ambiente.
+  PATIENT_INVITE_TTL_SECONDS: z.coerce.number().int().positive().default(604_800),
 });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;

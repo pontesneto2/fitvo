@@ -12,6 +12,8 @@ import { AuthApplicationService } from '../modules/auth/auth-application-service
 import { InMemoryAccountRepository } from '../modules/auth/in-memory-account-repository';
 import { ClinicApplicationService } from '../modules/clinic/clinic-application-service';
 import { InMemoryClinicRepository } from '../modules/clinic/in-memory-clinic-repository';
+import { InMemoryPatientRepository } from '../modules/patient/in-memory-patient-repository';
+import { PatientApplicationService } from '../modules/patient/patient-application-service';
 import { FakeAuthEmailSender } from './fake-auth-email-sender';
 
 export interface TestHarness {
@@ -19,6 +21,8 @@ export interface TestHarness {
   emails: FakeAuthEmailSender;
   /** Repositorio de clinica em memoria — expoe `seed*` para arranjar clinicas/admins. */
   clinic: InMemoryClinicRepository;
+  /** Repositorio de paciente/vinculo em memoria — expoe `seed*` para arranjar profissionais/especialidades. */
+  patient: InMemoryPatientRepository;
 }
 
 /** Monta a app com dependencias em memoria (sem Postgres/Redis) e expoe o
@@ -44,8 +48,16 @@ export async function buildTestHarness(): Promise<TestHarness> {
   );
   const clinic = new InMemoryClinicRepository();
   const clinicService = new ClinicApplicationService(clinic, hasher, authCore, 3600);
-  const app = await buildApp({ logLevel: 'silent', corsOrigin: '*', authService, clinicService });
-  return { app, emails, clinic };
+  const patient = new InMemoryPatientRepository();
+  const patientService = new PatientApplicationService(patient, hasher, authCore, 3600);
+  const app = await buildApp({
+    logLevel: 'silent',
+    corsOrigin: '*',
+    authService,
+    clinicService,
+    patientService,
+  });
+  return { app, emails, clinic, patient };
 }
 
 /** Atalho para os testes que so precisam da instancia da app. */

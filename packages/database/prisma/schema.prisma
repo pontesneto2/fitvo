@@ -57,6 +57,13 @@ enum InviteStatus {
   REVOKED // revogado pelo admin antes do aceite
 }
 
+/// Estado do vinculo paciente<->profissional (D-052/D-053). Encerrar um vinculo
+/// nao apaga dados: vira ARQUIVO e o historico e preservado (D-053).
+enum BondStatus {
+  ACTIVE // vinculo aberto: o "ambiente" da especialidade esta habilitado
+  ARCHIVED // encerrado: dados preservados, paciente segue vendo o historico
+}
+
 // ---------------------------------------------------------------------------
 // Identidade
 // ---------------------------------------------------------------------------
@@ -110,9 +117,11 @@ model Tenant {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  professionals ProfessionalProfile[]
-  memberships   ClinicMembership[]
-  invites       ProfessionalInvite[]
+  professionals  ProfessionalProfile[]
+  memberships    ClinicMembership[]
+  invites        ProfessionalInvite[]
+  patientInvites PatientInvite[]
+  bonds          Bond[]
 
   @@map("tenant")
 }
@@ -148,9 +157,11 @@ model ProfessionalProfile {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  account     Account                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  tenant      Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  specialties ProfessionalSpecialty[]
+  account        Account                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  specialties    ProfessionalSpecialty[]
+  patientInvites PatientInvite[]
+  bonds          Bond[]
 
   @@index([tenantId])
   @@map("professional_profile")
@@ -162,7 +173,9 @@ model Specialty {
   code SpecialtyCode @unique
   name String
 
-  professionals ProfessionalSpecialty[]
+  professionals  ProfessionalSpecialty[]
+  patientInvites PatientInvite[]
+  bonds          Bond[]
 
   @@map("specialty")
 }
@@ -195,6 +208,7 @@ model PatientProfile {
   updatedAt DateTime @updatedAt
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  bonds   Bond[]
 
   @@map("patient_profile")
 }
@@ -225,4 +239,67 @@ model ProfessionalInvite {
   @@index([tenantId])
   @@index([tenantId, status])
   @@map("professional_invite")
+}
+
+// ---------------------------------------------------------------------------
+// Convite profissional -> paciente + Vinculo (D-006/D-052/D-053/D-055)
+// ---------------------------------------------------------------------------
+
+/// Convite de um profissional para um paciente (D-006), direcionado a UMA
+/// especialidade (D-052): o aceite abre o vinculo naquele "ambiente". Distinto
+/// do convite admin->profissional (ProfessionalInvite). O token de uso unico e
+/// guardado SO como hash — o segredo em claro nunca e persistido (mesma
+/// disciplina dos tokens de auth, D-029). Expira em 7 dias e e reenviavel
+/// (D-055): o reenvio rotaciona o token e estende a validade na mesma linha.
+/// tenantId denormalizado = o tenant do profissional (escopo obrigatorio — D-002).
+/// Datas em UTC (D-067).
+model PatientInvite {
+  id                    String       @id @default(cuid())
+  tenantId              String // tenant do profissional que convida (escopo — D-002)
+  professionalProfileId String // profissional que convida (D-006)
+  specialtyId           String // especialidade-alvo do vinculo futuro (D-052)
+  email                 String // e-mail do paciente convidado
+  status                InviteStatus @default(PENDING)
+  tokenHash             String       @unique // sha256 do token de uso unico (nunca em claro)
+  expiresAt             DateTime // validade (7 dias por padrao, aplicado na aplicacao — D-055)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professionalProfile ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
+  specialty           Specialty           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([professionalProfileId, status])
+  @@index([email])
+  @@map("patient_invite")
+}
+
+/// Vinculo = paciente <-> (profissional + especialidade) (D-052). E a entidade
+/// central: anamnese, avaliacoes, treinos, cobrancas penduram no vinculo (fases
+/// seguintes). Cada vinculo materializa um "ambiente" na UX do paciente. A
+/// tripla (paciente, profissional, especialidade) e unica — "Leo educador" e
+/// "Leo nutricionista" sao vinculos distintos. Encerrar vira ARQUIVO, nunca
+/// apaga (D-053). tenantId denormalizado = tenant do profissional (escopo — D-002).
+model Bond {
+  id                    String     @id @default(cuid())
+  tenantId              String // tenant do profissional (escopo denormalizado — D-002)
+  patientProfileId      String
+  professionalProfileId String
+  specialtyId           String
+  status                BondStatus @default(ACTIVE)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  archivedAt            DateTime? // momento do encerramento (UTC), null enquanto ativo (D-053)
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patientProfile      PatientProfile      @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  professionalProfile ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
+  specialty           Specialty           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+
+  @@unique([patientProfileId, professionalProfileId, specialtyId])
+  @@index([tenantId])
+  @@index([professionalProfileId, status])
+  @@index([patientProfileId, status])
+  @@map("bond")
 }

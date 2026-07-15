@@ -33,5 +33,24 @@ const css = buildThemeCss(); // blocos :root e .dark
 ```
 
 Alternar tema = adicionar/remover a classe `dark` na raiz (`<html>`). As classes
-utilitárias (`bg-surface-base`, `text-text-principal`, `shadow-raised`…) seguem o
-modo ativo sem inversão manual no componente.
+utilitárias seguem o modo ativo sem inversão manual no componente.
+
+### Chaves de cor semântica (Tailwind)
+
+Para evitar o "duplo" feio (`text-text-*`, `border-border-*`), a utility usa nome
+limpo; a CSS var canônica (`--text-*`, `--surface-*`, `--border-*`) permanece:
+
+| Token (CSS var)     | Classe Tailwind                          |
+|---------------------|------------------------------------------|
+| `--text-principal`  | `text-fg`                                |
+| `--text-auxiliar`   | `text-fg-muted`                          |
+| `--text-sutil`      | `text-fg-subtle`                         |
+| `--surface-base`    | `bg-surface`                             |
+| `--surface-raised`  | `bg-surface-raised`                      |
+| `--border-default`  | `border-line`                            |
+| `--border-hover`    | `border-line-hover`                      |
+| `--border-focus`    | `border-line-focus`                      |
+| `--focus-ring`      | `ring-focus`                             |
+| `--tooltip-surface` | `bg-tooltip` / `--tooltip-text` → `text-tooltip-fg` |
+
+As rampas primitivas mantêm o nome (`bg-brand-500`, `text-danger-600`…).

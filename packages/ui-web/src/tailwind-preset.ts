@@ -4,7 +4,6 @@ import {
   black,
   colors,
   controlHeight,
-  cssVarNames,
   cssVarRef,
   duration,
   easing,
@@ -61,12 +60,35 @@ function px(scale: Record<string, number>): TokenScale {
   return out;
 }
 
-/** Cores semanticas -> `var(--token)`; a chave Tailwind e o nome da var sem `--`. */
+/**
+ * Chave Tailwind de cada cor semantica. Evita o "duplo" feio que sai de casar o
+ * prefixo da utility com o nome do token (`text-` + `text-sutil` = `text-text-
+ * sutil`; `border-` + `border-default` = `border-border-default`): texto -> `fg*`,
+ * borda -> `line*`, superficie -> `surface*`, anel -> `focus`. As CSS vars
+ * (`--text-*`, `--border-*`, ...) permanecem como IDENTIDADE canonica do token
+ * (§0); aqui so nomeamos a utility. Uso: `bg-surface`, `text-fg-subtle`,
+ * `border-line`, `ring-focus`.
+ */
+const SEMANTIC_TW_KEY: Record<SemanticColorName, string> = {
+  textPrincipal: 'fg',
+  textAuxiliar: 'fg-muted',
+  textSutil: 'fg-subtle',
+  surfaceBase: 'surface',
+  surfaceRaised: 'surface-raised',
+  surfaceOverlay: 'surface-overlay',
+  borderDefault: 'line',
+  borderHover: 'line-hover',
+  borderFocus: 'line-focus',
+  tooltipSurface: 'tooltip',
+  tooltipText: 'tooltip-fg',
+  focusRing: 'focus',
+};
+
+/** Cores semanticas -> `var(--token)`, sob a chave Tailwind limpa (ver acima). */
 function semanticColorVars(): TokenScale {
   const out: TokenScale = {};
-  for (const name of Object.keys(cssVarNames) as SemanticColorName[]) {
-    const key = cssVarNames[name].replace(/^--/, '');
-    out[key] = cssVarRef(name);
+  for (const name of Object.keys(SEMANTIC_TW_KEY) as SemanticColorName[]) {
+    out[SEMANTIC_TW_KEY[name]] = cssVarRef(name);
   }
   return out;
 }

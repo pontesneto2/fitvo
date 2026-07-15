@@ -38,9 +38,14 @@ describe('buildThemeCss', () => {
 });
 
 describe('fitvoTailwindTheme', () => {
-  it('mapeia cores semanticas para var(--token)', () => {
-    expect(fitvoTailwindTheme.colors['surface-base']).toBe('var(--surface-base)');
-    expect(fitvoTailwindTheme.colors['text-principal']).toBe('var(--text-principal)');
+  it('mapeia cores semanticas para var(--token) sob chave Tailwind limpa', () => {
+    // Chave limpa (fg/surface/line), sem o "duplo" text-text-*/border-border-*;
+    // a CSS var canonica permanece --text-*/--surface-*.
+    expect(fitvoTailwindTheme.colors['surface']).toBe('var(--surface-base)');
+    expect(fitvoTailwindTheme.colors['fg']).toBe('var(--text-principal)');
+    expect(fitvoTailwindTheme.colors['fg-subtle']).toBe('var(--text-sutil)');
+    expect(fitvoTailwindTheme.colors['line']).toBe('var(--border-default)');
+    expect(fitvoTailwindTheme.colors['focus']).toBe('var(--focus-ring)');
   });
 
   it('expoe as rampas primitivas como valor fixo', () => {

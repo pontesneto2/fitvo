@@ -15,6 +15,8 @@ export * from './input';
 export * from './radio';
 export * from './select';
 export * from './select-variants';
+export * from './side-nav';
+export * from './side-nav-variants';
 export * from './switch';
 export * from './tabs';
 export * from './tabs-variants';

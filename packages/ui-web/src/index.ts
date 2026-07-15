@@ -16,5 +16,6 @@ export * from './input';
 export * from './radio';
 export * from './select';
 export * from './switch';
+export * from './tabs';
 export * from './tailwind-preset';
 export * from './textarea';

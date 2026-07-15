@@ -5,6 +5,7 @@
  * entrarao aqui conforme o design-system-components.md for implementado.
  */
 export * from './button';
+export * from './card';
 export * from './checkbox';
 export * from './cn';
 export * from './css-variables';

@@ -4,6 +4,7 @@
  * §8): preset de tema + geracao das CSS custom properties. Componentes visuais
  * entrarao aqui conforme o design-system-components.md for implementado.
  */
+export * from './badge';
 export * from './button';
 export * from './card';
 export * from './checkbox';

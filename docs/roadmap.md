@@ -26,31 +26,43 @@ RESPONSÁVEL** (decisão que só você pode tomar), **BLOQUEADO — TERCEIROS**
 | 7 | Esqueletos de conteúdo (Exercise/Workout, Food/MealPlan, Encounter/MedicalRecord/Prescription, Assessment — ADR-0006) | #14 | SÓ schema. Campos finos deferidos (`detail Json?` + TODO(D-063)). Sem slice de API. |
 | 8 | Adapters das abstrações (observability/pino, cache/Redis, storage/S3, notifications, ai/Anthropic — ADR-0005) | #15 | Todos com fake/mock testável + gate para uso ao vivo. |
 | 9 | Upgrade de infra (Node 22, eslint 10, commitlint 21, vitest 4) | #16 | TypeScript e Prisma majors deliberadamente NÃO subiram (ver PENDENTE). |
-| 10 | Design tokens (`brand-tokens` populado: cor, tipografia, elevação, ícones Lucide, densidade) | worktree design, ainda sem PR próprio | Ver EM ANDAMENTO — falta consolidar em PR. |
-| 11 | Cola de framework (`ui-web` preset Tailwind + CSS vars; `ui-mobile` ThemeProvider) | idem | |
-| 12 | Primitivos de UI: Button, Input/Field/Textarea, Checkbox/Radio/Switch, Select/Combobox, Card (§1–§7) | idem | |
+| 10 | Design tokens (`brand-tokens` populado: cor, tipografia, elevação, ícones Lucide, densidade) | #18 (aberto) | Ver EM ANDAMENTO — aguardando revisão/merge. |
+| 11 | Cola de framework (`ui-web` preset Tailwind + CSS vars; `ui-mobile` ThemeProvider) | #18 (aberto) | |
+| 12 | Primitivos de UI §1–§18 (Button, Input/Field/Textarea, Checkbox/Radio/Switch, Select/Combobox, Card, Badge, Tabs, Menu lateral, Breadcrumb, Modal, Toast, Tooltip, estados de tela, Tabela, Avatar) + `Logo` (wordmark fechado, mark provisório) | #18 (aberto) | 227 testes (`brand-tokens` 18 + `ui-web` 127 + `ui-mobile` 82). Consolidado de uma branch de trabalho local que não tinha PR nem push — risco de perda eliminado. |
 
 ## EM ANDAMENTO
 
-- **Camada de design system** (branch/worktree `worktree-brand-tokens`, fora do
-  tree principal): `brand-tokens` + `ui-web` + `ui-mobile` com primitivos §1–§7
-  completos; commits locais indicam avanço adicional em Menu lateral,
-  Breadcrumb, Modal/Dialog, Toast, Tooltip (§8–§14) — a confirmar com a sessão
-  de design antes de assumir como concluído. Nada disso tem PR aberto ainda.
-- **Política de merge e este roadmap** (branch `docs/politica-de-merge`) —
-  este próprio documento.
+- **PR #17** (`docs/politica-de-merge`) — Política de Merge + este roadmap.
+  Este próprio commit ajusta a ordem do PENDENTE abaixo, a pedido do
+  responsável, antes do merge.
+- **PR #18** (`feat/ui-primitivos`) — consolida `brand-tokens` + `ui-web` +
+  `ui-mobile` (primitivos §1–§18 + `Logo`) em `main`. Verificado localmente
+  (typecheck/lint/test/build 100% verdes, monorepo inteiro); aguardando
+  revisão antes do merge (volume grande, mesmo sendo área de baixo risco pela
+  Política de Merge).
 
 ## PENDENTE (ordem de execução pretendida)
 
-1. **Consolidar a camada de design em PR(s)** — trazer `brand-tokens`/`ui-web`/
-   `ui-mobile` do worktree paralelo para `main` via PR revisável (não
-   `--admin`, ver Política de Merge — é área de baixo risco mas o volume
-   justifica revisão visual).
-2. **Restante dos primitivos de UI** (§8–§18 do doc de componentes: Badge,
-   Tabs, Avatar, Tabela, e o que não estiver coberto pelo item acima).
-3. **Apps web** (`web-personal`, `web-admin`, `site`) — App Router + TanStack
+Reordenado em 2026-07-15 a pedido do responsável: conteúdo (D-063) vem antes
+de dashboard/relatórios e de IA. Motivo — dashboard/relatórios exibem dados
+que vêm do conteúdo (treino, dieta, avaliação); sem conteúdo é gráfico de
+tabela vazia. Treino e nutrição são o coração do produto: sem eles não existe
+FITVO.
+
+1. **Apps web** (`web-personal`, `web-admin`, `site`) — App Router + TanStack
    Query + client de API + tema/dark + fontes; telas de auth e shell de
-   dashboard derivadas do design system. Depende do item 1.
+   dashboard derivadas do design system. Depende do merge do PR #18.
+2. **Domínios de conteúdo — regra fina** (D-063): treino, nutrição e
+   prontuário/prescrição médica hoje são só schema (PR #14). Preencher
+   comportamento/regra de negócio real é decisão humana com referências
+   (ex.: MFit, Dietbox) — ver BLOQUEADO — RESPONSÁVEL. **Coração do produto —
+   prioridade alta.**
+3. **IA (D-022)** — a abstração multi-provider já existe
+   (`packages/ai`, `AnthropicAIProvider` + `FakeAIProvider`, PR #15) com
+   `embed()` propositalmente não suportado (Anthropic não oferece
+   embeddings). Falta definir os casos de uso de produto que consomem IA
+   (sugestão automática, geração de plano, etc.) — não inventar sem ADR.
+   Depende do item 2 (IA sobre conteúdo pressupõe que o conteúdo exista).
 4. **Agenda** — modelagem e slice de API para agendamento de atendimentos por
    vínculo (mencionado em D-001 como dado por vínculo; sem ADR de detalhe
    ainda — regra fina fica em BLOQUEADO — RESPONSÁVEL).
@@ -61,33 +73,24 @@ RESPONSÁVEL** (decisão que só você pode tomar), **BLOQUEADO — TERCEIROS**
    depende de credenciais (Firebase, provedor de e-mail/SMS) — ver BLOQUEADO —
    TERCEIROS.
 7. **Dashboard e relatórios** — telas de indicadores para profissional/clínica
-   (financeiro, atendimentos, adesão). ADR-0004 já antecipa "dashboards e
-   relatórios" para dados financeiros ricos como evolução futura, não
-   escopo fechado ainda.
-8. **Domínios de conteúdo — regra fina** (D-063): treino, nutrição e
-   prontuário/prescrição médica hoje são só schema (PR #14). Preencher
-   comportamento/regra de negócio real é decisão humana com referências
-   (ex.: MFit, Dietbox) — ver BLOQUEADO — RESPONSÁVEL.
-9. **IA (D-022)** — a abstração multi-provider já existe
-   (`packages/ai`, `AnthropicAIProvider` + `FakeAIProvider`, PR #15) com
-   `embed()` propositalmente não suportado (Anthropic não oferece
-   embeddings). Falta definir os casos de uso de produto que consomem IA
-   (sugestão automática, geração de plano, etc.) — não inventar sem ADR.
-10. **Mobile (Expo)** — app "3-em-1" (aluno + profissional), Expo Router +
-    TanStack Query. Ainda não iniciado; bloco próprio, depende de apps web e
-    design mobile estarem maduros.
-11. **Testes ao vivo das integrações** (Asaas sandbox, IA real, FCM, e-mail,
-    SMS) — hoje todos gated por ausência de credenciais no ambiente. Rodar
-    exige as credenciais reais (ver BLOQUEADO — TERCEIROS).
-12. **Deploy** (Vercel + Railway) — infraestrutura de deploy ainda não
+   (financeiro, atendimentos, adesão, **e adesão/evolução de conteúdo** —
+   depende do item 2 já ter dado real para exibir). ADR-0004 já antecipa
+   "dashboards e relatórios" para dados financeiros ricos como evolução
+   futura, não escopo fechado ainda.
+8. **Mobile (Expo)** — app "3-em-1" (aluno + profissional), Expo Router +
+   TanStack Query. Ainda não iniciado; bloco próprio, depende de apps web e
+   design mobile estarem maduros.
+9. **Testes ao vivo das integrações** (Asaas sandbox, IA real, FCM, e-mail,
+   SMS) — hoje todos gated por ausência de credenciais no ambiente. Rodar
+   exige as credenciais reais (ver BLOQUEADO — TERCEIROS).
+10. **Deploy** (Vercel + Railway) — infraestrutura de deploy ainda não
     configurada; requer credenciais + ordem explícita de publicação.
 
 ## BLOQUEADO — RESPONSÁVEL (decisão que só você pode tomar)
 
-- **Apps web**: liberar o início do item 3 do PENDENTE depende de você
-  confirmar que `brand-tokens`/`ui-web` estão maduros o suficiente para
-  consumo, e decidir onde o squeeze do design acontece (tree principal vs.
-  worktree isolado).
+- **Apps web**: liberar o início do item 1 do PENDENTE depende do merge do PR
+  #18 (`brand-tokens`/`ui-web`/`ui-mobile`) e da sua confirmação de que estão
+  maduros o suficiente para consumo em produto.
 - **TypeScript 6/7**: bump depende de o `typescript-eslint` lançar suporte a
   TS ≥6.1 (hoje não suporta). Pesquisar `npm view @typescript-eslint/parser
   peerDependencies` periodicamente; quando destravar, é tarefa isolada.
@@ -103,8 +106,10 @@ RESPONSÁVEL** (decisão que só você pode tomar), **BLOQUEADO — TERCEIROS**
   nível de detalhe — não especificado nos ADRs.
 - **Casos de uso de IA (D-022)**: quais features realmente usam IA generativa
   no produto (a abstração técnica já existe, falta a decisão de produto).
-- **Biblioteca de ícones/logo final**: ícones já resolvidos (Lucide oficial);
-  logo definitivo (dark/light) ainda pendente conforme registro de marca.
+- **Símbolo final do Logo**: ícones já resolvidos (Lucide oficial); wordmark
+  já fechado ("FIT" `brand-500` / "VO" `energy-400`, componente `Logo` em
+  `ui-web`/`ui-mobile`, PR #18); falta o símbolo/mark definitivo — hoje o
+  componente usa um mark geométrico PROVISÓRIO.
 - **shadcn/ui**: adoção para a camada web adiada — decisão condicionada à
   identidade visual (shadcn customizado vs. primitivos puros).
 

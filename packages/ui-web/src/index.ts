@@ -4,5 +4,7 @@
  * §8): preset de tema + geracao das CSS custom properties. Componentes visuais
  * entrarao aqui conforme o design-system-components.md for implementado.
  */
+export * from './button';
+export * from './cn';
 export * from './css-variables';
 export * from './tailwind-preset';

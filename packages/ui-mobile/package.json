@@ -18,7 +18,8 @@
     "@fitvo/brand-tokens": "workspace:*"
   },
   "peerDependencies": {
-    "react": ">=18"
+    "react": ">=18",
+    "react-native": ">=0.74"
   },
   "devDependencies": {
     "@fitvo/eslint-config": "workspace:*",
@@ -26,6 +27,7 @@
     "@types/react": "^18.3.0",
     "eslint": "^9.13.0",
     "react": "^18.3.1",
+    "react-native": "^0.76.0",
     "typescript": "^5.6.2"
   }
 }

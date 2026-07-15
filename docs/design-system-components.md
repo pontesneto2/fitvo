@@ -443,8 +443,13 @@ tokens correspondentes desde já; ajustar o valor no sistema não exige tocar em
 componente.
 
 - **Ilustrações e imagens de marca** — estilo, paleta, uso em estados vazios.
-- **Logo** — símbolo em exploração; wordmark Poppins (FIT `brand-800` peso alto /
-  VO `brand-500` peso leve). Cor primária: `#0FA678`.
+- **Logo** — **definida (com ícone provisório).** Wordmark oficial (artes em
+  `packages/brand-tokens/assets/logo/`, consumido pelo componente `Logo` de
+  ui-web/ui-mobile): "FIT" `brand-500` (light) / branco (dark), "VO" `energy-400`
+  em ambos — ver `design-system.md` §9. O **símbolo isolado** é PROVISÓRIO
+  (`icon-fitvo-provisional.svg`): "V" geométrico em `brand-500` com o braço em
+  `energy-400`; trocável só substituindo o arquivo, sem tocar no componente.
+  `TODO`: substituir pelo símbolo definitivo quando existir.
 - **Gráficos avançados** — heatmap de frequência, comparativos de evolução.
 - **Componentes de domínio** — card de exercício, card de refeição, linha do
   tempo de evolução, cartão de prescrição. Serão especificados na fase de cada

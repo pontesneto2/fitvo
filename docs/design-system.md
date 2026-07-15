@@ -217,11 +217,17 @@ mais respiro) para o tom mais sóbrio que o contexto clínico pede.
   MIT). Tokens em `design-system-components.md` §19.
 - **Dark fino:** superfícies, hover, foco e estados de input em
   `design-system-components.md` §21.
+- **Logo (wordmark):** identidade final definida. As artes oficiais vivem em
+  `packages/brand-tokens/assets/logo/` (SVG + PNG, uma variante por tema).
+  **Hierarquia oficial:** "FIT" em `brand-500` (`#0FA678`) no tema light /
+  branco (`#FFFFFF`) no tema dark; "VO" em `energy-400` (`#00E676`) em ambos os
+  temas — o neon no "VO" fecha o nome com a cor de energia da marca. FIT é a
+  base (marca), VO é o destaque (energia). A regra anterior de "FIT em destaque"
+  / "FIT dominante" (herdada do briefing inicial, em Poppins `brand-800`) foi
+  **SUPERADA pela identidade final — não aplicar.** O **símbolo isolado** ainda é
+  provisório (ver `design-system-components.md` §20).
 
 **Ainda em aberto:**
-- **Logo:** ainda não definida. Símbolo em exploração; wordmark será Poppins com
-  "FIT" em peso alto (`brand-800` `#08543E`) e "VO" em peso leve (`brand-500`
-  `#0FA678`). Cor primária da marca: `#0FA678`.
 - Ilustrações e imagens de marca.
 - **shadcn/ui + MCP** para a camada web — decisão **ADIADA**. O preset Tailwind
   permanece neutro (ver CLAUDE.md); não adotar sem ordem.

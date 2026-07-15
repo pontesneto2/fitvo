@@ -21,3 +21,16 @@ export const avatarSize = {
   lg: 56,
   xl: 80,
 } as const satisfies Record<AvatarSize, number>;
+
+export type LogoSize = 'sm' | 'md' | 'lg';
+
+/**
+ * Dimensoes do Logo (mark + wordmark, §9/§20 — "Logo" ainda [A DEFINIR]). O mark
+ * e PROVISORIO (forma geometrica, sem simbolo final); o tamanho do texto do
+ * wordmark usa `fontSize.h3/h2/h1` diretamente no componente, nao aqui.
+ */
+export const logoMarkSize = {
+  sm: 20,
+  md: 28,
+  lg: 36,
+} as const satisfies Record<LogoSize, number>;

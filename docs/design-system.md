@@ -219,9 +219,11 @@ mais respiro) para o tom mais sóbrio que o contexto clínico pede.
   `design-system-components.md` §21.
 
 **Ainda em aberto:**
-- **Logo:** ainda não definida. Símbolo em exploração; wordmark será Poppins com
-  "FIT" em peso alto (`brand-800` `#08543E`) e "VO" em peso leve (`brand-500`
-  `#0FA678`). Cor primária da marca: `#0FA678`.
+- **Logo:** ainda não definida. Símbolo em exploração — `packages/ui-web`/
+  `packages/ui-mobile` expõem um `Logo` com mark PROVISÓRIO (forma geométrica,
+  sem símbolo de marca) até o símbolo final fechar. Wordmark FECHADO: Poppins
+  600, "FIT" em `brand-500` (`#0FA678`, cor primária da marca) e "VO" em
+  `energy-400` (`#00E676`).
 - Ilustrações e imagens de marca.
 - **shadcn/ui + MCP** para a camada web — decisão **ADIADA**. O preset Tailwind
   permanece neutro (ver CLAUDE.md); não adotar sem ordem.

@@ -443,8 +443,9 @@ tokens correspondentes desde já; ajustar o valor no sistema não exige tocar em
 componente.
 
 - **Ilustrações e imagens de marca** — estilo, paleta, uso em estados vazios.
-- **Logo** — símbolo em exploração; wordmark Poppins (FIT `brand-800` peso alto /
-  VO `brand-500` peso leve). Cor primária: `#0FA678`.
+- **Logo** — símbolo em exploração (mark do componente `Logo` é PROVISÓRIO, sem
+  forma final); wordmark Poppins 600 (FIT `brand-500` / VO `energy-400`). Cor
+  primária: `#0FA678`.
 - **Gráficos avançados** — heatmap de frequência, comparativos de evolução.
 - **Componentes de domínio** — card de exercício, card de refeição, linha do
   tempo de evolução, cartão de prescrição. Serão especificados na fase de cada

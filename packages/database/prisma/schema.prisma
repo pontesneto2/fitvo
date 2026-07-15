@@ -50,6 +50,13 @@ enum ClinicRole {
   CLINIC_ADMIN // admin de clinica (visao ampla, dado operacional; nunca clinico)
 }
 
+enum InviteStatus {
+  PENDING // aguardando aceite do profissional
+  ACCEPTED // aceito: profissional vinculado a clinica
+  EXPIRED // expirado (expiresAt no passado) sem aceite
+  REVOKED // revogado pelo admin antes do aceite
+}
+
 // ---------------------------------------------------------------------------
 // Identidade
 // ---------------------------------------------------------------------------
@@ -105,6 +112,7 @@ model Tenant {
 
   professionals ProfessionalProfile[]
   memberships   ClinicMembership[]
+  invites       ProfessionalInvite[]
 
   @@map("tenant")
 }
@@ -189,4 +197,32 @@ model PatientProfile {
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@map("patient_profile")
+}
+
+// ---------------------------------------------------------------------------
+// Convite admin de clinica -> profissional (D-014/D-048/D-049)
+// ---------------------------------------------------------------------------
+
+/// Convite de um admin de clinica para um profissional. E a UNICA porta de
+/// entrada de um profissional numa clinica (D-048): quem se cadastra por fora
+/// vira solo. Distinto do convite profissional->paciente (D-005, fase do
+/// dominio de paciente). O token de uso unico e guardado SO como hash — o
+/// segredo em claro nunca e persistido (mesma disciplina dos tokens de auth,
+/// D-029). Expira em 7 dias por padrao (definido na aplicacao), espelhando a
+/// convencao do convite de paciente (D-055). Datas em UTC (D-067).
+model ProfessionalInvite {
+  id        String       @id @default(cuid())
+  tenantId  String // clinica que convida (escopo de tenant obrigatorio — D-002)
+  email     String // e-mail do profissional convidado
+  status    InviteStatus @default(PENDING)
+  tokenHash String       @unique // sha256 do token de uso unico (nunca em claro)
+  expiresAt DateTime // validade (default de 7 dias aplicado na camada de aplicacao)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("professional_invite")
 }

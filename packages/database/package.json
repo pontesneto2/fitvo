@@ -19,7 +19,7 @@
     "build": "prisma generate"
   },
   "dependencies": {
-    "@prisma/client": "^6.1.0"
+    "@prisma/client": "^7.8.0"
   },
   "devDependencies": {
     "@fitvo/eslint-config": "workspace:*",

@@ -15,4 +15,9 @@ regexes = [
   '''(?i)your[-_].*[-_]here''',
   '''(?i)placeholder''',
   '''USER:PASSWORD''',
+  # Fixtures de teste (senhas e segredos falsos em *.test.ts) — nao sao reais.
+  '''senha-[a-z0-9-]+''',
+  '''(access|refresh)-secret-[a-z0-9-]+''',
+  '''secret-de-teste[a-z0-9-]*''',
+  '''test-(access|refresh)-secret[a-z0-9-]*''',
 ]

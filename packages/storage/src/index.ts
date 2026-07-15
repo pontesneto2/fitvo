@@ -1,7 +1,8 @@
 /**
  * @fitvo/storage — contrato de storage S3-compatible (D-026): upload,
- * download, URL assinada e remocao. Interfaces apenas; adaptador (provedor
- * escolhido por custo de egress) em fase posterior.
+ * download, URL assinada e remocao. Alem do contrato, expoe o adaptador
+ * concreto (`S3StorageProvider`, LIVE gated) e a store em memoria
+ * (`InMemoryStorage`) para testes e dev local.
  */
 
 export interface PutObjectInput {
@@ -21,3 +22,11 @@ export interface StorageProvider {
   delete(key: string): Promise<void>;
   exists(key: string): Promise<boolean>;
 }
+
+// Adaptadores concretos (D-026). O dominio depende apenas de `StorageProvider`.
+export { InMemoryStorage } from './in-memory-storage';
+export {
+  buildS3ClientConfig,
+  type S3StorageConfig,
+  S3StorageProvider,
+} from './s3-storage-provider';

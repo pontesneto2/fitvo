@@ -49,10 +49,12 @@ Roteamento definido pelo responsável (o **agente principal** assume o que sobra
 
 ### Fora do escopo do agente de design (para o agente principal)
 
-- Corrigir a **Política de Merge** (foi criada na branch errada:
-  `feat/clinic-convites`).
-- Criar **`docs/roadmap.md`** como fonte única do plano.
-- §19 e §17 acima (podem ir para o agente que assumir).
+- **Política de Merge** e **`docs/roadmap.md`** — JÁ EM ANDAMENTO no **PR #17**
+  (`docs/politica-de-merge`, "docs: politica de merge + roadmap versionado";
+  `docs/roadmap.md` já está lá). **Não recriar** — só revisar/mergear o #17.
+  (Antes eu havia listado "criar roadmap.md" por não saber do #17; corrigido para
+  evitar trabalho duplicado — a mesma lição que gerou os PRs #18/#19 paralelos.)
+- §19 (Lucide) e §17 (dataviz) acima — para o agente que assumir.
 
 ## Contexto que só existe nesta sessão (preservar)
 

@@ -7,4 +7,5 @@
 export * from './button';
 export * from './cn';
 export * from './css-variables';
+export * from './input';
 export * from './tailwind-preset';

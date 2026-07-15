@@ -1,0 +1,58 @@
+import type { PrismaClient } from '@fitvo/database';
+import { prisma as defaultPrisma } from '@fitvo/database';
+
+import type {
+  AccountRecord,
+  AccountRepository,
+  CreatePatientInput,
+  CreateProfessionalInput,
+} from './account-repository';
+
+const ACCOUNT_PROJECTION = {
+  id: true,
+  email: true,
+  passwordHash: true,
+  name: true,
+} as const;
+
+/** Implementacao Prisma (infra) do repositorio de identidade. */
+export class PrismaAccountRepository implements AccountRepository {
+  constructor(private readonly db: PrismaClient = defaultPrisma) {}
+
+  findByEmail(email: string): Promise<AccountRecord | null> {
+    return this.db.account.findUnique({ where: { email }, select: ACCOUNT_PROJECTION });
+  }
+
+  createProfessional(input: CreateProfessionalInput): Promise<AccountRecord> {
+    return this.db.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: { type: 'SOLO', name: input.tenantName },
+      });
+      return tx.account.create({
+        data: {
+          email: input.email,
+          passwordHash: input.passwordHash,
+          name: input.name,
+          document: input.document,
+          documentType: input.documentType,
+          professionalProfile: { create: { tenant: { connect: { id: tenant.id } } } },
+        },
+        select: ACCOUNT_PROJECTION,
+      });
+    });
+  }
+
+  createPatient(input: CreatePatientInput): Promise<AccountRecord> {
+    return this.db.account.create({
+      data: {
+        email: input.email,
+        passwordHash: input.passwordHash,
+        name: input.name,
+        document: input.document,
+        documentType: 'CPF',
+        patientProfile: { create: {} },
+      },
+      select: ACCOUNT_PROJECTION,
+    });
+  }
+}

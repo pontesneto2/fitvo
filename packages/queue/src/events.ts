@@ -23,3 +23,39 @@ export interface BondCreatedEvent {
   specialtyId: string;
   tenantId: string;
 }
+
+/** Nome da fila da regua de cobranca (Fluxo A — ADR-0004). */
+export const BILLING_QUEUE = 'fitvo-billing';
+
+/**
+ * Nome do job repetido (cron) que dispara uma varredura da regua de cobranca. O
+ * scheduler enfileira com `repeatEveryMs`; o worker roda a transicao de status +
+ * lembretes a cada tick.
+ */
+export const RULER_TICK_EVENT = 'ruler.tick';
+
+/** Payload do tick da regua — instante da varredura (ISO UTC). Dado puro. */
+export interface RulerTickEvent {
+  /** Momento de referencia da varredura (ISO 8601, UTC — D-067). */
+  at: string;
+}
+
+/**
+ * Tipo de lembrete da regua de cobranca (ADR-0004): aviso 3 dias antes ->
+ * vencimento -> 2 dias vencido -> 4 dias vencido -> suspensao aos 7 dias. A
+ * ENTREGA (push/e-mail) e GATED (D-028) — o worker so enfileira o lembrete.
+ */
+export type SubscriptionReminderKind =
+  'pre_due_3d' | 'due' | 'overdue_2d' | 'overdue_4d' | 'suspended';
+
+/** Nome do job de lembrete de assinatura publicado pela regua. */
+export const SUBSCRIPTION_REMINDER_EVENT = 'subscription.reminder';
+
+/** Payload do lembrete de assinatura (Fluxo A). Dado puro e serializavel. */
+export interface SubscriptionReminderEvent {
+  subscriptionId: string;
+  tenantId: string;
+  kind: SubscriptionReminderKind;
+  /** Vencimento do periodo atual (ISO 8601, UTC — D-067). */
+  dueDate: string | null;
+}

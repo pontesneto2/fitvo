@@ -141,6 +141,9 @@ model Tenant {
   invites        ProfessionalInvite[]
   patientInvites PatientInvite[]
   bonds          Bond[]
+  paymentAccount PaymentAccount? // subconta Asaas + taxa por tenant (ADR-0004/D-058)
+  subscriptions  Subscription[] // assinaturas de plano da plataforma (Fluxo A)
+  charges        Charge[] // cobrancas paciente->profissional (Fluxo B, via split)
 
   @@map("tenant")
 }
@@ -322,6 +325,7 @@ model Bond {
   patientProfile      PatientProfile      @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
   professionalProfile ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
   specialty           Specialty           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+  charges             Charge[] // cobrancas penduram no vinculo (Fluxo B — ADR-0004)
 
   @@unique([patientProfileId, professionalProfileId, specialtyId])
   @@index([tenantId])
@@ -406,4 +410,186 @@ model SharingSuggestion {
 
   @@index([patientProfileId, status])
   @@map("sharing_suggestion")
+}
+
+// ---------------------------------------------------------------------------
+// Financeiro: planos, assinatura (Fluxo A), cobranca+split (Fluxo B), webhook
+// (D-018 a D-021 / D-025 / D-050 / D-056 a D-062 / D-069 — ADR-0004)
+// ---------------------------------------------------------------------------
+
+/// Periodicidade de cobranca (D-057/D-060). Periodos longos sao pagos adiantados
+/// e podem carregar desconto progressivo — modelado como dado em PlanPrice.
+enum Periodicity {
+  MONTHLY
+  QUARTERLY
+  BIANNUAL
+  ANNUAL
+}
+
+/// Estagio do onboarding da subconta Asaas do tenant (D-050). A subconta e passo
+/// OBRIGATORIO do Fluxo B; o walletId so e preenchido quando o onboarding LIVE
+/// (gated — sem credenciais Asaas neste repo) e concluido.
+enum OnboardingStatus {
+  PENDING // sem subconta ainda (walletId nulo)
+  IN_PROGRESS // subconta solicitada, aguardando aprovacao Asaas (gated)
+  COMPLETED // subconta ativa, walletId preenchido
+}
+
+/// Estado da assinatura de plano da plataforma (Fluxo A — D-062). Trial de 7 dias
+/// antes de ACTIVE; a regua (worker) transiciona ACTIVE->PAST_DUE->SUSPENDED.
+/// SUSPENDED != exclusao (D-021): dados retidos.
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELED
+}
+
+/// Metodo de cobranca (D-056). Espelha ChargeMethod de @fitvo/payments (o
+/// adaptador Asaas normaliza entre o enum do banco e a string do gateway).
+enum ChargeMethod {
+  BOLETO
+  PIX
+  CREDIT_CARD
+}
+
+/// Estado da cobranca (Fluxo B — D-019/D-020). Espelha ChargeStatus de
+/// @fitvo/payments. REFUNDED cobre o reembolso voluntario (D-025); a politica
+/// juridica de estorno/arrependimento e GATED (advogado — ADR-0004).
+enum ChargeStatus {
+  PENDING
+  CONFIRMED
+  RECEIVED
+  OVERDUE
+  REFUNDED
+  FAILED
+}
+
+/// Plano Nivel 1 (plataforma -> profissional/clinica — D-060). Os PRECOS sao
+/// dado configuravel (PlanPrice), NUNCA hardcoded; o catalogo comercial real e
+/// uma decisao humana (GATED) — nao semeamos precos reais nesta fase.
+model Plan {
+  id        String   @id @default(cuid())
+  code      String   @unique // identificador estavel (ex.: "solo", "clinic")
+  name      String
+  tier      String // faixa comercial (ex.: intern/solo/clinic) — texto livre nesta fase
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prices        PlanPrice[]
+  subscriptions Subscription[]
+
+  @@map("plan")
+}
+
+/// Preco de um plano por periodicidade (D-057/D-060). Filho de Plano para que
+/// periodos longos carreguem descontos progressivos como DADO. Dinheiro sempre
+/// em centavos inteiros (D-069). Valores comerciais reais sao GATED.
+model PlanPrice {
+  id          String      @id @default(cuid())
+  planId      String
+  periodicity Periodicity
+  amountCents Int // centavos inteiros (D-069)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, periodicity])
+  @@map("plan_price")
+}
+
+/// Subconta Asaas + taxa por tenant (D-050/D-058/D-059). Escopo = tenant (solo
+/// ou clinica). A taxa e configuravel por tenant (solo paga mais, clinica menos)
+/// e guardada em BASIS POINTS inteiros (1 bp = 0,01%; ex.: 500 = 5,00%) para
+/// manter tudo inteiro (D-069). O valor comercial real e GATED; default 0.
+/// asaasWalletId fica nulo ate o onboarding LIVE da subconta (GATED — sem
+/// credenciais Asaas neste repo).
+model PaymentAccount {
+  id               String           @id @default(cuid())
+  tenantId         String           @unique
+  asaasWalletId    String? // preenchido no onboarding LIVE (GATED)
+  feeBasisPoints   Int              @default(0) // taxa FITVO em basis points (config comercial — GATED)
+  onboardingStatus OnboardingStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("payment_account")
+}
+
+/// Assinatura de plano da plataforma (Fluxo A — D-062). Idempotencia obrigatoria
+/// (D-035): idempotencyKey unica evita cobranca duplicada em retry. Uma
+/// assinatura NAO-terminal por tenant (regra na aplicacao). asaasSubscriptionId
+/// nulo enquanto o gateway LIVE nao e chamado (GATED — usa FakePaymentGateway).
+/// Datas em UTC (D-067).
+model Subscription {
+  id                  String             @id @default(cuid())
+  tenantId            String
+  planId              String
+  periodicity         Periodicity
+  status              SubscriptionStatus @default(TRIALING)
+  asaasSubscriptionId String? // preenchido pelo gateway LIVE (GATED)
+  idempotencyKey      String             @unique // idempotencia financeira (D-035)
+  currentPeriodEnd    DateTime? // vencimento do periodo atual (base da regua)
+  trialEndsAt         DateTime? // fim do trial de 7 dias (D-062)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status])
+  @@index([status, currentPeriodEnd]) // varredura da regua de cobranca (worker)
+  @@map("subscription")
+}
+
+/// Cobranca paciente -> profissional (Fluxo B — D-019/D-050). Emitida contra um
+/// VINCULO (bond — ADR-0004), avulsa ou recorrente (recurring + periodicity —
+/// D-057). O split e capturado como DADO (professionalWalletId + platformFeeCents)
+/// para preservar o financeiro granular mesmo dentro da clinica. Idempotencia
+/// obrigatoria (D-035): idempotencyKey unica. Dinheiro em centavos (D-069). O
+/// chargeback (D-020) e apenas um estado futuro — modelado via status, sem logica
+/// de contestacao (risco do profissional — ADR-0004). Datas em UTC (D-067).
+model Charge {
+  id                   String       @id @default(cuid())
+  tenantId             String
+  bondId               String
+  amountCents          Int // centavos inteiros (D-069)
+  method               ChargeMethod
+  status               ChargeStatus @default(PENDING)
+  recurring            Boolean      @default(false) // cobranca recorrente (D-057)
+  periodicity          Periodicity? // preenchido quando recurring
+  asaasChargeId        String?      @unique // id no Asaas (GATED — nulo com o Fake)
+  idempotencyKey       String       @unique // idempotencia financeira (D-035)
+  professionalWalletId String? // subconta destino do split (nulo ate onboarding — GATED)
+  platformFeeCents     Int          @default(0) // taxa FITVO retida, capturada como dado (D-061)
+  description          String?
+  dueDate              DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([bondId])
+  @@map("charge")
+}
+
+/// Ledger de idempotencia de webhooks Asaas (D-035). Um evento reentregue e
+/// no-op: asaasEventId unico dedupe a reprocessagem. Guarda o payload cru para
+/// auditoria/reprocessamento manual. Datas em UTC (D-067).
+model WebhookEvent {
+  id           String   @id @default(cuid())
+  asaasEventId String   @unique // id do evento no Asaas (chave de dedupe)
+  type         String // tipo do evento (ex.: PAYMENT_RECEIVED)
+  payload      Json // payload cru para auditoria
+  processedAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@map("webhook_event")
 }

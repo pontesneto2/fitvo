@@ -9,6 +9,12 @@
 export interface JobOptions {
   delayMs?: number;
   attempts?: number;
+  /**
+   * Intervalo de repeticao (cron) em ms. Quando presente, o job e REPETIDO nesse
+   * intervalo (ex.: a varredura diaria da regua de cobranca — ADR-0004). Traduz
+   * para `repeat.every` do BullMQ; a fila em memoria (testes) ignora a repeticao.
+   */
+  repeatEveryMs?: number;
 }
 
 export interface Queue<TData> {
@@ -29,5 +35,15 @@ export interface QueueFactory {
 }
 
 export { BullMqQueueFactory } from './bullmq-queue-factory';
-export { BOND_CREATED_EVENT, type BondCreatedEvent, SHARING_QUEUE } from './events';
+export {
+  BILLING_QUEUE,
+  BOND_CREATED_EVENT,
+  type BondCreatedEvent,
+  RULER_TICK_EVENT,
+  type RulerTickEvent,
+  SHARING_QUEUE,
+  SUBSCRIPTION_REMINDER_EVENT,
+  type SubscriptionReminderEvent,
+  type SubscriptionReminderKind,
+} from './events';
 export { type CollectedJob, InMemoryQueueFactory } from './in-memory-queue-factory';

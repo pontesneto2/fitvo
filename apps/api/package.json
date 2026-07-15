@@ -22,6 +22,7 @@
     "@fitvo/config": "workspace:*",
     "@fitvo/database": "workspace:*",
     "@fitvo/observability": "workspace:*",
+    "@fitvo/payments": "workspace:*",
     "@fitvo/queue": "workspace:*",
     "fastify": "^5.1.0",
     "ioredis": "^5.11.1",

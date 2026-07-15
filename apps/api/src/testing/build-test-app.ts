@@ -5,12 +5,15 @@ import {
   InMemoryVerificationTokenStore,
   JwtTokenService,
 } from '@fitvo/auth';
+import { FakePaymentGateway } from '@fitvo/payments';
 import { type BondCreatedEvent, InMemoryQueueFactory, SHARING_QUEUE } from '@fitvo/queue';
 import type { FastifyInstance } from 'fastify';
 
 import { buildApp } from '../app';
 import { AuthApplicationService } from '../modules/auth/auth-application-service';
 import { InMemoryAccountRepository } from '../modules/auth/in-memory-account-repository';
+import { BillingApplicationService } from '../modules/billing/billing-application-service';
+import { InMemoryBillingRepository } from '../modules/billing/in-memory-billing-repository';
 import { ClinicApplicationService } from '../modules/clinic/clinic-application-service';
 import { InMemoryClinicRepository } from '../modules/clinic/in-memory-clinic-repository';
 import { ConsentApplicationService } from '../modules/consent/consent-application-service';
@@ -28,6 +31,8 @@ export interface TestHarness {
   patient: InMemoryPatientRepository;
   /** Repositorio de consentimento em memoria — expoe `seed*` para arranjar pacientes/profissionais/vinculos. */
   consent: InMemoryConsentRepository;
+  /** Repositorio de billing em memoria — expoe `seed*` para planos/subcontas/donos/vinculos. */
+  billing: InMemoryBillingRepository;
   /** Fabrica de filas em memoria — coleta os eventos publicados (ex.: bond.created). */
   queue: InMemoryQueueFactory;
 }
@@ -61,6 +66,15 @@ export async function buildTestHarness(): Promise<TestHarness> {
   const patientService = new PatientApplicationService(patient, hasher, authCore, 3600, bondEvents);
   const consent = new InMemoryConsentRepository();
   const consentService = new ConsentApplicationService(consent, authCore);
+  const billing = new InMemoryBillingRepository();
+  // Gateway Fake deterministico (sem Asaas). platformWalletId de teste habilita
+  // a montagem de split quando a subconta tem walletId semeado.
+  const billingService = new BillingApplicationService(
+    billing,
+    new FakePaymentGateway(),
+    authCore,
+    'wallet_fitvo_test',
+  );
   const app = await buildApp({
     logLevel: 'silent',
     corsOrigin: '*',
@@ -68,8 +82,9 @@ export async function buildTestHarness(): Promise<TestHarness> {
     clinicService,
     patientService,
     consentService,
+    billingService,
   });
-  return { app, emails, clinic, patient, consent, queue };
+  return { app, emails, clinic, patient, consent, billing, queue };
 }
 
 /** Atalho para os testes que so precisam da instancia da app. */

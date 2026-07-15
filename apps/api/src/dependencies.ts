@@ -7,12 +7,15 @@ import {
   RedisVerificationTokenStore,
 } from '@fitvo/auth';
 import { prisma } from '@fitvo/database';
+import { AsaasPaymentGateway, FakePaymentGateway, type PaymentGateway } from '@fitvo/payments';
 import { type BondCreatedEvent, BullMqQueueFactory, SHARING_QUEUE } from '@fitvo/queue';
 import { Redis } from 'ioredis';
 
 import type { ApiEnv } from './env';
 import { AuthApplicationService } from './modules/auth/auth-application-service';
 import { PrismaAccountRepository } from './modules/auth/prisma-account-repository';
+import { BillingApplicationService } from './modules/billing/billing-application-service';
+import { PrismaBillingRepository } from './modules/billing/prisma-billing-repository';
 import { ClinicApplicationService } from './modules/clinic/clinic-application-service';
 import { PrismaClinicRepository } from './modules/clinic/prisma-clinic-repository';
 import { ConsentApplicationService } from './modules/consent/consent-application-service';
@@ -28,7 +31,31 @@ export interface AppDependencies {
   clinicService: ClinicApplicationService;
   patientService: PatientApplicationService;
   consentService: ConsentApplicationService;
+  billingService: BillingApplicationService;
   onClose?: () => Promise<void>;
+}
+
+/**
+ * Escolhe o gateway de pagamento (ADR-0004). Com credenciais Asaas configuradas,
+ * usa o adaptador LIVE; sem elas (caso deste repo publico), cai para o
+ * FakePaymentGateway deterministico e registra um aviso claro. A app SEMPRE sobe.
+ */
+function buildPaymentGateway(env: ApiEnv): PaymentGateway {
+  if (env.ASAAS_API_KEY && env.ASAAS_WEBHOOK_SECRET) {
+    return new AsaasPaymentGateway({
+      apiKey: env.ASAAS_API_KEY,
+      baseUrl: env.ASAAS_BASE_URL,
+      webhookSecret: env.ASAAS_WEBHOOK_SECRET,
+    });
+  }
+  // eslint-disable-next-line no-console
+  console.warn(
+    JSON.stringify({
+      level: 'warn',
+      msg: 'Asaas nao configurado (ASAAS_API_KEY/ASAAS_WEBHOOK_SECRET ausentes) — usando FakePaymentGateway.',
+    }),
+  );
+  return new FakePaymentGateway();
 }
 
 /** Monta as dependencias reais (Prisma + Redis + Argon2 + JWT) a partir do env. */
@@ -90,6 +117,14 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     new PrismaConsentRepository(prisma),
     authCore,
   );
+  // authCore satisfaz AccessTokenVerifier — a slice de billing reusa o mesmo
+  // verificador. O gateway e Asaas (LIVE) ou Fake conforme a config (GATED).
+  const billingService = new BillingApplicationService(
+    new PrismaBillingRepository(prisma),
+    buildPaymentGateway(env),
+    authCore,
+    env.ASAAS_PLATFORM_WALLET_ID ?? null,
+  );
 
   return {
     logLevel: env.LOG_LEVEL,
@@ -98,6 +133,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     clinicService,
     patientService,
     consentService,
+    billingService,
     onClose: async () => {
       await queueFactory.close();
       await redis.quit();

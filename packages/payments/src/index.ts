@@ -72,3 +72,14 @@ export interface PaymentGateway {
   /** Valida assinatura do webhook e devolve o evento normalizado. */
   parseWebhook(payload: unknown, signature: string): Promise<PaymentWebhookEvent>;
 }
+
+// Adaptadores concretos e helpers puros (ADR-0004). O adaptador Asaas e LIVE
+// GATED (sem credenciais neste repo); o Fake e o fallback deterministico.
+export {
+  type AsaasConfig,
+  AsaasPaymentGateway,
+  type HttpClient,
+  normalizeAsaasStatus,
+} from './asaas-payment-gateway';
+export { FakePaymentGateway } from './fake-payment-gateway';
+export { buildChargeSplits, computePlatformFeeCents } from './split';

@@ -27,5 +27,7 @@ export * from './tabs-variants';
 export * from './textarea';
 export * from './theme-context';
 export * from './themes';
+export * from './toast';
+export * from './toast-variants';
 export * from './toggle-variants';
 export * from './use-field';

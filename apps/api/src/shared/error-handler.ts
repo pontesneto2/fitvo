@@ -14,6 +14,24 @@ function statusCodeOf(error: unknown): number | undefined {
   return undefined;
 }
 
+/** Item de erro de validacao do AJV/Fastify (subconjunto usado aqui). */
+interface ValidationIssue {
+  instancePath?: string;
+  message?: string;
+  params?: Record<string, unknown>;
+}
+
+/** Erros de validacao de schema do Fastify (`schema.body` etc. — D-032). */
+function fastifyValidationIssues(error: unknown): ValidationIssue[] | undefined {
+  if (typeof error === 'object' && error !== null && 'validation' in error) {
+    const { validation } = error as { validation: unknown };
+    if (Array.isArray(validation)) {
+      return validation as ValidationIssue[];
+    }
+  }
+  return undefined;
+}
+
 /**
  * Tradutor de erros para RFC 7807 (D-031). O front traduz o ProblemDetails
  * tecnico numa mensagem amigavel ao usuario final.
@@ -25,6 +43,27 @@ export function registerErrorHandler(app: FastifyInstance): void {
       for (const issue of error.issues) {
         const path = issue.path.join('.') || '(body)';
         (errors[path] ??= []).push(issue.message);
+      }
+      const problem: ProblemDetails = {
+        type: 'https://fitvo.dev/problems/validation',
+        title: 'Requisicao invalida',
+        status: 400,
+        errors,
+      };
+      return reply.code(400).type(PROBLEM_CONTENT_TYPE).send(problem);
+    }
+
+    const issues = fastifyValidationIssues(error);
+    if (issues) {
+      const errors: Record<string, string[]> = {};
+      for (const issue of issues) {
+        const missing =
+          typeof issue.params?.missingProperty === 'string'
+            ? issue.params.missingProperty
+            : undefined;
+        const path =
+          (issue.instancePath ?? '').replace(/^\//, '').replaceAll('/', '.') || missing || '(body)';
+        (errors[path] ??= []).push(issue.message ?? 'invalido');
       }
       const problem: ProblemDetails = {
         type: 'https://fitvo.dev/problems/validation',

@@ -42,7 +42,14 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
   registerErrorHandler(app);
 
   await app.register(fastifySwagger, {
-    openapi: { info: { title: 'FITVO API', version: '0.0.0' } },
+    openapi: {
+      info: { title: 'FITVO API', version: '0.0.0' },
+      components: {
+        securitySchemes: {
+          bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        },
+      },
+    },
   });
   await app.register(fastifySwaggerUi, { routePrefix: '/docs' });
 

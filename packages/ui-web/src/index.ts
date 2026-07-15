@@ -15,6 +15,7 @@ export * from './css-variables';
 export * from './field';
 export * from './field-styles';
 export * from './input';
+export * from './logo';
 export * from './modal';
 export * from './radio';
 export * from './select';

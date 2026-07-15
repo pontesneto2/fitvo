@@ -1,0 +1,9 @@
+<!-- TODO: ÍCONE PROVISÓRIO — símbolo/monograma temporário do FITVO.
+     Substituir pelo símbolo definitivo quando existir. O componente `Logo`
+     (variant="icon") referencia ESTE arquivo: trocar o símbolo = trocar este
+     arquivo, sem tocar no componente. Cores = tokens: brand-500 (#0FA678),
+     detalhe em energy-400 (#00E676). Quadrado, legível de 16px a 512px. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="FITVO">
+  <path d="M136 140 L256 372 L376 140" fill="none" stroke="#0FA678" stroke-width="76" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="376" cy="140" r="34" fill="#00E676"/>
+</svg>

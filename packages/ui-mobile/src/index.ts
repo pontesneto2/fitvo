@@ -16,6 +16,8 @@ export * from './card-variants';
 export * from './checkbox';
 export * from './field';
 export * from './input';
+export * from './logo';
+export * from './logo-variants';
 export * from './modal';
 export * from './modal-variants';
 export * from './radio';

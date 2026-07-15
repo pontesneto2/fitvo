@@ -1,6 +1,14 @@
 // FITVO — Prisma schema.
-// Fase 1: apenas datasource + generator. NENHUM model de negocio ainda.
-// As entidades (account, tenant, bond, consent, billing...) entram na Fase 2.
+// Fase 2 (fatia 1): identidade + tenancy. Sem vinculo/consentimento/financeiro
+// ainda (fases seguintes). Datas em UTC (D-067); dinheiro nao aparece aqui.
+//
+// Fundamentos (ADRs):
+// - Account (identidade) separada dos perfis de papel; 1 conta = N papeis
+//   (D-041/D-044). Login por e-mail unico (D-042). Documento fiscal (D-043).
+// - Tenant = clinica ou profissional solo (tenant de 1) (D-012/D-045).
+// - Profissional tem N especialidades, cada uma verificada pela plataforma
+//   (D-008/D-046). Especialidades = catalogo fixo (D-047).
+// - RBAC 4 niveis; admin de clinica desacoplado de profissional (D-013/D-015).
 
 generator client {
   provider = "prisma-client-js"
@@ -9,4 +17,176 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum TenantType {
+  SOLO // profissional solo: tenant de 1 pessoa (auto-criado)
+  CLINIC // clinica: tenant multiprofissional
+}
+
+enum DocumentType {
+  CPF
+  CNPJ
+}
+
+enum SpecialtyCode {
+  TRAINING // treino / educacao fisica (CREF)
+  NUTRITION // nutricao (CRN)
+  MEDICINE // medicina (CRM)
+}
+
+enum VerificationStatus {
+  PENDING // cadastrado, aguardando envio/analise
+  IN_ANALYSIS // documentos em revisao pela plataforma
+  VERIFIED // habilitado a atender naquela especialidade
+  REJECTED
+}
+
+enum ClinicRole {
+  CLINIC_ADMIN // admin de clinica (visao ampla, dado operacional; nunca clinico)
+}
+
+// ---------------------------------------------------------------------------
+// Identidade
+// ---------------------------------------------------------------------------
+
+/// Conta = identidade unica de login. Acumula N papeis (profissional, paciente,
+/// admin de clinica, super admin) sob a mesma conta (D-041/D-044).
+model Account {
+  id                String       @id @default(cuid())
+  email             String       @unique
+  passwordHash      String
+  name              String
+  document          String // CPF ou CNPJ da PESSOA (D-043)
+  documentType      DocumentType
+  emailVerifiedAt   DateTime?
+  preferredLocale   String       @default("pt-BR") // i18n (D-066)
+  preferredTimezone String       @default("America/Sao_Paulo") // exibicao (D-067)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  professionalProfile ProfessionalProfile?
+  patientProfile      PatientProfile?
+  platformAdmin       PlatformAdmin?
+  clinicMemberships   ClinicMembership[]
+
+  @@map("account")
+}
+
+/// Super Admin FITVO (gestao da plataforma inteira — D-013).
+model PlatformAdmin {
+  id        String   @id @default(cuid())
+  accountId String   @unique
+  createdAt DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("platform_admin")
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy (clinica / solo)
+// ---------------------------------------------------------------------------
+
+/// Unidade de isolamento de dados e cobranca. Solo = tenant de 1 (auto-criado);
+/// clinica = tenant multiprofissional com admin (D-012/D-045).
+model Tenant {
+  id           String        @id @default(cuid())
+  type         TenantType
+  name         String
+  document     String? // CNPJ da CLINICA mora aqui (D-043); solo herda o da conta
+  documentType DocumentType?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  professionals ProfessionalProfile[]
+  memberships   ClinicMembership[]
+
+  @@map("tenant")
+}
+
+/// Vinculo de uma pessoa a uma clinica como ADMIN (papel desacoplado de
+/// profissional — D-013/D-015). Admin puro nunca acessa dado clinico.
+model ClinicMembership {
+  id        String     @id @default(cuid())
+  accountId String
+  tenantId  String
+  role      ClinicRole @default(CLINIC_ADMIN)
+  createdAt DateTime   @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, tenantId])
+  @@index([tenantId])
+  @@map("clinic_membership")
+}
+
+// ---------------------------------------------------------------------------
+// Perfis de papel: profissional e paciente
+// ---------------------------------------------------------------------------
+
+/// Perfil profissional (1:1 com a conta). Pertence a um tenant: o proprio
+/// (solo) ou a clinica que o convidou (D-045/D-048).
+model ProfessionalProfile {
+  id          String   @id @default(cuid())
+  accountId   String   @unique
+  tenantId    String
+  displayName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  account     Account                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tenant      Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  specialties ProfessionalSpecialty[]
+
+  @@index([tenantId])
+  @@map("professional_profile")
+}
+
+/// Especialidade do catalogo fixo da plataforma (D-047). Semeada na migracao.
+model Specialty {
+  id   String        @id @default(cuid())
+  code SpecialtyCode @unique
+  name String
+
+  professionals ProfessionalSpecialty[]
+
+  @@map("specialty")
+}
+
+/// Habilitacao do profissional numa especialidade, com status de verificacao
+/// individual pela plataforma (D-046/D-010/D-051).
+model ProfessionalSpecialty {
+  id                    String             @id @default(cuid())
+  professionalProfileId String
+  specialtyId           String
+  verificationStatus    VerificationStatus @default(PENDING)
+  councilDocument       String? // registro no conselho (CREF/CRN/CRM)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  professionalProfile ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
+  specialty           Specialty           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+
+  @@unique([professionalProfileId, specialtyId])
+  @@index([specialtyId])
+  @@map("professional_specialty")
+}
+
+/// Perfil de paciente (1:1 com a conta). Dados corporais globais e vinculos
+/// entram na fase do dominio de paciente.
+model PatientProfile {
+  id        String   @id @default(cuid())
+  accountId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("patient_profile")
 }

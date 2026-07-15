@@ -1,4 +1,4 @@
-import { fontFamily, fontWeight } from '@fitvo/brand-tokens';
+import { fontFamily, fontWeight, space } from '@fitvo/brand-tokens';
 import type { ReactNode } from 'react';
 import type { TextInputProps, TextStyle } from 'react-native';
 import { StyleSheet, TextInput } from 'react-native';
@@ -10,39 +10,43 @@ import { useFieldColors } from './use-field';
 export type { InputStatus } from './input-variants';
 
 /**
- * Input MOBILE (design-system-components.md §2 + dark §21). TextInput de linha
- * unica; a decisao de cor/estado vive em `input-variants.ts` + `useFieldColors`
- * (compartilhado com Textarea). No touch nao ha hover; foco e runtime.
+ * Textarea MOBILE (design-system-components.md §2). TextInput multilinha — mesmos
+ * tokens de estado do Input (via `useFieldColors`), com altura minima de 80px,
+ * padding vertical e texto alinhado ao topo.
  */
-export interface InputProps extends Omit<
+export interface TextareaProps extends Omit<
   TextInputProps,
-  'style' | 'editable' | 'placeholderTextColor'
+  'style' | 'editable' | 'placeholderTextColor' | 'multiline'
 > {
   readonly status?: InputStatus;
   readonly disabled?: boolean;
   readonly readOnly?: boolean;
 }
 
+const MIN_HEIGHT = 80;
+
 const styles = StyleSheet.create({
   base: {
-    height: INPUT_DIMS.height,
+    minHeight: MIN_HEIGHT,
     paddingHorizontal: INPUT_DIMS.paddingHorizontal,
+    paddingVertical: space[2],
     borderRadius: INPUT_DIMS.borderRadius,
     borderWidth: INPUT_DIMS.borderWidth,
     fontFamily: fontFamily.body,
     fontWeight: String(fontWeight.regular) as TextStyle['fontWeight'],
     fontSize: INPUT_DIMS.fontSize,
+    textAlignVertical: 'top',
   },
 });
 
-export function Input({
+export function Textarea({
   status = 'default',
   disabled = false,
   readOnly = false,
   onFocus,
   onBlur,
   ...props
-}: InputProps): ReactNode {
+}: TextareaProps): ReactNode {
   const {
     colors,
     editable,
@@ -52,6 +56,7 @@ export function Input({
 
   return (
     <TextInput
+      multiline
       editable={editable}
       placeholderTextColor={colors.placeholderColor}
       accessibilityState={{ disabled }}

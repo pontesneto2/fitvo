@@ -5,6 +5,9 @@
  * visuais entrarao aqui conforme o design-system-components.md for implementado.
  */
 export * from './button';
+export * from './field';
 export * from './input';
+export * from './textarea';
 export * from './theme-context';
 export * from './themes';
+export * from './use-field';

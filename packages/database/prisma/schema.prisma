@@ -642,10 +642,14 @@ model WebhookEvent {
 //   Prescription seguem com `detail Json?` + TODO(D-063) ate a decisao de produto
 //   com referencia propria (Dietbox). NAO inventar.
 //
-//   ANAMNESE / AVALIACAO — ABERTO. O D-094 (ADR-0010) decidiu o CICLO DE VIDA da
-//   anamnese (gate, uma por vinculo), NAO a taxonomia dos campos. Seguem
-//   deferidas — e estao FORA do escopo de sync offline, entao o Json nao conflita
-//   com o D-099.
+//   ANAMNESE — DECIDIDA (D-103, ADR-0011), TIPAGEM PENDENTE. A taxonomia existe
+//   (nucleo + modulo por especialidade + condicionais) e a autoria por secao
+//   (D-102) tambem: o `detail Json?` abaixo esta com os dias contados e sera
+//   substituido por colunas tipadas em PR proprio. Nao construir em cima dele.
+//
+//   AVALIACAO/MEDIDAS (Assessment) — ABERTO. O ADR-0011 fechou a ANAMNESE, nao a
+//   taxonomia de medidas, que segue deferida (D-063). Ambas estao FORA do escopo
+//   de sync offline, entao o Json nao conflita com o D-099.
 //
 // Modelos ligados a vinculo (Bond) carregam tenantId denormalizado para escopo
 // (D-002) e sao isolados POR VINCULO (ADR-0001). Bibliotecas (Exercise/Food) =
@@ -1280,20 +1284,25 @@ model Prescription {
 /// o aluno ve o que precisa fazer. A fonte da verdade do gate e ESTE registro —
 /// nao ha flag duplicada no Bond, que poderia divergir.
 ///
-/// CAMPOS DEFERIDOS — `detail Json?` DELIBERADO: o D-094 decidiu o CICLO DE VIDA
-/// da anamnese (gate, unica por vinculo, autopreenchida), NAO a taxonomia
-/// clinica dos campos. Nenhum ADR a define — nao inventar (CLAUDE.md). Isto NAO
-/// conflita com o D-099: a anamnese esta FORA do escopo de sync offline (que e
-/// so planos ativos + execucoes pendentes), entao nao ha merge por campo aqui.
-/// Tipar quando a decisao de produto existir — mesma fila do D-063 de
-/// nutricao/medicina.
+/// CAMPOS: TAXONOMIA JA DECIDIDA — TIPAGEM EM PR SEGUINTE. O `detail Json?`
+/// abaixo e TEMPORARIO e nao deve ser usado como base para nada: o D-103
+/// (ADR-0011) fechou a taxonomia (nucleo comum + modulo por especialidade +
+/// perguntas condicionais) e o D-102 exige autoria POR SECAO, o que empurra a
+/// modelagem para blocos com autor + timestamp, nao para uma tabela larga. A
+/// substituicao por colunas tipadas sai em PR proprio (nao foi feita aqui para
+/// nao inflar um PR de area critica).
+///
+/// O ADR-0011 tambem REVISA o D-094: a anamnese pode ser preenchida pelo
+/// paciente, pelo profissional ou por AMBOS, e pode NASCER do profissional na
+/// consulta presencial (D-102) — o gate e satisfeito independente de quem
+/// preencheu. A modalidade do vinculo (D-101) e que define o fluxo.
 model Anamnesis {
   id         String          @id @default(cuid())
   tenantId   String // escopo denormalizado (D-002)
   bondId     String          @unique // uma por vinculo (D-094); isolamento (ADR-0001)
   status     AnamnesisStatus @default(PENDING) // o GATE (D-093)
   answeredAt DateTime? // quando o aluno respondeu (UTC)
-  detail     Json? // TODO(D-094): campos por especialidade — decisao humana pendente
+  detail     Json? // TEMPORARIO — TODO(D-103, ADR-0011): taxonomia ja decidida; tipar em PR proprio
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 

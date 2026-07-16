@@ -3,7 +3,7 @@
 > Fonte única do plano de execução. Substitui qualquer backlog interno de
 > sessão — o backlog do agente deve espelhar este documento, nunca o
 > contrário. Atualizar sempre que uma fase mudar de status. As decisões de
-> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-078); a
+> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-100); a
 > identidade visual em `docs/design-system.md`.
 
 Convenção de status: **FEITO** (mergeado em `main`, com PR), **EM ANDAMENTO**,
@@ -52,12 +52,35 @@ FITVO.
 1. **Apps web** (`web-personal`, `web-admin`, `site`) — App Router + TanStack
    Query + client de API + tema/dark + fontes; telas de auth e shell de
    dashboard derivadas do design system. Depende do merge do PR #18.
-2. **Domínios de conteúdo — regra fina** (D-063): treino, nutrição e
-   prontuário/prescrição médica hoje são só schema (PR #14). Preencher
-   comportamento/regra de negócio real é decisão humana com referências
-   (ex.: MFit, Dietbox) — ver BLOQUEADO — RESPONSÁVEL. **Coração do produto —
-   prioridade alta.** Inclui exames laboratoriais (solicitação + anexo de
-   resultado, D-076, ADR-0007) — ponte nutrição↔medicina.
+2. **Domínio de treino — regra fina** (D-063 fechado para treino via
+   **ADR-0009**, D-079 a D-092): hoje é só schema (PR #14) com `detail Json?`.
+   Fase de implementação (aguardando aprovação do **plano de modelagem** antes
+   de código — dado clínico-adjacente, **revisão humana obrigatória**):
+   - Reestrutura a hierarquia `Bond → WorkoutPlan → Workout → WorkoutItem →
+     WorkoutSet` (D-079/D-081) e mata o `detail Json?` (colunas tipadas).
+   - **Execução + avaliação + check-in** (D-086/D-087): `WorkoutSession`,
+     `SetLog`, `WorkoutRating`.
+   - **Agendamento de liberação** de plano + **régua de validade** (worker —
+     D-083/D-084).
+   - **Análise de forma por IA** (D-088): vídeo + pré-análise assíncrona +
+     validação profissional (`FormAnalysis`) — depende do item 4 (IA) e do
+     offline/câmera nativa (item 12/mobile).
+   - **Deleção lógica** em biblioteca/geral (D-089): estados
+     `ativo`/`descontinuado` em `Exercise`/`Food`.
+   - **Coração do produto — prioridade alta.**
+2b. **Fluxo do aluno, gates e atendimento** (D-093 a D-100, **ADR-0010**):
+   gates obrigatórios (anamnese trava o app até responder — D-093), anamnese
+   por vínculo separada de avaliação/medidas (D-094), **Atendimento** (ticket +
+   escalada inteligente de canal — D-096, `Attendance`/`AttendanceMessage`/
+   `AttendanceRating`), **Notificações inteligentes** como pilar (D-097,
+   `Notification` — o modelo que ADR-0005/D-028 descreveu e faltava). Toca dado
+   clínico + auth (troca de e-mail verificada) → **revisão humana obrigatória**.
+2c. **Nutrição e medicina — regra fina** (D-063, ainda ABERTO): planos
+   alimentares/macros e prontuário/prescrição seguem a mesma lógica do treino,
+   mas dependem de referência própria (**Dietbox**, como o MFit foi para
+   treino) — ver BLOQUEADO — RESPONSÁVEL. Inclui exames laboratoriais
+   (solicitação + anexo de resultado, D-076, ADR-0007) — ponte
+   nutrição↔medicina.
 3. **Videoconferência — treino e nutrição** (D-074/D-075, ADR-0007): package
    `video` novo (interface + adapter Daily/Prebuilt + fake, mesmo padrão dos
    demais adapters da ADR-0005). Habilitado nos ambientes de treino e
@@ -80,7 +103,9 @@ FITVO.
    vínculo (mencionado em D-001 como dado por vínculo; sem ADR de detalhe
    ainda — regra fina fica em BLOQUEADO — RESPONSÁVEL).
 7. **Check-in** — registro de check-in do paciente por vínculo/especialidade
-   (mencionado em D-001; mesma situação: sem ADR de detalhe).
+   (mencionado em D-001; sem ADR de detalhe genérico). **Parcialmente resolvido
+   em treino:** a conclusão de treino conta como check-in (D-086, ADR-0009) e
+   nasce com o item 2; falta o check-in genérico das demais especialidades.
 8. **Notificações reais** (push/email/SMS ao vivo) — a estrutura de adapter já
    existe (`packages/notifications`, PR #15); falta o disparo ao vivo, que
    depende de credenciais (Firebase, provedor de e-mail/SMS) — ver BLOQUEADO —
@@ -103,6 +128,14 @@ FITVO.
 12. **Mobile (Expo)** — app "3-em-1" (aluno + profissional), Expo Router +
     TanStack Query. Ainda não iniciado; bloco próprio, depende de apps web e
     design mobile estarem maduros.
+12b. **Offline-first do app do aluno** (D-099/D-100, ADR-0010): WatermelonDB
+    (SQLite como fonte da verdade) + **servidor de sync próprio** (dois
+    endpoints pull/push + conflito idempotente — item mais caro do lote),
+    escopo delimitado (planos ativos + execuções pendentes), criptografia local
+    obrigatória, tombstones (`deletedAt`) + `updatedAt` indexado nas tabelas
+    sincronizáveis. **Exige development build** (adeus Expo Go). Depende do item
+    12 (mobile) e do item 2 (treino tipado — merge por campo exige colunas, não
+    `Json`).
 13. **Testes ao vivo das integrações** (Asaas sandbox, IA real, FCM, e-mail,
     SMS, Daily) — hoje todos gated por ausência de credenciais no ambiente.
     Rodar exige as credenciais reais (ver BLOQUEADO — TERCEIROS).
@@ -123,8 +156,13 @@ FITVO.
 - **Agenda / Check-in**: não há ADR de detalhe — regra de negócio fina
   (janelas de disponibilidade, política de remarcação, frequência de
   check-in) precisa ser definida antes de implementar além do esqueleto.
-- **Campos finos de treino/nutrição/medicina (D-063)**: decisão humana com
-  referências de produto (MFit/Dietbox citados como benchmark). Exames
+- **Plano de modelagem de treino/fluxo (ADR-0009/0010)**: os ADRs estão
+  escritos (D-079 a D-100); falta **aprovar o plano de modelagem** (entidades,
+  relações, índices, migração `Json`→tipado) antes de escrever qualquer código.
+  Área de dado clínico-adjacente → revisão humana obrigatória, sem auto-merge.
+- **Campos finos de nutrição/medicina (D-063, ainda aberto)**: treino já foi
+  fechado (ADR-0009/0010, benchmark MFit). Nutrição e medicina dependem de
+  referência de produto própria (**Dietbox**) e decisão humana. Exames
   laboratoriais (D-076) entram junto quando essa fase for aberta.
 - **Dashboard e relatórios**: quais indicadores, para qual persona, com que
   nível de detalhe — não especificado nos ADRs.

@@ -13,6 +13,8 @@ export * from './breadcrumb-variants';
 export * from './button';
 export * from './card';
 export * from './card-variants';
+export * from './chart-bar';
+export * from './chart-line';
 export * from './checkbox';
 export * from './field';
 export * from './input';

@@ -167,6 +167,14 @@ html.dark table.demo tbody tr:hover { background: var(--neutral-700); }
 }
 .page-btn.active { background: var(--brand-500); color: #fff; font-weight: 500; }
 .page-btn:hover:not(.active) { background: var(--neutral-100); }
+
+.chart-card {
+  border-radius: var(--radius-lg); border: 1px solid var(--border-default);
+  padding: 16px; background: var(--surface-raised);
+}
+.chart-legend { display: flex; gap: 16px; margin-top: 8px; padding-left: 32px; }
+.chart-legend span { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-auxiliar); }
+.chart-legend i { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
 html.dark .page-btn:hover:not(.active) { background: var(--neutral-800); }
 
 footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border-default); font-size: 12px; color: var(--text-sutil); }
@@ -286,6 +294,40 @@ footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border
     <button class="page-btn">2</button>
     <button class="page-btn">3</button>
     <button class="page-btn">›</button>
+  </div>
+</section>
+
+<section>
+  <h2>Gráficos (§17) — <code>LineChart</code> / <code>BarChart</code></h2>
+  <p class="desc">Ordem de cor das séries (<code>chartSeries</code>), grid/eixo (<code>borderDefault</code>/<code>textSutil</code>). Cor nunca é o único diferenciador: no line, cada série tem um padrão de traço próprio; no bar, a legenda sempre identifica a série pelo nome. Mockup estático fiel aos tokens — o componente real (Recharts/victory-native) é interativo (tooltip, hover).</p>
+  <div class="pair">
+    <div class="chart-card">
+      <svg viewBox="0 0 320 180" width="100%" height="180" aria-hidden="true">
+        <line x1="32" y1="10" x2="32" y2="150" stroke="var(--border-default)" />
+        <line x1="32" y1="150" x2="300" y2="150" stroke="var(--border-default)" />
+        <polyline points="32,120 100,90 168,100 236,50 300,60" fill="none" stroke="#0FA678" stroke-width="2" />
+        <polyline points="32,140 100,130 168,80 236,95 300,40" fill="none" stroke="#2D9CDB" stroke-width="2" stroke-dasharray="6 3" />
+        <text x="20" y="165" font-size="11" fill="var(--text-sutil)">Jan</text>
+        <text x="285" y="165" font-size="11" fill="var(--text-sutil)">Mai</text>
+      </svg>
+      <div class="chart-legend">
+        <span><i style="background:#0FA678"></i>Treino</span>
+        <span><i style="background:#2D9CDB"></i>Nutrição</span>
+      </div>
+    </div>
+    <div class="chart-card">
+      <svg viewBox="0 0 320 180" width="100%" height="180" aria-hidden="true">
+        <line x1="32" y1="10" x2="32" y2="150" stroke="var(--border-default)" />
+        <line x1="32" y1="150" x2="300" y2="150" stroke="var(--border-default)" />
+        <rect x="50" y="90" width="28" height="60" rx="4" fill="#0FA678" />
+        <rect x="118" y="60" width="28" height="90" rx="4" fill="#0FA678" />
+        <rect x="186" y="40" width="28" height="110" rx="4" fill="#0FA678" />
+        <rect x="254" y="75" width="28" height="75" rx="4" fill="#0FA678" />
+        <text x="20" y="165" font-size="11" fill="var(--text-sutil)">Jan</text>
+        <text x="285" y="165" font-size="11" fill="var(--text-sutil)">Abr</text>
+      </svg>
+      <div class="chart-legend"><span><i style="background:#0FA678"></i>Receita</span></div>
+    </div>
   </div>
 </section>
 

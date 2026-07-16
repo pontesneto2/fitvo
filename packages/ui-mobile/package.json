@@ -16,11 +16,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fitvo/brand-tokens": "workspace:*"
+    "@fitvo/brand-tokens": "workspace:*",
+    "victory-native": "^36.9.2"
   },
   "peerDependencies": {
     "react": ">=18",
-    "react-native": ">=0.74"
+    "react-native": ">=0.74",
+    "react-native-svg": ">=13"
   },
   "devDependencies": {
     "@fitvo/eslint-config": "workspace:*",
@@ -29,6 +31,7 @@
     "eslint": "^10.7.0",
     "react": "^18.3.1",
     "react-native": "^0.76.0",
+    "react-native-svg": "^15.8.0",
     "typescript": "^5.6.2",
     "vitest": "^3.0.0"
   }

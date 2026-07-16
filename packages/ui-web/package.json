@@ -18,7 +18,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fitvo/brand-tokens": "workspace:*"
+    "@fitvo/brand-tokens": "workspace:*",
+    "recharts": "^3.9.2"
   },
   "peerDependencies": {
     "react": ">=18"

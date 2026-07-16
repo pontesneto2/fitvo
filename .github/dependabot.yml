@@ -5,6 +5,34 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    # Versoes travadas POR DECISAO ARQUITETURAL, nao por inercia. O Dependabot
+    # nao tem como saber disso e reabre o mesmo PR vermelho toda semana — e como
+    # o update e AGRUPADO, um pacote travado reprova o grupo inteiro e leva junto
+    # patches legitimos. Ignorar so o MAJOR: patch/minor da linha atual continuam
+    # chegando (inclusive correcao de seguranca).
+    ignore:
+      # Prisma preso no 6.x: o 7 remove `datasource.url` do schema.prisma e exige
+      # `prisma.config.ts` + `@prisma/adapter-pg` — muda como o PrismaClient e
+      # instanciado na API e no worker inteiros. E migracao com escopo proprio,
+      # nao um bump. Ver docs/troubleshooting.md §3 e docs/roadmap.md.
+      # Ao destravar: subir `prisma` (CLI) e `@prisma/client` JUNTOS — subir
+      # metade do par foi o que quebrou os PRs #5, #12 e #32.
+      - dependency-name: 'prisma'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@prisma/*'
+        update-types: ['version-update:semver-major']
+      # TypeScript preso no 5.x: nenhuma versao lancada de
+      # @typescript-eslint/parser suporta TS >=6.1 (peer: >=4.8.4 <6.1.0).
+      # Subir quebraria o lint type-aware do monorepo inteiro. Destravar quando
+      # o typescript-eslint suportar.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
+      # victory-native preso no v36 (SVG puro sobre react-native-svg). O v41 "XL"
+      # troca o motor por Skia + Reanimated — dependencia nativa pesada, e nao ha
+      # app RN real no repo para validar. Escolha registrada em
+      # docs/ui-primitives.md (§17). Destravar junto com o app mobile.
+      - dependency-name: 'victory-native'
+        update-types: ['version-update:semver-major']
     groups:
       dev-dependencies:
         dependency-type: development

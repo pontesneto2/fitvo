@@ -1,7 +1,7 @@
 name: CI
 
 # Checks obrigatorios para branch protection em main (configurar no GitHub):
-# lint, typecheck, test, build, format, dependency-scan, secret-scan.
+# lint, typecheck, test, build, format, dependency-scan, secret-scan, migrate.
 on:
   pull_request:
     branches: [main]
@@ -35,6 +35,57 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: pnpm run format:check
+
+  migrate:
+    name: migrate
+    runs-on: ubuntu-latest
+    # Os demais jobs NAO tocam banco: provam que o codigo compila e passa nos
+    # testes, nao que a MIGRACAO aplica. Sem este job o CI fica verde com a
+    # cadeia de migracoes quebrada, e o erro so aparece no deploy — ou no
+    # primeiro `pnpm db:migrate` de quem clonou o repo.
+    services:
+      postgres:
+        # Porta 5432 aqui de proposito: o runner e limpo. O 5434 do
+        # docker-compose e contorno para o Postgres NATIVO da maquina local
+        # (ver docs/troubleshooting.md) — colisao que nao existe no CI.
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fitvo
+          POSTGRES_PASSWORD: fitvo
+          POSTGRES_DB: fitvo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://fitvo:fitvo@localhost:5432/fitvo?schema=public
+      SHADOW_DATABASE_URL: postgresql://fitvo:fitvo@localhost:5432/fitvo_shadow?schema=public
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      # 1) A cadeia inteira aplica num banco VAZIO — o que o deploy e o dev
+      #    novo fazem. `migrate deploy` nao cria migracao: so aplica as
+      #    existentes, entao falha se alguma estiver quebrada ou fora de ordem.
+      - name: Migracoes aplicam do zero
+        run: pnpm --filter @fitvo/database exec prisma migrate deploy
+
+      # 2) DRIFT: schema.prisma bate com as migracoes? Pega o caso classico de
+      #    editar o schema e esquecer de gerar a migracao — que passa em lint,
+      #    typecheck, test e build, e so quebra no deploy. --exit-code faz o
+      #    comando sair !=0 quando ha diferenca.
+      - name: Cria banco de shadow para o diff
+        run: psql "$DATABASE_URL" -c 'CREATE DATABASE fitvo_shadow;'
+      - name: Sem drift entre schema.prisma e as migracoes
+        run: |
+          pnpm --filter @fitvo/database exec prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$SHADOW_DATABASE_URL" \
+            --exit-code
 
   dependency-scan:
     name: dependency-scan

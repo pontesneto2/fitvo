@@ -3,7 +3,7 @@
 > Fonte única do plano de execução. Substitui qualquer backlog interno de
 > sessão — o backlog do agente deve espelhar este documento, nunca o
 > contrário. Atualizar sempre que uma fase mudar de status. As decisões de
-> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-100); a
+> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-104); a
 > identidade visual em `docs/design-system.md`.
 
 Convenção de status: **FEITO** (mergeado em `main`, com PR), **EM ANDAMENTO**,
@@ -75,12 +75,22 @@ FITVO.
    `AttendanceRating`), **Notificações inteligentes** como pilar (D-097,
    `Notification` — o modelo que ADR-0005/D-028 descreveu e faltava). Toca dado
    clínico + auth (troca de e-mail verificada) → **revisão humana obrigatória**.
-2c. **Nutrição e medicina — regra fina** (D-063, ainda ABERTO): planos
+2c. **Modalidade e anamnese tipada** (D-101 a D-104, **ADR-0011**): modalidade
+   do vínculo (`ONLINE`/`PRESENCIAL`/`HIBRIDO` — D-101, estruturante: muda o
+   fluxo da anamnese e a UX do gate), anamnese **híbrida com rastreio de
+   autoria** (D-102, revisa o D-094 — "o paciente declarou" ≠ "o profissional
+   aferiu"), e a **taxonomia** que fecha o `TODO(D-094)` e mata o
+   `Anamnesis.detail Json?` (D-103: núcleo + módulo por especialidade +
+   condicionais). Dado clínico → **revisão humana obrigatória**.
+2d. **Nutrição e medicina — regra fina** (D-063, ainda ABERTO): planos
    alimentares/macros e prontuário/prescrição seguem a mesma lógica do treino,
    mas dependem de referência própria (**Dietbox**, como o MFit foi para
    treino) — ver BLOQUEADO — RESPONSÁVEL. Inclui exames laboratoriais
    (solicitação + anexo de resultado, D-076, ADR-0007) — ponte
-   nutrição↔medicina.
+   nutrição↔medicina. **Destrava o D-104** (`MealLog`, ADR-0011): o check de
+   refeição precisa de um nível `Meal` que não existe hoje (`MealPlan →
+   MealPlanItem` vai direto ao alimento) — mesma lacuna que o D-079 achou no
+   treino.
 3. **Videoconferência — treino e nutrição** (D-074/D-075, ADR-0007): package
    `video` novo (interface + adapter Daily/Prebuilt + fake, mesmo padrão dos
    demais adapters da ADR-0005). Habilitado nos ambientes de treino e
@@ -156,14 +166,23 @@ FITVO.
 - **Agenda / Check-in**: não há ADR de detalhe — regra de negócio fina
   (janelas de disponibilidade, política de remarcação, frequência de
   check-in) precisa ser definida antes de implementar além do esqueleto.
-- **Plano de modelagem de treino/fluxo (ADR-0009/0010)**: os ADRs estão
-  escritos (D-079 a D-100); falta **aprovar o plano de modelagem** (entidades,
-  relações, índices, migração `Json`→tipado) antes de escrever qualquer código.
-  Área de dado clínico-adjacente → revisão humana obrigatória, sem auto-merge.
+- **Schema de treino/fluxo (ADR-0009/0010)**: escrito e em **PR #26** (CI verde,
+  rebaseado na main) — aguarda **revisão humana**, área clínico-adjacente, sem
+  `--admin`. Não mergear sem aprovação explícita.
+- **Modalidade — quem define e quando (D-101, ADR-0011)**: o vínculo nasce do
+  aceite do convite (D-006/D-055), então a modalidade precisa ser escolhida pelo
+  profissional **no convite** e carregada, ou definida depois. E se ela **muda**
+  (paciente migra de presencial para online), é edição do vínculo ou dado
+  histórico? Não decidido — bloqueia a modelagem do D-101.
+- **Granularidade da autoria da anamnese (D-102, ADR-0011)**: rastrear quem
+  preencheu **por seção/bloco** (barato, provavelmente suficiente para o peso
+  jurídico) ou **por campo** (caro: dobra o schema ou exige tabela de
+  auditoria). Decisão de modelagem que precisa do seu aval.
 - **Campos finos de nutrição/medicina (D-063, ainda aberto)**: treino já foi
-  fechado (ADR-0009/0010, benchmark MFit). Nutrição e medicina dependem de
-  referência de produto própria (**Dietbox**) e decisão humana. Exames
-  laboratoriais (D-076) entram junto quando essa fase for aberta.
+  fechado (ADR-0009/0010, benchmark MFit) e a anamnese pelo ADR-0011. Nutrição e
+  medicina dependem de referência de produto própria (**Dietbox**) e decisão
+  humana. Exames laboratoriais (D-076) entram junto. **Bloqueia o D-104**
+  (`MealLog`): falta o nível `Meal` entre plano e alimento.
 - **Dashboard e relatórios**: quais indicadores, para qual persona, com que
   nível de detalhe — não especificado nos ADRs.
 - **Casos de uso de IA (D-022)**: quais features realmente usam IA generativa

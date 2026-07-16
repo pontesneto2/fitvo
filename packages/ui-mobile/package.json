@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@fitvo/brand-tokens": "workspace:*",
-    "lucide-react-native": "^0.469.0"
+    "lucide-react-native": "^1.24.0"
   },
   "peerDependencies": {
     "react": ">=18",
@@ -33,6 +33,6 @@
     "react-native": "^0.76.0",
     "react-native-svg": "^15.8.0",
     "typescript": "^5.6.2",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.10"
   }
 }

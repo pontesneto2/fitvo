@@ -77,8 +77,11 @@ jobs:
       #    editar o schema e esquecer de gerar a migracao — que passa em lint,
       #    typecheck, test e build, e so quebra no deploy. --exit-code faz o
       #    comando sair !=0 quando ha diferenca.
+      # URL sem `?schema=public`: esse parametro e do Prisma, e o psql rejeita
+      # ("invalid URI query parameter"). O shadow precisa ser OUTRO banco — o
+      # Prisma o usa como rascunho e o reinicia.
       - name: Cria banco de shadow para o diff
-        run: psql "$DATABASE_URL" -c 'CREATE DATABASE fitvo_shadow;'
+        run: psql "postgresql://fitvo:fitvo@localhost:5432/fitvo" -c 'CREATE DATABASE fitvo_shadow;'
       - name: Sem drift entre schema.prisma e as migracoes
         run: |
           pnpm --filter @fitvo/database exec prisma migrate diff \

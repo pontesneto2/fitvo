@@ -15,6 +15,7 @@ o formato: contexto, decisão, alternativas consideradas, consequências.
 | [0008](docs/adr/0008-perfil-publico-e-white-label.md) | Perfil público e white-label estrutural |
 | [0009](docs/adr/0009-dominio-treino.md) | Domínio de treino |
 | [0010](docs/adr/0010-fluxo-aluno-gates-atendimento.md) | Fluxo do aluno, gates e atendimento |
+| [0011](docs/adr/0011-modalidade-e-anamnese.md) | Modalidade de atendimento e anamnese (revisa D-094) |
 
 ## Desenvolvimento local
 

@@ -339,7 +339,57 @@ git rev-parse --short HEAD origin/main    # os dois tem que bater
 > aos seus olhos. Nos dois casos o resultado é o mesmo: verde que não significa
 > nada. Silenciar erro de git é desligar o alarme porque ele estava apitando.
 
-## 9. `prisma migrate reset` pede consentimento explícito
+## 9. `git reset --hard origin/main` apaga a branch em que você está
+
+**Sintoma**
+
+Você quer voltar a `main` para começar outra branch. Roda o reset, cria a branch
+nova, trabalha. Depois volta à branch anterior e **o commit sumiu** — mesmo sem
+nunca ter rodado nada que "apagasse" nada.
+
+**Causa**
+
+`git reset --hard <alvo>` **não te leva** ao alvo: ele **move o ponteiro da branch
+atual** para lá. Se você está em `feat/x` e roda `git reset --hard origin/main`, a
+`feat/x` **passa a apontar para a main** — os commits dela saem do caminho e só
+sobrevivem no reflog.
+
+O `git checkout -b nova origin/main` seguinte funciona e mascara o estrago: a
+branch nova nasce certa, e a antiga só se revela destruída quando você volta nela.
+
+**Regra**
+
+> `reset --hard` age na **branch atual**, não no alvo. Confirme onde você está
+> **antes**, e prefira o comando que não depende disso:
+
+```bash
+git branch --show-current                  # ONDE eu estou?
+git checkout -b nova origin/main           # nao precisa de reset nenhum
+git fetch origin && git switch -d origin/main   # se quer so olhar a main
+```
+
+**Se já aconteceu, o reflog recupera:**
+
+```bash
+git reflog | head              # acha o SHA anterior ao reset
+git reset --hard <sha-antigo>  # devolve a branch
+# ou, se ja tinha empurrado:
+git reset --hard origin/feat/x
+```
+
+**Caso real**
+
+Aconteceu nesta sessão: um `reset --hard origin/main` rodado **de dentro** de uma
+branch de PR moveu o ponteiro dela e descartou o commit localmente. **Nada se
+perdeu só porque o `push` tinha acontecido antes** — o remoto era a cópia
+sobrevivente. O acaso foi o backup.
+
+> Fecha a família das seções 7, 8 e 9: **comando destrutivo cujo alvo não foi
+> confirmado**. A 7 lê o diff errado e conclui errado; a 8 joga fora o erro que
+> avisaria; a 9 age sobre um alvo que não é o que você pensou. Nos três, a
+> ferramenta obedeceu com precisão — a uma pergunta que não era a sua.
+
+## 10. `prisma migrate reset` pede consentimento explícito
 
 **Sintoma**
 

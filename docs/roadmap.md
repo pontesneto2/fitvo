@@ -162,6 +162,14 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
 - **Prisma 7**: migração para `prisma.config.ts` + `@prisma/adapter-pg` é
   mudança arquitetural na forma como `PrismaClient` é instanciado em toda a
   API/worker — decisão de quando vale a pena priorizar, não bump direto.
+
+  **Quando destravar, o par sobe em PR MANUAL — nunca via Dependabot.** O
+  `prisma` (CLI) é `devDependency` e o `@prisma/client` é `dependency`, e o
+  agrupamento do Dependabot é **por `dependency-type`**: eles caem em **grupos
+  diferentes**, logo em **PRs diferentes**. Sob essa configuração o par **não
+  consegue se mover atomicamente** — e client 7 com CLI 6 (ou o inverso) quebra.
+  Não é má sorte: é a configuração garantindo o erro. Foi o que derrubou os PRs
+  #5, #12, #32 e #33. Os dois têm que subir no mesmo commit.
 - **Agenda / Check-in**: não há ADR de detalhe — regra de negócio fina
   (janelas de disponibilidade, política de remarcação, frequência de
   check-in) precisa ser definida antes de implementar além do esqueleto.

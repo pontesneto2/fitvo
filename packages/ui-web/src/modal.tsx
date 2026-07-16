@@ -1,7 +1,9 @@
+import { X } from 'lucide-react';
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { cn } from './cn';
+import { Icon } from './icon';
 
 /**
  * Modal / Dialog WEB (design-system-components.md §12). Overlay com foco preso
@@ -49,19 +51,6 @@ const sizeClasses: Record<ModalSize, string> = {
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-function XIcon(): ReactNode {
-  return (
-    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M5 5l10 10M15 5L5 15"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 export function Modal({
   open,
@@ -195,7 +184,7 @@ export function Modal({
                   'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-offset-2 focus-visible:ring-offset-surface-raised focus-visible:ring-focus',
                 )}
               >
-                <XIcon />
+                <Icon icon={X} size="md" />
               </button>
             ) : null}
           </div>

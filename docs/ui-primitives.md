@@ -77,6 +77,7 @@ Cada item: web + mobile + testes + galeria (artifact HTML light/dark), um commit
 | 18 | Avatar + AvatarGroup | `abe9f0f` | sizes token `avatarSize`; fallback iniciais brand-100/700; borda 2px; grupo "+N". `getInitials` pura. Fallback agnóstico. |
 | 15 | Skeleton/EmptyState/ErrorState | `8be0370` | estados de tela; compõem `Button`; `role=alert`; msg amigável (ADR-0005). Skeleton: web pulse nativo / mobile Animated cor; dark neutral-800→700. Sucesso = Toast. |
 | 9/20 | Logo + assets de marca | `1aef665`+`8a19427` | wordmark (arte oficial, cores baked=tokens) + **ícone provisório**. Web embute SVG; mobile via `source` PNG do app. |
+| 19 | Ícones (Lucide) + componente `Icon` | `757bd88` | `lucide-react`/`lucide-react-native` (imports nomeados, tree-shaking ok). Substitui TODO o SVG inline/desenho manual anterior (Select, Badge, Toast, Modal, Checkbox, Button spinner, Table sort, states, Logo ícone provisório no mobile — agora `SvgXml` da mesma arte do web, não mais um "V" de texto). |
 
 **Contagem de testes:** ui-web **128**, ui-mobile **81**.
 
@@ -96,10 +97,6 @@ Cada item: web + mobile + testes + galeria (artifact HTML light/dark), um commit
   lib — aceitável). Ambos consomem a ordem de séries do §17 e a regra "nunca cor
   como único diferenciador". Roteado ao **agente principal**; ver
   `handoff-design.md`.
-- **§19 Ícones (Lucide)** — DESTRAVADO: adotar `lucide-react`/`lucide-react-native`,
-  criar componente `Icon` (wrapper fino sobre tokens `icon-size-*`/`icon-stroke`/
-  `icon-color-*`), e **substituir todo o SVG inline / desenho manual** dos
-  componentes existentes (dívida de duplicação). Roteado ao **agente principal**.
 - **§20 restante** — ilustrações, gráficos avançados, componentes de domínio,
   onboarding, impressão: DEFERIDO (dependem de decisões que ainda não existem).
   A **logo** já foi definida (símbolo isolado ainda provisório).

@@ -1,9 +1,10 @@
-import { fontFamily, fontWeight } from '@fitvo/brand-tokens';
 import type { ReactNode } from 'react';
 import type { ImageSourcePropType, StyleProp, ViewStyle } from 'react-native';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, View } from 'react-native';
+import { SvgXml } from 'react-native-svg';
 
-import { LOGO_ICON_COLORS, LOGO_WORDMARK_ASPECT } from './logo-variants';
+import { LOGO_ICON_PROVISIONAL } from './logo-art';
+import { LOGO_WORDMARK_ASPECT } from './logo-variants';
 import { useTheme } from './theme-context';
 
 /**
@@ -15,8 +16,9 @@ import { useTheme } from './theme-context';
  *   Com `lightSource`+`darkSource`, escolhe pelo tema ativo. Cor FIXA na arte
  *   (raster nao segue tokens em runtime); as cores da arte = brand-500/energy-400/
  *   branco por valor (§9).
- * - `icon`: simbolo **PROVISORIO** (§20) — "V" `brand-500` com detalhe `energy-400`,
- *   desenhado (sem SVG/lucide no mobile). `TODO`: trocar pelo definitivo.
+ * - `icon`: simbolo **PROVISORIO** (§20) — mesma arte SVG do `ui-web` (`logo-art.ts`),
+ *   renderizada via `SvgXml` (`react-native-svg`, peer do pacote desde §19). Antes
+ *   desenhava um "V" de texto como aproximacao; agora e o SVG real, igual a web.
  *
  * `size` = ALTURA (dp); a largura acompanha a proporcao da arte.
  */
@@ -33,13 +35,7 @@ export interface LogoProps {
   readonly style?: StyleProp<ViewStyle>;
 }
 
-const styles = StyleSheet.create({
-  iconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
-  vLabel: { fontFamily: fontFamily.heading, fontWeight: String(fontWeight.semibold) as '600' },
-  accent: { position: 'absolute', borderRadius: 999, backgroundColor: LOGO_ICON_COLORS.accent },
-});
-
-/** Símbolo provisório desenhado: "V" (brand-500) + ponto de energia (energy-400). */
+/** Símbolo provisório: mesma arte SVG do `ui-web` (`logo-art.ts`), via `SvgXml`. */
 function ProvisionalIcon({
   size,
   title,
@@ -47,24 +43,13 @@ function ProvisionalIcon({
   readonly size: number;
   readonly title: string;
 }): ReactNode {
-  const dot = Math.max(4, Math.round(size * 0.18));
   return (
     <View
       accessibilityRole="image"
       accessibilityLabel={title}
-      style={[styles.iconWrap, { width: size, height: size }]}
+      style={{ width: size, height: size }}
     >
-      <Text
-        style={[
-          styles.vLabel,
-          { color: LOGO_ICON_COLORS.stroke, fontSize: Math.round(size * 0.82) },
-        ]}
-      >
-        V
-      </Text>
-      <View
-        style={[styles.accent, { width: dot, height: dot, top: size * 0.12, right: size * 0.14 }]}
-      />
+      <SvgXml xml={LOGO_ICON_PROVISIONAL} width={size} height={size} />
     </View>
   );
 }

@@ -9,6 +9,8 @@ export * from './badge';
 export * from './breadcrumb';
 export * from './button';
 export * from './card';
+export * from './chart-bar';
+export * from './chart-line';
 export * from './checkbox';
 export * from './cn';
 export * from './css-variables';

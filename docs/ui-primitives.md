@@ -77,9 +77,10 @@ Cada item: web + mobile + testes + galeria (artifact HTML light/dark), um commit
 | 18 | Avatar + AvatarGroup | `abe9f0f` | sizes token `avatarSize`; fallback iniciais brand-100/700; borda 2px; grupo "+N". `getInitials` pura. Fallback agnóstico. |
 | 15 | Skeleton/EmptyState/ErrorState | `8be0370` | estados de tela; compõem `Button`; `role=alert`; msg amigável (ADR-0005). Skeleton: web pulse nativo / mobile Animated cor; dark neutral-800→700. Sucesso = Toast. |
 | 9/20 | Logo + assets de marca | `1aef665`+`8a19427` | wordmark (arte oficial, cores baked=tokens) + **ícone provisório**. Web embute SVG; mobile via `source` PNG do app. |
+| 17 | Gráficos — `LineChart`/`BarChart` | `7d0d77b` | web = Recharts; mobile = `victory-native` v36 (SVG puro via `react-native-svg`, sem Skia/Reanimated — a v41 XL exige nativo pesado, sem app RN real pra validar). `seriesColor`/`dashPattern`/`ChartSeriesConfig` movidos para `@fitvo/brand-tokens/charts` (lógica pura, compartilhada entre os dois pacotes, evita duplicação). `chartGrid` corrigido: era cor fixa sem dark — agora reusa `borderDefault` (mesmo par, §21 "sobe na rampa"). Cor nunca é o único diferenciador (§17): line usa padrão de traço por série; bar sempre mostra a legenda. |
 | 19 | Ícones (Lucide) + componente `Icon` | `757bd88` | `lucide-react`/`lucide-react-native` (imports nomeados, tree-shaking ok). Substitui TODO o SVG inline/desenho manual anterior (Select, Badge, Toast, Modal, Checkbox, Button spinner, Table sort, states, Logo ícone provisório no mobile — agora `SvgXml` da mesma arte do web, não mais um "V" de texto). |
 
-**Contagem de testes:** ui-web **128**, ui-mobile **81**.
+**Contagem de testes:** ui-web **130**, ui-mobile **81** (+ lógica de série testada em `brand-tokens`).
 
 ## Framework glue (base, commits `a625c13`/`4c83379`/`5fa2104`)
 
@@ -92,11 +93,6 @@ Cada item: web + mobile + testes + galeria (artifact HTML light/dark), um commit
 
 ## Pendências (aguardando decisão/execução)
 
-- **§17 Gráficos/dataviz** — DESTRAVADO pelo responsável: **web = Recharts**,
-  **mobile = victory-native** (único ponto onde web e mobile não compartilham
-  lib — aceitável). Ambos consomem a ordem de séries do §17 e a regra "nunca cor
-  como único diferenciador". Roteado ao **agente principal**; ver
-  `handoff-design.md`.
 - **§20 restante** — ilustrações, gráficos avançados, componentes de domínio,
   onboarding, impressão: DEFERIDO (dependem de decisões que ainda não existem).
   A **logo** já foi definida (símbolo isolado ainda provisório).

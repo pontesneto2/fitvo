@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { chartSeries } from './charts';
+import { chartSeries, dashPattern, dashPatterns, seriesColor } from './charts';
 import type { ColorName } from './colors';
 import { black, colors, stops, white } from './colors';
 import { shadows, shadowToCss, shadowToNative } from './elevation';
@@ -88,6 +88,26 @@ describe('anel de foco e graficos', () => {
     for (const serie of chartSeries) {
       expect(serie).toMatch(HEX);
     }
+  });
+
+  it('seriesColor cicla pela ordem do token chartSeries', () => {
+    expect(seriesColor(0)).toBe(chartSeries[0]);
+    expect(seriesColor(chartSeries.length)).toBe(seriesColor(0));
+  });
+
+  it('dashPattern: solido na 1a serie, tracejados diferentes depois (§17 — cor nao e o unico diferenciador)', () => {
+    expect(dashPattern({ key: 'a', label: 'A' }, 0)).toBe('0');
+    expect(dashPattern({ key: 'b', label: 'B' }, 1)).not.toBe(
+      dashPattern({ key: 'a', label: 'A' }, 0),
+    );
+  });
+
+  it('dash explicito na config vence o padrao por indice', () => {
+    expect(dashPattern({ key: 'a', label: 'A', dash: '4 4' }, 0)).toBe('4 4');
+  });
+
+  it('todos os padroes de traco sao distintos entre si', () => {
+    expect(new Set(dashPatterns).size).toBe(dashPatterns.length);
   });
 });
 

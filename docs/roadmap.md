@@ -3,7 +3,7 @@
 > Fonte única do plano de execução. Substitui qualquer backlog interno de
 > sessão — o backlog do agente deve espelhar este documento, nunca o
 > contrário. Atualizar sempre que uma fase mudar de status. As decisões de
-> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-073); a
+> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-076); a
 > identidade visual em `docs/design-system.md`.
 
 Convenção de status: **FEITO** (mergeado em `main`, com PR), **EM ANDAMENTO**,
@@ -56,34 +56,47 @@ FITVO.
    prontuário/prescrição médica hoje são só schema (PR #14). Preencher
    comportamento/regra de negócio real é decisão humana com referências
    (ex.: MFit, Dietbox) — ver BLOQUEADO — RESPONSÁVEL. **Coração do produto —
-   prioridade alta.**
-3. **IA (D-022)** — a abstração multi-provider já existe
+   prioridade alta.** Inclui exames laboratoriais (solicitação + anexo de
+   resultado, D-076, ADR-0007) — ponte nutrição↔medicina.
+3. **Videoconferência — treino e nutrição** (D-074/D-075, ADR-0007): package
+   `video` novo (interface + adapter Daily/Prebuilt + fake, mesmo padrão dos
+   demais adapters da ADR-0005). Habilitado nos ambientes de treino e
+   nutrição; **bloqueado em medicina** por exigência regulatória (ver item 5 e
+   BLOQUEADO — TERCEIROS). Depende do item 2 (vídeo se ancora num
+   atendimento/vínculo já modelado).
+4. **IA (D-022)** — a abstração multi-provider já existe
    (`packages/ai`, `AnthropicAIProvider` + `FakeAIProvider`, PR #15) com
    `embed()` propositalmente não suportado (Anthropic não oferece
    embeddings). Falta definir os casos de uso de produto que consomem IA
    (sugestão automática, geração de plano, etc.) — não inventar sem ADR.
    Depende do item 2 (IA sobre conteúdo pressupõe que o conteúdo exista).
-4. **Agenda** — modelagem e slice de API para agendamento de atendimentos por
+5. **Telemedicina + receita eletrônica** (D-011/D-075, mesma fase): vídeo em
+   medicina e prescrição eletrônica dependem ambos de a FITVO se registrar
+   como pessoa jurídica prestadora no CRM do estado + assessoria jurídica
+   (Resolução CFM nº 2.314/2022) — ver BLOQUEADO — TERCEIROS. Até lá, receita
+   permanece impressa/assinatura física e vídeo permanece bloqueado nesse
+   ambiente.
+6. **Agenda** — modelagem e slice de API para agendamento de atendimentos por
    vínculo (mencionado em D-001 como dado por vínculo; sem ADR de detalhe
    ainda — regra fina fica em BLOQUEADO — RESPONSÁVEL).
-5. **Check-in** — registro de check-in do paciente por vínculo/especialidade
+7. **Check-in** — registro de check-in do paciente por vínculo/especialidade
    (mencionado em D-001; mesma situação: sem ADR de detalhe).
-6. **Notificações reais** (push/email/SMS ao vivo) — a estrutura de adapter já
+8. **Notificações reais** (push/email/SMS ao vivo) — a estrutura de adapter já
    existe (`packages/notifications`, PR #15); falta o disparo ao vivo, que
    depende de credenciais (Firebase, provedor de e-mail/SMS) — ver BLOQUEADO —
    TERCEIROS.
-7. **Dashboard e relatórios** — telas de indicadores para profissional/clínica
+9. **Dashboard e relatórios** — telas de indicadores para profissional/clínica
    (financeiro, atendimentos, adesão, **e adesão/evolução de conteúdo** —
    depende do item 2 já ter dado real para exibir). ADR-0004 já antecipa
    "dashboards e relatórios" para dados financeiros ricos como evolução
    futura, não escopo fechado ainda.
-8. **Mobile (Expo)** — app "3-em-1" (aluno + profissional), Expo Router +
-   TanStack Query. Ainda não iniciado; bloco próprio, depende de apps web e
-   design mobile estarem maduros.
-9. **Testes ao vivo das integrações** (Asaas sandbox, IA real, FCM, e-mail,
-   SMS) — hoje todos gated por ausência de credenciais no ambiente. Rodar
-   exige as credenciais reais (ver BLOQUEADO — TERCEIROS).
-10. **Deploy** (Vercel + Railway) — infraestrutura de deploy ainda não
+10. **Mobile (Expo)** — app "3-em-1" (aluno + profissional), Expo Router +
+    TanStack Query. Ainda não iniciado; bloco próprio, depende de apps web e
+    design mobile estarem maduros.
+11. **Testes ao vivo das integrações** (Asaas sandbox, IA real, FCM, e-mail,
+    SMS, Daily) — hoje todos gated por ausência de credenciais no ambiente.
+    Rodar exige as credenciais reais (ver BLOQUEADO — TERCEIROS).
+12. **Deploy** (Vercel + Railway) — infraestrutura de deploy ainda não
     configurada; requer credenciais + ordem explícita de publicação.
 
 ## BLOQUEADO — RESPONSÁVEL (decisão que só você pode tomar)
@@ -101,7 +114,8 @@ FITVO.
   (janelas de disponibilidade, política de remarcação, frequência de
   check-in) precisa ser definida antes de implementar além do esqueleto.
 - **Campos finos de treino/nutrição/medicina (D-063)**: decisão humana com
-  referências de produto (MFit/Dietbox citados como benchmark).
+  referências de produto (MFit/Dietbox citados como benchmark). Exames
+  laboratoriais (D-076) entram junto quando essa fase for aberta.
 - **Dashboard e relatórios**: quais indicadores, para qual persona, com que
   nível de detalhe — não especificado nos ADRs.
 - **Casos de uso de IA (D-022)**: quais features realmente usam IA generativa
@@ -117,9 +131,12 @@ FITVO.
 
 - **Textos jurídicos** (política de estorno, termos, D-021/D-025) → advogado.
 - **Credenciais de produção**: Asaas (chaves reais), provedor de e-mail/SMS,
-  Firebase Cloud Messaging, chave de API de IA em produção → nenhuma pode ser
-  gerada pelo agente; repositório é público (ver aviso de segurança no topo
-  deste arquivo).
+  Firebase Cloud Messaging, chave de API de IA em produção, Daily (D-074) →
+  nenhuma pode ser gerada pelo agente; repositório é público (ver aviso de
+  segurança no topo deste arquivo).
+- **Telemedicina/receita eletrônica** (D-011/D-075): registro da FITVO como
+  pessoa jurídica prestadora no CRM do estado + assessoria jurídica
+  (Resolução CFM nº 2.314/2022) → ação humana fora do repositório.
 - **Deploy**: contas Vercel/Railway configuradas, domínio Registro.br
   apontado → ação humana fora do repositório.
 - **Design visual não fechado**: qualquer tela sem direção definida em

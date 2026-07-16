@@ -3,7 +3,7 @@
 > Fonte única do plano de execução. Substitui qualquer backlog interno de
 > sessão — o backlog do agente deve espelhar este documento, nunca o
 > contrário. Atualizar sempre que uma fase mudar de status. As decisões de
-> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-076); a
+> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-078); a
 > identidade visual em `docs/design-system.md`.
 
 Convenção de status: **FEITO** (mergeado em `main`, com PR), **EM ANDAMENTO**,
@@ -90,13 +90,23 @@ FITVO.
    depende do item 2 já ter dado real para exibir). ADR-0004 já antecipa
    "dashboards e relatórios" para dados financeiros ricos como evolução
    futura, não escopo fechado ainda.
-10. **Mobile (Expo)** — app "3-em-1" (aluno + profissional), Expo Router +
+10. **Perfil público do profissional** (D-077, ADR-0008): página opt-in no app
+    `site` (`fitvo.com.br/<slug>`), com selo de verificação (D-010) e botão
+    "solicitar contato" reaproveitando o convite profissional→paciente
+    (D-006/D-055) já existente. Sem busca/vitrine/ranking/reviews/comissão —
+    fora de escopo por decisão (ver ADR-0008). Depende de apps web (item 1)
+    pelo componente `Logo`/design system compartilhado com o `site`.
+11. **White-label estrutural** (D-078, ADR-0008): campos de marca por tenant
+    (nome/logo/tokens) no schema, **sem ativação** — MVP sempre renderiza
+    FITVO. Esqueleto acompanha a modelagem de tenant existente; não é item
+    isolado de execução enquanto não houver demanda comercial de ativação.
+12. **Mobile (Expo)** — app "3-em-1" (aluno + profissional), Expo Router +
     TanStack Query. Ainda não iniciado; bloco próprio, depende de apps web e
     design mobile estarem maduros.
-11. **Testes ao vivo das integrações** (Asaas sandbox, IA real, FCM, e-mail,
+13. **Testes ao vivo das integrações** (Asaas sandbox, IA real, FCM, e-mail,
     SMS, Daily) — hoje todos gated por ausência de credenciais no ambiente.
     Rodar exige as credenciais reais (ver BLOQUEADO — TERCEIROS).
-12. **Deploy** (Vercel + Railway) — infraestrutura de deploy ainda não
+14. **Deploy** (Vercel + Railway) — infraestrutura de deploy ainda não
     configurada; requer credenciais + ordem explícita de publicação.
 
 ## BLOQUEADO — RESPONSÁVEL (decisão que só você pode tomar)
@@ -126,6 +136,9 @@ FITVO.
   componente usa um mark geométrico PROVISÓRIO.
 - **shadcn/ui**: adoção para a camada web adiada — decisão condicionada à
   identidade visual (shadcn customizado vs. primitivos puros).
+- **Ativação de white-label (D-078)**: quando (e para qual tenant/parceiro)
+  vale a pena ligar marca própria — hoje é só estrutura, sem gatilho de
+  produto definido.
 
 ## BLOQUEADO — TERCEIROS (jurídico, credenciais, design externo)
 

@@ -1,4 +1,4 @@
-import type { BondStatus, InviteStatus } from '@fitvo/database';
+import type { BondStatus, CareModality, InviteStatus } from '@fitvo/database';
 
 import type {
   AcceptPatientInviteOutcome,
@@ -15,6 +15,7 @@ interface StoredInvite {
   professionalProfileId: string;
   specialtyId: string;
   email: string;
+  modality: CareModality;
   status: InviteStatus;
   tokenHash: string;
   expiresAt: Date;
@@ -40,6 +41,7 @@ interface StoredBond {
   patientProfileId: string;
   professionalProfileId: string;
   specialtyId: string;
+  modality: CareModality;
   status: BondStatus;
   createdAt: Date;
   archivedAt: Date | null;
@@ -134,6 +136,7 @@ export class InMemoryPatientRepository implements PatientRepository {
       professionalProfileId: input.professionalProfileId,
       specialtyId: input.specialtyId,
       email: input.email,
+      modality: input.modality,
       status: 'PENDING',
       tokenHash: input.tokenHash,
       expiresAt: input.expiresAt,
@@ -288,12 +291,14 @@ export class InMemoryPatientRepository implements PatientRepository {
       created = false;
     }
 
+    // Espelha o Prisma: o vinculo nasce com a modalidade do convite (D-101).
     const bond: StoredBond = {
       id: this.nextId('bond'),
       tenantId: invite.tenantId,
       patientProfileId,
       professionalProfileId: invite.professionalProfileId,
       specialtyId: invite.specialtyId,
+      modality: invite.modality,
       status: 'ACTIVE',
       createdAt: new Date(),
       archivedAt: null,
@@ -343,6 +348,7 @@ export class InMemoryPatientRepository implements PatientRepository {
       professionalProfileId: invite.professionalProfileId,
       specialtyId: invite.specialtyId,
       email: invite.email,
+      modality: invite.modality,
       status: invite.status,
       expiresAt: invite.expiresAt,
       createdAt: invite.createdAt,
@@ -357,6 +363,7 @@ export class InMemoryPatientRepository implements PatientRepository {
       patientName: account?.name ?? '',
       patientEmail: account?.email ?? '',
       specialtyId: bond.specialtyId,
+      modality: bond.modality,
       status: bond.status,
       createdAt: bond.createdAt,
       archivedAt: bond.archivedAt,

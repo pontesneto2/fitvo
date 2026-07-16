@@ -16,6 +16,7 @@ const INVITE_PROJECTION = {
   professionalProfileId: true,
   specialtyId: true,
   email: true,
+  modality: true,
   status: true,
   expiresAt: true,
   createdAt: true,
@@ -62,6 +63,7 @@ export class PrismaPatientRepository implements PatientRepository {
         professionalProfileId: input.professionalProfileId,
         specialtyId: input.specialtyId,
         email: input.email,
+        modality: input.modality, // propagada ao Bond no aceite (D-101)
         tokenHash: input.tokenHash,
         expiresAt: input.expiresAt,
       },
@@ -99,6 +101,7 @@ export class PrismaPatientRepository implements PatientRepository {
         id: true,
         patientProfileId: true,
         specialtyId: true,
+        modality: true,
         status: true,
         createdAt: true,
         archivedAt: true,
@@ -112,6 +115,7 @@ export class PrismaPatientRepository implements PatientRepository {
       patientName: row.patientProfile.account.name,
       patientEmail: row.patientProfile.account.email,
       specialtyId: row.specialtyId,
+      modality: row.modality,
       status: row.status,
       createdAt: row.createdAt,
       archivedAt: row.archivedAt,
@@ -170,6 +174,7 @@ export class PrismaPatientRepository implements PatientRepository {
           professionalProfileId: true,
           specialtyId: true,
           email: true,
+          modality: true,
           status: true,
           expiresAt: true,
         },
@@ -243,12 +248,15 @@ export class PrismaPatientRepository implements PatientRepository {
         created = false;
       }
 
+      // O vinculo NASCE com a modalidade do convite (D-101): o profissional a
+      // escolheu la, e nao ha Bond sem modalidade.
       const bond = await tx.bond.create({
         data: {
           tenantId: invite.tenantId,
           patientProfileId,
           professionalProfileId: invite.professionalProfileId,
           specialtyId: invite.specialtyId,
+          modality: invite.modality,
         },
         select: { id: true },
       });

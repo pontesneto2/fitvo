@@ -8,6 +8,9 @@
 const TAGS = ['patient'];
 const bearerAuth = [{ bearerAuth: [] }];
 
+/** Modalidade do atendimento (D-101 — ADR-0011). Escolhida pelo profissional. */
+const MODALITY_VALUES = ['ONLINE', 'PRESENCIAL', 'HIBRIDO'];
+
 const tenantParams = {
   type: 'object',
   required: ['tenantId'],
@@ -38,11 +41,12 @@ const inviteSchema = {
     id: { type: 'string' },
     email: { type: 'string' },
     specialtyId: { type: 'string' },
+    modality: { type: 'string', enum: MODALITY_VALUES },
     status: { type: 'string', enum: ['PENDING', 'ACCEPTED', 'EXPIRED', 'REVOKED'] },
     expiresAt: { type: 'string', format: 'date-time' },
     createdAt: { type: 'string', format: 'date-time' },
   },
-  required: ['id', 'email', 'specialtyId', 'status', 'expiresAt', 'createdAt'],
+  required: ['id', 'email', 'specialtyId', 'modality', 'status', 'expiresAt', 'createdAt'],
 };
 
 const bondSchema = {
@@ -53,6 +57,7 @@ const bondSchema = {
     patientName: { type: 'string' },
     patientEmail: { type: 'string' },
     specialtyId: { type: 'string' },
+    modality: { type: 'string', enum: MODALITY_VALUES },
     status: { type: 'string', enum: ['ACTIVE', 'ARCHIVED'] },
     createdAt: { type: 'string', format: 'date-time' },
     archivedAt: { type: ['string', 'null'], format: 'date-time' },
@@ -63,6 +68,7 @@ const bondSchema = {
     'patientName',
     'patientEmail',
     'specialtyId',
+    'modality',
     'status',
     'createdAt',
   ],
@@ -78,7 +84,8 @@ export const createInviteRouteSchema = {
   tags: TAGS,
   summary: 'Convida um paciente para uma especialidade (profissional)',
   description:
-    'Cria um convite de uso unico direcionado a UMA especialidade (D-006/D-052). ' +
+    'Cria um convite de uso unico direcionado a UMA especialidade (D-006/D-052), ' +
+    'declarando a MODALIDADE do atendimento (D-101), que o vinculo herda no aceite. ' +
     'Requer perfil profissional no tenant que reivindica a especialidade-alvo. ' +
     'Devolve o token em claro UMA vez (entrega por push/e-mail e fase futura); ' +
     'o banco guarda apenas o hash.',
@@ -86,10 +93,19 @@ export const createInviteRouteSchema = {
   params: tenantParams,
   body: {
     type: 'object',
-    required: ['email', 'specialtyId'],
+    required: ['email', 'specialtyId', 'modality'],
     properties: {
       email: { type: 'string', description: 'E-mail do paciente convidado.' },
       specialtyId: { type: 'string', description: 'Especialidade-alvo do vinculo (D-052).' },
+      modality: {
+        type: 'string',
+        enum: MODALITY_VALUES,
+        description:
+          'Modalidade do atendimento (D-101). Definida pelo PROFISSIONAL — o paciente ' +
+          'nao escolhe a modalidade do servico que contrata. Define o fluxo da anamnese: ' +
+          'ONLINE (paciente preenche sozinho), PRESENCIAL (profissional preenche na ' +
+          'consulta) ou HIBRIDO (ambos).',
+      },
     },
   },
   response: { 201: inviteResult },

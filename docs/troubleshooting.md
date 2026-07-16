@@ -163,7 +163,101 @@ docker exec fitvo-postgres psql -U fitvo -d fitvo -c 'DROP DATABASE verify;'
 > O shadow database precisa ser **outro banco**: o Prisma o usa como rascunho e
 > o reinicia.
 
-## 5. `prisma migrate reset` pede consentimento explícito
+## 5. Teste de guard (401/403) que passa a provar validação — e continua verde
+
+**Sintoma**
+
+Um teste afirma `401` (sem autenticação) ou `403` (sem permissão), continua
+**verde**, e não prova mais nada: ele passou a exercitar a **validação de
+schema**, não o guard.
+
+**Causa**
+
+No Fastify, a **validação do `schema` da rota roda ANTES do handler**. Se o
+`payload` do teste ficar inválido — tipicamente porque um campo **novo e
+obrigatório** foi adicionado ao body e o teste não foi atualizado —, a requisição
+morre em `400` antes de chegar ao guard.
+
+E o teste que espera `401` **quebra ruidosamente** (bom). O perigoso é o inverso:
+um teste que espera `400` para "campo faltando" continua verde **mesmo se o guard
+sumir**, porque a validação responde primeiro.
+
+**Regra**
+
+> **Teste de guard precisa de payload VÁLIDO.** O único campo que pode faltar num
+> teste de `401`/`403` é a credencial.
+
+Ao adicionar campo obrigatório num body, varra os testes daquela rota: os que
+mandam payload parcial mudam de significado sem mudar de cor.
+
+**Exemplo real** (D-101, modalidade obrigatória no convite):
+
+```ts
+const unauthorized = await app.inject({
+  method: 'POST',
+  url: `/v1/patients/${TENANT}/invites`,
+  // Body VALIDO de proposito: sem `modality` o schema rejeitaria com 400
+  // antes do guard, e o teste passaria a provar validacao em vez do 401.
+  payload: { email: 'p@fitvo.dev', specialtyId: SPECIALTY, modality: 'ONLINE' },
+});
+expect(unauthorized.statusCode).toBe(401);
+```
+
+> É o mesmo gênero de problema da seção 4 (drift) e da seção 6 (vacuidade):
+> **verde que mente**. Um check só vale se você souber o que ele reprova.
+
+## 6. Asserção sobre relação AUSENTE sem a relação no `include` — passa por vacuidade
+
+**Sintoma**
+
+Um check afirma que uma relação **não** existe, fica verde, e não prova nada:
+
+```ts
+const loaded = await prisma.anamnesis.findUniqueOrThrow({
+  where: { id },
+  include: { parq: true }, // <- `lifestyle` NAO esta aqui
+});
+expect(loaded.lifestyle).toBeUndefined(); // VERDE — e vazio
+```
+
+**Causa**
+
+O Prisma só devolve a relação **pedida no `include`**. A relação não pedida vem
+`undefined` **sempre** — a asserção fala sobre a *forma da query*, não sobre o
+banco. Ela passaria **idêntica** se a linha existisse. O check não tem como falhar,
+logo não reprova nada.
+
+A distinção que importa:
+
+- **`undefined`** = não perguntei (ausente do `include`).
+- **`null`** = perguntei e não existe. **Só este** é o dado.
+
+**Regra**
+
+> Para afirmar que uma seção/relação está **ausente**, ela precisa estar no
+> `include` e a asserção precisa ser contra **`null`**, nunca `undefined`. E
+> ancore contra uma relação **presente** no mesmo objeto — se as duas dessem o
+> mesmo resultado, o teste estaria quebrado.
+
+```ts
+const loaded = await prisma.anamnesis.findUniqueOrThrow({
+  where: { id },
+  include: { parq: true, lifestyle: true }, // as DUAS pedidas
+});
+expect(loaded.lifestyle).toBeNull(); // secao ausente = linha ausente
+expect(loaded.parq).not.toBeNull(); // ancora: prova que o include funciona
+```
+
+**Procedência**
+
+Este caso foi cometido **no PR que escreveu a seção 5 acima** — o autor aplicou a
+disciplina ao código de produção e não ao próprio check, no mesmo arquivo, no
+mesmo dia. Fica registrado com a procedência de propósito: **o padrão não se
+aplica sozinho, nem para quem acabou de escrevê-lo.** A pergunta certa nunca é
+"ele passa?", e sim **"o que este check reprova?"** — um check que não consegue
+falhar já falhou.
+
+## 7. `prisma migrate reset` pede consentimento explícito
 
 **Sintoma**
 

@@ -36,12 +36,18 @@ async function setupProfessional(
   return { accountId: body.account.id, token: body.tokens.accessToken, professionalProfileId };
 }
 
-function createInvite(app: FastifyInstance, token: string, email: string, specialtyId = SPECIALTY) {
+function createInvite(
+  app: FastifyInstance,
+  token: string,
+  email: string,
+  specialtyId = SPECIALTY,
+  modality = 'ONLINE',
+) {
   return app.inject({
     method: 'POST',
     url: `/v1/patients/${PRO_TENANT}/invites`,
     headers: { authorization: `Bearer ${token}` },
-    payload: { email, specialtyId },
+    payload: { email, specialtyId, modality },
   });
 }
 
@@ -103,6 +109,60 @@ describe('fluxo de paciente e vinculo (E2E via inject)', () => {
     await harness.app.close();
   });
 
+  it('o vinculo herda a modalidade declarada no convite pelo profissional (D-101)', async () => {
+    const harness = await buildTestHarness();
+    const pro = await setupProfessional(harness);
+
+    // O profissional declara PRESENCIAL — quem sabe como atende e ele; o
+    // paciente nao escolhe a modalidade do servico que contrata (D-101).
+    const invited = await createInvite(
+      harness.app,
+      pro.token,
+      'presencial@fitvo.dev',
+      SPECIALTY,
+      'PRESENCIAL',
+    );
+    expect(invited.statusCode).toBe(201);
+    expect(invited.json().invite.modality).toBe('PRESENCIAL');
+
+    // O aceite nao recebe modalidade nenhuma: ela VIAJA no convite. E o que
+    // permite o vinculo nascer com ela.
+    const accepted = await accept(harness.app, invited.json().token);
+    expect(accepted.statusCode).toBe(201);
+
+    const { activeBonds } = (await overview(harness.app, pro.token)).json();
+    expect(activeBonds[0]).toMatchObject({
+      patientEmail: 'presencial@fitvo.dev',
+      modality: 'PRESENCIAL',
+    });
+
+    await harness.app.close();
+  });
+
+  it('recusa convite sem modalidade: nenhum ADR elegeu um padrao (D-101)', async () => {
+    const harness = await buildTestHarness();
+    const pro = await setupProfessional(harness);
+
+    const semModalidade = await harness.app.inject({
+      method: 'POST',
+      url: `/v1/patients/${PRO_TENANT}/invites`,
+      headers: { authorization: `Bearer ${pro.token}` },
+      payload: { email: 'p@fitvo.dev', specialtyId: SPECIALTY },
+    });
+    expect(semModalidade.statusCode).toBe(400);
+
+    const invalida = await createInvite(
+      harness.app,
+      pro.token,
+      'p@fitvo.dev',
+      SPECIALTY,
+      'SEMIPRESENCIAL',
+    );
+    expect(invalida.statusCode).toBe(400);
+
+    await harness.app.close();
+  });
+
   it('publica o evento bond.created no aceite (alimenta o motor de compartilhamento — D-017)', async () => {
     const harness = await buildTestHarness();
     const pro = await setupProfessional(harness);
@@ -140,7 +200,9 @@ describe('fluxo de paciente e vinculo (E2E via inject)', () => {
     const unauthorized = await harness.app.inject({
       method: 'POST',
       url: `/v1/patients/${PRO_TENANT}/invites`,
-      payload: { email: 'paciente@fitvo.dev', specialtyId: SPECIALTY },
+      // Body VALIDO de proposito: sem `modality` o schema da rota rejeitaria com
+      // 400 antes do guard, e o teste passaria a provar a validacao em vez do 401.
+      payload: { email: 'paciente@fitvo.dev', specialtyId: SPECIALTY, modality: 'ONLINE' },
     });
     expect(unauthorized.statusCode).toBe(401);
 
@@ -287,6 +349,7 @@ describe('fluxo de paciente e vinculo (E2E via inject)', () => {
       professionalProfileId: proId,
       specialtyId: SPECIALTY,
       email: 'exp@fitvo.dev',
+      modality: 'ONLINE',
       tokenHash: hashInviteToken('raw-expirado'),
       expiresAt: new Date(Date.now() - 1_000),
     });

@@ -1,7 +1,9 @@
+import { AlertCircle, Check, Info, Star, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import { cn } from './cn';
+import { Icon } from './icon';
 
 /**
  * Toast / Notificacao WEB (design-system-components.md §13). Componente de
@@ -36,87 +38,44 @@ export interface ToastData {
 interface VariantStyle {
   readonly surface: string;
   readonly icon: string;
-  readonly node: ReactNode;
-}
-
-function CheckGlyph(): ReactNode {
-  return <path d="M13 4.5 6.5 11 3 7.5" />;
-}
-function AlertGlyph(): ReactNode {
-  return (
-    <>
-      <path d="M8 4v5" />
-      <path d="M8 11.5v.01" />
-    </>
-  );
-}
-function InfoGlyph(): ReactNode {
-  return (
-    <>
-      <path d="M8 7.5v4.5" />
-      <path d="M8 4.5v.01" />
-    </>
-  );
-}
-function StarGlyph(): ReactNode {
-  return <path d="M8 2.5l1.6 3.4 3.7.5-2.7 2.6.7 3.7L8 11.4 4.7 13.2l.7-3.7L2.7 6.9l3.7-.5z" />;
+  readonly glyph: typeof Check;
 }
 
 const VARIANTS: Record<ToastVariant, VariantStyle> = {
   success: {
     surface: 'bg-energy-50 border-l-energy-500',
     icon: 'text-energy-600',
-    node: <CheckGlyph />,
+    glyph: Check,
   },
   error: {
     surface: 'bg-danger-50 border-l-danger-400',
     icon: 'text-danger-600',
-    node: <AlertGlyph />,
+    glyph: AlertCircle,
   },
   warning: {
     surface: 'bg-warning-50 border-l-warning-400',
     icon: 'text-warning-600',
-    node: <AlertGlyph />,
+    glyph: AlertCircle,
   },
   info: {
     surface: 'bg-clinic-50 border-l-clinic-400',
     icon: 'text-clinic-600',
-    node: <InfoGlyph />,
+    glyph: Info,
   },
   achievement: {
     surface: 'bg-lime-50 border-l-lime-400',
     icon: 'text-lime-600',
-    node: <StarGlyph />,
+    glyph: Star,
   },
 };
 
 function ToastIcon({ variant }: { readonly variant: ToastVariant }): ReactNode {
   return (
-    <svg
-      viewBox="0 0 16 16"
-      className={cn('mt-0.5 h-4 w-4 shrink-0', VARIANTS[variant].icon)}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {VARIANTS[variant].node}
-    </svg>
-  );
-}
-
-function XIcon(): ReactNode {
-  return (
-    <svg viewBox="0 0 14 14" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-      <path
-        d="M3.5 3.5l7 7M10.5 3.5l-7 7"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
+    <Icon
+      icon={VARIANTS[variant].glyph}
+      size="sm"
+      className={cn('mt-0.5 shrink-0', VARIANTS[variant].icon)}
+    />
   );
 }
 
@@ -166,7 +125,7 @@ export function Toast({
             'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-offset-1 focus-visible:ring-focus',
           )}
         >
-          <XIcon />
+          <Icon icon={X} size="sm" />
         </button>
       ) : null}
     </div>

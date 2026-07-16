@@ -16,6 +16,8 @@ o formato: contexto, decisão, alternativas consideradas, consequências.
 | [0009](docs/adr/0009-dominio-treino.md) | Domínio de treino |
 | [0010](docs/adr/0010-fluxo-aluno-gates-atendimento.md) | Fluxo do aluno, gates e atendimento |
 | [0011](docs/adr/0011-modalidade-e-anamnese.md) | Modalidade de atendimento e anamnese (revisa D-094) |
+| [0012](docs/adr/0012-agenda.md) | Agenda e agendamento |
+| [0013](docs/adr/0013-dominio-nutricao.md) | Domínio de nutrição (revisa D-104) |
 
 ## Desenvolvimento local
 

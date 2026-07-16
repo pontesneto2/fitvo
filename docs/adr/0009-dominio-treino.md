@@ -1,7 +1,7 @@
 # ADR-0009 — Domínio de Treino
 
 **Status:** Aceito
-**Decisões cobertas:** D-079 a D-092
+**Decisões cobertas:** D-079 a D-092, D-105
 
 ## Contexto
 
@@ -47,6 +47,25 @@ Vínculo (bond = paciente ↔ profissional+especialidade = "ambiente")
   executa na ordem que quiser) ou **dias da semana** (cada treino tem dia
   marcado).
 - As duas opções coexistem no produto; a escolha é um atributo do plano.
+
+### D-105 — Plano fixo × plano variável
+
+> Adicionado depois da aceitação inicial deste ADR. Complementa o D-079.
+
+- Além dos planos **variáveis** (que rodam por dia ou por letra — D-080), existe
+  o **plano FIXO**: um plano que vale **todo dia**, ou **nos dias escolhidos pelo
+  profissional**, e que **não interfere nos demais planos ativos**.
+- **Caso de uso real:** plano de alongamento/mobilidade que o aluno faz sempre,
+  independente de ser dia de treino A ou B.
+- **Não é alternativa aos outros — coexiste** permanentemente. O profissional
+  decide se inclui e em quais dias vale.
+- **Distingue-se do D-079:** lá são planos que **competem pelo tempo** do aluno
+  (o aluno escolhe entre "Musculação Julho" e "Cardio Julho"); aqui é um plano que
+  **roda por cima de todos**. A diferença não é cosmética: um plano fixo não deve
+  ser contado como "o treino de hoje" nos indicadores de aderência (D-092), senão
+  o alongamento infla a aderência de quem não treinou.
+- **Vale para treino.** **Não se aplica a nutrição** — não existe "dieta que roda
+  por cima das outras" (ver D-112, ADR-0013).
 
 ### D-081 — Séries nunca uniformes
 

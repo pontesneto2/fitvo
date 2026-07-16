@@ -27,6 +27,12 @@ updates:
       # o typescript-eslint suportar.
       - dependency-name: 'typescript'
         update-types: ['version-update:semver-major']
+      # victory-native preso no v36 (SVG puro sobre react-native-svg). O v41 "XL"
+      # troca o motor por Skia + Reanimated — dependencia nativa pesada, e nao ha
+      # app RN real no repo para validar. Escolha registrada em
+      # docs/ui-primitives.md (§17). Destravar junto com o app mobile.
+      - dependency-name: 'victory-native'
+        update-types: ['version-update:semver-major']
     groups:
       dev-dependencies:
         dependency-type: development

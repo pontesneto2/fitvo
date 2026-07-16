@@ -1,7 +1,36 @@
-# FITVO — Registro de Decisões de Planejamento
+# ARQUIVO HISTÓRICO — Registro bruto da sessão de planejamento (D-001 a D-073)
 
-> Documento vivo da sessão de planejamento. Depois vira ADRs em `docs/adr/`
-> e alimenta o `CLAUDE.md`. Não é código; é a fonte das decisões.
+> ## ⚠️ NÃO É FONTE VIVA
+>
+> Este é o **registro bruto da sessão de planejamento original** — a conversa em
+> que as decisões nasceram. Os ADRs em **`docs/adr/`** foram **gerados a partir
+> daqui** e **substituem** este arquivo.
+>
+> **As decisões vigentes estão em `docs/adr/`. Em caso de divergência, o ADR
+> vence.**
+>
+> Preservado para rastrear a **origem** e o **raciocínio** — não para consultar
+> o que vale hoje. Ver o mapa D-número → ADR no `README.md`.
+>
+> ### Como este arquivo engana (leia antes de citá-lo)
+>
+> Os ADRs **destilaram** este registro, e a destilação **perdeu nuance de
+> propósito**. Citar daqui como se fosse regra vigente é erro real, já cometido:
+>
+> - **D-014** aqui diz *"profissionais não enxergam o trabalho uns dos outros
+>   **por padrão**"*. O ADR-0003 registra *"Só o admin tem visão ampla"* — **sem**
+>   o "por padrão". A porta entreaberta existe **só aqui**, e portanto **não é
+>   decisão vigente**.
+> - **D-012** aparece **duas vezes**: a original (clínica como "gancho faseado") e
+>   a **REVISADA** (clínica modelada por completo). Só a segunda vale, e quem ler
+>   a primeira sem seguir adiante conclui o oposto do que está decidido.
+>
+> Se você precisa de uma regra para decidir algo **agora**, ela tem que existir
+> num ADR. Se só existe aqui, ela **não foi decidida** — proponha ao responsável.
+>
+> **Faixa contida:** D-001 a D-073 (sequência completa, sem lacunas). As decisões
+> **D-074 em diante** nasceram depois desta sessão, direto nos ADRs, e **não têm
+> entrada aqui**.
 
 ---
 

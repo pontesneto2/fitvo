@@ -5,6 +5,18 @@
 > detalhe. Em caso de conflito entre memória/hábito e este documento, este
 > documento vence.
 
+> **Fonte das decisões — leia antes de citar um `D-xxx`:**
+> `docs/adr/` é a **única fonte viva**. O `README.md` traz o **mapa
+> D-número → ADR**: use-o para achar onde uma decisão está decidida, porque o ADR
+> **destila** e nem sempre repete o rótulo `D-xxx` no texto — `grep D-012 docs/adr/`
+> não acha nada e **isso não significa que falta**.
+> `docs/history/decisions-planejamento-original.md` é o registro **bruto** da
+> sessão de planejamento (D-001 a D-073), do qual os ADRs foram gerados: é
+> **histórico, não fonte**. Ele contém nuance que os ADRs **descartaram de
+> propósito** — citá-la como regra vigente é erro (já cometido). **Em caso de
+> divergência, o ADR vence.** Se a regra só existe no histórico, ela **não foi
+> decidida**: proponha ao responsável em vez de assumir.
+
 ---
 
 ## ⚠️ AVISO — REPOSITÓRIO PÚBLICO: SEGURANÇA DE SEGREDOS É PRIORIDADE MÁXIMA

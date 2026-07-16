@@ -94,8 +94,9 @@ está errada:
 a derivação é uma igualdade simples e **estável** — o vínculo é
 `paciente ↔ (profissional + especialidade)` com unique nessa tripla (ADR-0001),
 tem **exatamente um** profissional, e trocá-lo não é mutação: é outro vínculo.
-Nenhuma decisão hoje permite um segundo profissional escrever num vínculo alheio
-(D-014: *"profissionais não enxergam o trabalho uns dos outros por padrão"*).
+Nenhuma decisão vigente permite um segundo profissional escrever num vínculo
+alheio — o ADR-0003 registra que **só o admin de clínica tem visão ampla**, e o
+admin puro **não acessa dado clínico** (D-015).
 
 **Portanto a justificativa NÃO é "o profissional do vínculo pode mudar".** Isso é
 falso, e um campo defendido por um motivo falso cai na primeira revisão.
@@ -116,14 +117,18 @@ separa os dois casos:
 É a mesma razão pela qual se guarda o **preço no momento da compra** em vez de
 fazer join com o preço atual do produto. Ninguém chama isso de duplicação.
 
-**O cenário concreto que fecha o argumento.** O D-012 (REVISADO) torna a clínica
-o **coração comercial** do produto — vender para clínicas que centralizam toda a
-operação — e o D-014 diz que profissionais não veem o trabalho uns dos outros
-**"por padrão"**: a porta está deliberadamente entreaberta, e o D-012 já prevê
-compartilhamento intra-clínica **sob consentimento**. No dia em que qualquer
-decisão permitir um segundo ator escrever num vínculo (cobertura de colega,
-supervisão, admin que também é profissional), a derivação passa a devolver
-**"nenhum dos dois"** para linhas **já escritas**.
+**O cenário concreto que fecha o argumento.** O ADR-0003 já decide que a **clínica
+é um tenant multi-profissional** e "argumento comercial forte para clínicas
+(operação centralizada)"; que **compartilhamento entre profissionais é sempre
+autorizado pelo paciente, nunca automático** (D-016); e que existe um **motor de
+compartilhamento** que detecta sobreposição de profissionais sobre o mesmo
+paciente e sugere compartilhar (D-017). Ou seja: **múltiplos profissionais em
+torno do mesmo paciente já é o caso central do produto** — hoje eles apenas
+*leem* sob consentimento, não escrevem em vínculo alheio.
+
+No dia em que qualquer decisão permitir um segundo ator **escrever** num vínculo
+(cobertura de colega, supervisão, admin que também é profissional), a derivação
+passa a devolver **"nenhum dos dois"** para linhas **já escritas**.
 
 Isso não seria um bug novo: seria uma **mudança de schema reescrevendo
 retroativamente o que um documento jurídico afirma**. É precisamente o que este
@@ -369,7 +374,7 @@ Sinalizado para decisão de sequenciamento — **nada implementado por este ADR*
   exatamente um profissional (ADR-0001). Rejeitado: a autoria é uma **derivação
   congelada**, não um cache de estado presente. Derivar acopla o significado de um
   documento jurídico ao estado *atual* do vínculo — e quando a clínica
-  multiprofissional chegar (D-012/D-014), a derivação devolveria "nenhum dos dois"
+  multiprofissional chegar (ADR-0003), a derivação devolveria "nenhum dos dois"
   para linhas já escritas, **reescrevendo retroativamente** o que o prontuário
   afirma. Critério geral: *se a fonte mudar, este campo deve mudar junto?* Sim →
   derive; não → armazene. Mesma razão do preço registrado na compra. Distinto do

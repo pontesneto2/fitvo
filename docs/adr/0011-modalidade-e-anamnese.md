@@ -151,6 +151,13 @@ conduta.
 
 ### D-104 — `MealLog`: check de refeição
 
+> ⚠️ **REVISADO pelo D-118 (ADR-0013).** O registro deixa de ser **binário**
+> ("consumiu") e passa a ter **três estados** — comi tudo / **parcial** / não comi
+> — mais **foto** opcional. Motivo: "parcial" é a resposta honesta mais comum, e
+> colapsá-la em sim/não falsifica o indicador de aderência. O resto desta decisão
+> (check-in, tempo real, escopo de sync) **permanece**. O bloqueio registrado
+> abaixo também **caiu**: o ADR-0013 (D-112) cria o nível `Meal`.
+
 - O paciente **marca que consumiu a refeição**, com comentário opcional. O
   nutricionista vê em **tempo real**.
 - É o **irmão exato** da execução de treino (D-086): prescrição → execução →
@@ -182,15 +189,34 @@ O D-102 cita adipometria e bioimpedância como o que o profissional afere no
 presencial, mas a taxonomia acima **não tem bloco de antropometria** — e não é
 esquecimento:
 
+A distinção correta é **declarado × aferido**:
+
+- **Anamnese** = história, entrevista — o que é **DECLARADO** (pelo paciente, ou
+  colhido pelo profissional conversando).
+- **`Assessment`** = o que é **AFERIDO/MEDIDO** (adipometria, bioimpedância, peso,
+  circunferências).
+
+O D-102 citou adipometria como ilustração de **autoria** (o que o profissional faz
+presencialmente), **não** de onde o dado mora.
+
 - **O bloco é visível no fluxo** da anamnese: no presencial, o profissional afere
   e registra ali, sem sair do processo.
-- **O dado mora no `Assessment`**, não na anamnese. Medida é **recorrente** por
-  natureza (remede-se todo mês) e o D-094 (ADR-0010) já reservou o `Assessment`
-  para avaliação/medidas. A "primeira medida" não é um tipo especial de dado: é
-  simplesmente o primeiro `Assessment`, criado de dentro do fluxo da anamnese.
-- **O bloco é invisível na modalidade `ONLINE`** (D-101): não há profissional
-  presente para aferir, e o paciente não faz a própria adipometria. Mostrar o
-  bloco seria pedir o impossível.
+- **Toda medida é `Assessment`, desde a primeira.** Medida é **recorrente** por
+  natureza (reavaliação típica a cada 3 meses) e o D-094 (ADR-0010) já reservou o
+  `Assessment` para avaliação/medidas — que também aceita autoria do profissional.
+  A "primeira medida" não é um tipo especial de dado: é simplesmente o primeiro
+  `Assessment`, criado de dentro do fluxo da anamnese. **Nada duplica**, e a linha
+  do tempo de evolução (D-085) fica **contínua desde o dia 1**.
+- **Requisito de UX — o bloco aparece com os campos BLOQUEADOS para o paciente**,
+  com a mensagem *"seu profissional preencherá na consulta"*. Isso é
+  **transparência**: o paciente entende que a medida existe e o que esperar, em
+  vez de descobrir um vazio inexplicado. Visualmente é um bloco da anamnese;
+  estruturalmente é a primeira medida da série.
+- **Autoria: somente o PROFISSIONAL preenche antropometria.** O paciente tem
+  acesso de **leitura**. É a única parte do fluxo com autoria restrita — coerente
+  com D-102 ("o profissional aferiu Y" ≠ "o paciente declarou X").
+- **O bloco é invisível na modalidade `ONLINE`** (D-101): não há consulta
+  presencial, não há aferição. A modalidade decide o fluxo.
 
 **A consequência é a regra:** o **fluxo** da anamnese **não é 1:1 com a entidade**
 `Anamnesis`. Um passo do fluxo escreve em outra entidade. Uma implementação

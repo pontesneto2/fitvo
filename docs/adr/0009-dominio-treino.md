@@ -1,0 +1,356 @@
+# ADR-0009 — Domínio de Treino
+
+**Status:** Aceito
+**Decisões cobertas:** D-079 a D-092, D-105
+
+## Contexto
+
+O esqueleto de conteúdo (PR #14, ADR-0006) deixou o domínio de treino como
+estrutura mínima — `Workout`/`WorkoutItem` com o detalhe fino deferido para
+`detail Json?` e marcador `TODO(D-063)`. O D-063 era decisão humana com
+referência de produto (MFit como benchmark do líder de mercado). Esta ADR fecha
+o D-063 **para treino**: consolida a hierarquia, os campos finos e as regras de
+execução, avaliação e biblioteca. Treino é o coração do produto — sem ele não
+existe FITVO.
+
+Nutrição e medicina seguem a mesma lógica e continuam deferidos (dependem de
+referência própria — Dietbox — e de decisão humana). Esta ADR não os antecipa.
+
+## Decisão
+
+### D-079 — Hierarquia do domínio de treino
+
+A modelagem passa a ter cinco níveis:
+
+```
+Vínculo (bond = paciente ↔ profissional+especialidade = "ambiente")
+  └── N Planos ATIVOS simultâneos (ex.: "Musculação Julho" + "Cardio Julho")
+       └── Treinos do plano (A/B/C  OU  dias da semana)
+            └── Exercícios do treino
+                 └── Séries (cada uma é uma linha própria)
+```
+
+- **Caso comum otimizado:** um profissional por especialidade. Dentro do
+  vínculo, o aluno pode ter vários planos ativos ao mesmo tempo, **todos do
+  mesmo profissional**.
+- O modelo N:N do vínculo (D-002/D-052) permanece como **capacidade** — dois
+  personais = dois ambientes (dois vínculos). A interface é otimizada para o
+  caso comum, sem perder a capacidade.
+- O esqueleto atual tem apenas três níveis (`Bond → Workout → WorkoutItem`).
+  Falta o nível **plano**: `Workout` hoje acumula os papéis de "plano" e
+  "treino". A modelagem introduz `WorkoutPlan` acima de `Workout` (ver
+  "Impacto de modelagem").
+
+### D-080 — Organização do plano: A/B/C ou dias da semana
+
+- A organização é escolhida **por plano**, não global: **A/B/C** (o aluno
+  executa na ordem que quiser) ou **dias da semana** (cada treino tem dia
+  marcado).
+- As duas opções coexistem no produto; a escolha é um atributo do plano.
+
+### D-105 — Plano fixo × plano variável
+
+> Adicionado depois da aceitação inicial deste ADR. Complementa o D-079.
+
+- Além dos planos **variáveis** (que rodam por dia ou por letra — D-080), existe
+  o **plano FIXO**: um plano que vale **todo dia**, ou **nos dias escolhidos pelo
+  profissional**, e que **não interfere nos demais planos ativos**.
+- **Caso de uso real:** plano de alongamento/mobilidade que o aluno faz sempre,
+  independente de ser dia de treino A ou B.
+- **Não é alternativa aos outros — coexiste** permanentemente. O profissional
+  decide se inclui e em quais dias vale.
+- **Distingue-se do D-079:** lá são planos que **competem pelo tempo** do aluno
+  (o aluno escolhe entre "Musculação Julho" e "Cardio Julho"); aqui é um plano que
+  **roda por cima de todos**. A diferença não é cosmética: um plano fixo não deve
+  ser contado como "o treino de hoje" nos indicadores de aderência (D-092), senão
+  o alongamento infla a aderência de quem não treinou.
+- **Vale para treino.** **Não se aplica a nutrição** — não existe "dieta que roda
+  por cima das outras" (ver D-112, ADR-0013).
+
+### D-081 — Séries nunca uniformes
+
+- **Cada série é uma linha própria**, com seus próprios valores. Um exercício
+  pode ter séries totalmente diferentes entre si.
+- Campos por série: ordem, repetições (incluindo "até a falha"), carga,
+  descanso, técnica, observação.
+- Modelar como "3×12 a 20kg" (uniforme) é **proibido** — é requisito explícito.
+  Exemplo que precisa ser suportado: série 1 (12 reps · 20kg · 60s · normal),
+  série 2 (10 reps · 25kg · 90s · normal), série 3 (falha · 25kg · 90s ·
+  drop-set).
+- Consequência de modelagem: `WorkoutItem.detail Json?` é substituído por uma
+  entidade filha `WorkoutSet` (uma linha por série).
+- **A carga é modelada em colunas tipadas separadas** (peso / duração /
+  distância / peso corporal), **nunca** num par polimórfico `valor + unidade`.
+  Motivo: o D-092 exige "evolução de carga por exercício"; com valor
+  polimórfico, uma agregação mal escrita soma gramas com segundos e o **bug é
+  silencioso**. Colunas tipadas tornam o estado inválido irrepresentável. O caso
+  é real, não hipotético — o D-079 cita "Cardio Julho" como plano ativo
+  convivendo com musculação, então séries de tempo/distância convivem com carga.
+- Todas as grandezas são **inteiras** (gramas, segundos, metros — nunca float),
+  com formatação só na exibição, na mesma disciplina do dinheiro em centavos
+  (D-069).
+
+### D-082 — Exercícios conjugados
+
+- Suportar agrupamento de exercícios: bi-set, tri-set, circuito. Exercícios
+  conjugados são executados em sequência, sem descanso entre eles.
+- É atributo estrutural do treino (agrupamento de itens), não um tipo novo de
+  exercício da biblioteca.
+- **As rodadas de um circuito são as séries, não um contador.** "3 rodadas de
+  A+B+C" = cada item do grupo tem 3 séries; a **rodada N é a série de ordem N**
+  de cada item. Um campo `roundCount` no grupo foi **rejeitado**: ou força
+  rodadas idênticas (violando o D-081, que proíbe séries uniformes — na prática
+  a rodada 3 é mais pesada ou até a falha), ou é redundante com a contagem de
+  séries e pode divergir dela (estado inválido representável). Rodada-como-série
+  preserva a variação por rodada de graça.
+- O descanso entre rodadas é o `restSeconds` da série do **último item** do
+  grupo (os anteriores vão a zero) — não exige campo de grupo.
+- **Invariante** (camada de domínio): todos os itens de um mesmo grupo têm a
+  mesma contagem de séries. Grupo malformado é erro de validação.
+- **Fora de escopo:** circuito por tempo com rodadas indeterminadas (AMRAP,
+  EMOM) — ver "Gaps conhecidos" abaixo.
+
+### D-083 — Validade do plano
+
+- Todo plano tem validade própria: **30 dias por padrão, configurável** pelo
+  profissional. É independente da vigência da consultoria, mas **comunicante**.
+- **Plano vence com consultoria ativa** → avisa o profissional ("o plano do
+  João vence em 3 dias") e o aluno vê "plano expirado, aguarde novo treino".
+- **Consultoria encerra** → o vínculo vira arquivo e o histórico é preservado
+  (D-053, ADR-0001).
+- **Regra inegociável:** o aluno nunca fica sem nada silenciosamente. Sempre há
+  comunicação — a régua de vencimento é varredura de worker (BullMQ).
+
+### D-084 — Agendamento de liberação de plano
+
+- O profissional pode **programar treinos/planos para liberação futura**: monta
+  o planejamento completo (ex.: 3 meses) e o sistema libera cada plano conforme
+  a data programada.
+- Ataca a dor #1 do mercado (montar treino toma tempo) e é diferencial
+  competitivo. A liberação agendada é varredura de worker (mesma régua de
+  D-083).
+
+### D-085 — Progressão reativa (não prescrita)
+
+- **Não** existe progressão automática embutida no plano (nada de "semana 1-4:
+  3×12; semana 5-8: 4×10" avançando sozinho).
+- O profissional observa a evolução e **edita a ficha quando quer**.
+- O sistema deve ser **inteligente ao apresentar a evolução**: linha do tempo
+  com os dados que realmente demonstram progresso ao longo do período. A
+  inteligência está na leitura, não na prescrição.
+
+### D-086 — Execução do treino pelo aluno
+
+Ao executar, o aluno:
+- **Marca conclusão** (obrigatório).
+- **Registra a carga real usada** (pode divergir da prescrita — o dado real é
+  o que importa para a evolução, D-085).
+- **Avalia o treino** (obrigatório — D-087).
+
+A marcação de conclusão **também conta como check-in** do aluno no app e
+alimenta os indicadores (D-092). A execução é o principal alvo de escrita
+offline (D-099, ADR-0010): a série é registrada no momento do uso, com ou sem
+sinal.
+
+### D-087 — Avaliação do treino: "instagramável"
+
+- A avaliação é interativa e projetada para ser **printada e compartilhada**
+  (pelo aluno e pelo profissional) — objetivo de produto: aquisição orgânica.
+- Composição: **nota 1 a 5**, **nível de esforço percebido**, **comentário
+  livre** e **reações rápidas** com personalidade (ex.: "morri 💀", "voei 🚀",
+  "perna bamba 🦵") — as reações são o que torna a tela printável.
+- Uma avaliação por sessão executada (não por plano).
+- **O enum guarda o código** (`DIED`, `FLEW`, `WOBBLY_LEGS`); o **label e o
+  emoji vivem no i18n/config**, nunca no enum — coerente com D-066 (textos
+  externalizados desde já). Trocar "morri 💀" por outro texto é mudança de
+  tradução, **zero migração**; só adicionar reação nova exige migração, o que é
+  raro e aceitável. Mesma regra vale para as técnicas de série (D-081):
+  `DROP_SET`, `BI_SET` são códigos; a redação é i18n.
+- Catálogo em tabela (profissional cria a própria reação/técnica) fica para
+  depois, se a iteração provar ser frequente — não se antecipa.
+
+### D-088 — Análise de forma por IA (assíncrona, com validação profissional)
+
+- O aluno **grava um vídeo** da execução; a IA **pré-analisa** (pose
+  estimation) e sugere pontos de atenção; o **profissional valida** antes de
+  qualquer devolutiva ao aluno. **Não** é análise ao vivo por câmera.
+- **Justificativa (baseada em pesquisa):** captura markerless por câmera única
+  não é grau-laboratório — a acurácia degrada no plano transverso e sob
+  oclusão. Além disso, o profissional é o responsável técnico: IA dando
+  devolutiva direta ao aluno sobre execução é risco de lesão e de
+  responsabilidade civil. O humano fica no circuito — coerente com D-023
+  (ADR-0005): profissional valida a saída da IA antes de chegar ao leigo.
+- A saída bruta da pose estimation é payload semiestruturado do provider
+  (legítimo para `Json`, ao contrário do conteúdo de domínio — ver "Impacto de
+  modelagem"); a devolutiva ao aluno só existe após aprovação do profissional.
+
+### D-089 — Biblioteca de exercícios: deleção lógica
+
+- A biblioteca é **base compartilhada da plataforma** (sem dono, `PLATFORM`) +
+  **itens próprios do profissional** (privados por padrão, `PRIVATE`) —
+  reafirma D-064 (ADR-0006), já modelado no esqueleto.
+- Mudanças na biblioteca **propagam para todo o app** (componentização):
+  melhorar vídeo, corrigir descrição. A propagação nunca substitui a natureza
+  do exercício.
+- **Deleção é sempre lógica.** Estados de um item de biblioteca:
+  - `ativo` — aparece na busca, pode ser adicionado a treinos novos;
+  - `descontinuado` — some da busca, mas continua funcionando nos treinos que
+    já o usam; o histórico permanece íntegro.
+- Ao descontinuar um item em uso, **avisar os profissionais afetados** e
+  sugerir substituto.
+- **Separação de responsabilidade:** o **treino** guarda o que foi prescrito
+  (carga, série, técnica — em `WorkoutSet`/`WorkoutItem`); a **biblioteca**
+  guarda o que o exercício é (nome, vídeo, músculo — em `Exercise`). A
+  propagação da biblioteca nunca reescreve a prescrição.
+- **Regra geral do sistema:** deleção lógica vale para tudo — exercício,
+  alimento, plano comercial, especialidade. O que sai de circulação continua
+  existindo para quem já usa. Alinhado a "nunca apagar dados automaticamente" e
+  à guarda legal de dado clínico (D-100, ADR-0010).
+
+### D-090 — Clonagem de treino
+
+- O profissional pode **clonar um treino/plano** de um aluno para outro e
+  editar. Cópia profunda (plano → treinos → exercícios → séries) para um novo
+  vínculo. Economiza horas — feature do líder de mercado (MFit) e ataque à dor
+  #1.
+- A clonagem cria registros próprios do vínculo de destino (isolamento por
+  vínculo — ADR-0001); pode registrar a linhagem de origem como dado, sem
+  vincular a execução de um aluno à do outro.
+
+### D-091 — Vídeo dos exercícios
+
+- Cada exercício da biblioteca base tem vídeo demonstrativo — **paridade
+  competitiva**, não inovação (MFit ~1.800; Personal Fit ~700). O vídeo é
+  referência de storage (chave S3), no mesmo padrão de `ProgressPhoto`.
+- **Geração de vídeo por IA: rejeitada** — cara, lenta e pior que filmar.
+  Filmar os exercícios bem feitos custa menos e entrega mais.
+
+### D-092 — Indicadores do domínio de treino
+
+O dado nasce suportando estes cálculos (a tela de dashboard é fase posterior —
+o **dado** precisa nascer certo, com índices por data):
+
+- **Para o aluno:** aderência (% de treinos concluídos no período), evolução de
+  carga por exercício (linha do tempo — o gráfico que motiva), sequência de
+  dias treinados (streak), volume total por semana.
+- **Para o profissional:** aderência dos alunos (quem está sumindo), alunos com
+  plano vencendo (D-083), evolução agregada, alunos avaliando o treino como
+  muito difícil/fácil (sinal de ajuste — D-087), mensagens sem resposta
+  (ADR-0010, D-096).
+
+Todos os indicadores são **derivados** de execuções e séries registradas — não
+há entidade nova de indicador, há índices planejados.
+
+## Gaps conhecidos (decisão de produto pendente — não modelar sem ADR)
+
+Registrados aqui para ficarem **visíveis, não esquecidos**. Nenhum é bloqueante
+do MVP; nenhum deve ser modelado por conta própria.
+
+### Blocos com teto de tempo — AMRAP/EMOM
+
+- **Não são expressáveis no modelo atual.** A rodada-como-série (D-082) cobre
+  circuito de rodadas **conhecidas** ("3 rodadas de A+B+C"). Não cobre AMRAP
+  ("máximo de rounds em 12 min") nem EMOM ("a cada minuto, por 10 min"), onde a
+  contagem de rodadas é **indeterminada na prescrição**.
+- Um contador de rodadas (`roundCount`) **também não resolveria** — o problema
+  não é contar, é que não há número a prescrever.
+- Resolver exigiria um **bloco com teto de tempo e alvo** (entidade nova com
+  `durationCapSeconds` + critério de pontuação) — mudança estrutural, não campo
+  extra.
+- **Relevante se** CrossFit/HIIT/treino funcional entrarem no escopo de verdade.
+  Nenhum ADR decidiu isso. Exige decisão de produto explícita.
+
+### Taxonomia de grupo muscular
+
+- O D-089 cita "músculo" como conteúdo da biblioteca, mas **nenhum ADR decidiu a
+  taxonomia** (enum fixo de grupos × catálogo em tabela × múltiplos músculos por
+  exercício com primário/secundário). Não modelado — decisão de produto pendente.
+
+### Catálogo de técnicas de série
+
+- O `SetTechnique` nasce **mínimo de propósito** (só o que este ADR fundamenta:
+  normal e drop-set). Ampliar o catálogo (rest-pause, pirâmide, isometria,
+  negativa...) é decisão de produto + migração, não invenção do agente (D-087).
+
+## Impacto de modelagem e inconsistências herdadas (D-063 fechado)
+
+Com o D-063 fechado para treino, o `detail Json?` do esqueleto **deve ser
+substituído por colunas tipadas** — não se constrói em cima do `Json`, que vira
+dívida técnica rápido e é **incompatível com o merge por campo** exigido pelo
+offline-first (D-099, ADR-0010). Inconsistências identificadas entre esta ADR e
+o schema atual (PR #14), a resolver na fase de implementação:
+
+1. **Hierarquia incompleta** — o esqueleto tem `Bond → Workout → WorkoutItem`;
+   D-079 exige o nível **plano**. Introduzir `WorkoutPlan` (dono da validade,
+   organização e agendamento — D-080/D-083/D-084) entre `Bond` e `Workout`.
+   `Workout` permanece com o significado de **"treino do plano"** — sem renomear
+   a tabela existente.
+2. **Séries em `Json`** — `WorkoutItem.detail Json?` contradiz D-081 (série =
+   linha própria). Substituir por entidade filha `WorkoutSet`, com carga em
+   **colunas tipadas inteiras** (D-081) e conjugação por campos de agrupamento
+   no `WorkoutItem` (D-082) — sem entidade de bloco, que não teria atributo
+   próprio para hospedar.
+3. **Sem estado de deleção lógica** — `Exercise`/`Food` não têm ciclo de vida;
+   D-089 exige `ativo`/`descontinuado`. A regra geral de deleção lógica também
+   revisita `onDelete` das relações (nunca apagar fisicamente o referenciado).
+4. **Execução/avaliação/análise inexistentes** — D-086/D-087/D-088 exigem
+   entidades novas (`WorkoutSession`, `SetLog`, `WorkoutRating`,
+   `FormAnalysis`), ausentes no esqueleto.
+5. **`detail Json?` genérico** nos demais itens de treino desaparece em favor de
+   colunas tipadas.
+
+O plano de modelagem detalhado (entidades, relações, índices) é apresentado ao
+responsável **antes de qualquer código** — nenhuma migração é escrita sem
+aprovação.
+
+## Alternativas consideradas
+
+- **Séries uniformes ("3×12 a 20kg"):** simplifica o schema, mas quebra o
+  requisito real do mercado (séries variáveis, drop-set, falha). Rejeitado —
+  série é linha própria (D-081).
+- **Carga polimórfica (`valor` + `unidade`):** um par único cobriria peso,
+  tempo e distância com menos colunas, mas deixa o estado inválido
+  representável — uma agregação de "evolução de carga" (D-092) somaria gramas
+  com segundos, e o bug seria **silencioso**. Rejeitado — colunas tipadas
+  separadas (D-081).
+- **Contador de rodadas (`roundCount`) no grupo de conjugados:** parece o modo
+  óbvio de expressar "3 rodadas de A+B+C", mas ou força rodadas idênticas
+  (violando D-081) ou duplica a contagem de séries e diverge dela. Rejeitado —
+  rodada é a série de ordem N de cada item do grupo (D-082).
+- **Entidade `WorkoutBlock` para conjugados:** normalizaria o grupo, mas o D-082
+  define o comportamento ("em sequência, sem descanso") igual para
+  bi-set/tri-set/circuito — o "tipo" é só a contagem de itens, e não sobra
+  atributo de grupo para a entidade hospedar. Rejeitado como overengineering;
+  cada tabela nova custa dobrado no offline (schema local + remoto + sync,
+  D-099). Reavaliar se surgir atributo real de grupo.
+- **Progressão prescrita/automática no plano:** parece sofisticado, mas engessa
+  e não reflete a prática (o profissional ajusta reagindo ao dado). Rejeitado —
+  progressão reativa (D-085).
+- **Manter `detail Json?` e detalhar em runtime:** adia trabalho, mas cria
+  dívida imediata e inviabiliza o merge por campo do offline (D-099). Rejeitado
+  — colunas tipadas agora.
+- **Análise de forma ao vivo por câmera:** mais "mágico", mas a acurácia
+  markerless não sustenta devolutiva clínica e transfere responsabilidade à IA.
+  Rejeitado — assíncrona com validação humana (D-088).
+- **Geração de vídeo de exercício por IA:** cara, lenta e inferior a filmar.
+  Rejeitado (D-091).
+- **Deleção física de itens de biblioteca:** quebra histórico de treinos em uso
+  e a guarda legal. Rejeitado — deleção sempre lógica (D-089).
+
+## Consequências
+
+- Novas entidades a modelar: `WorkoutPlan`, `WorkoutSet`, `WorkoutSession`,
+  `SetLog`, `WorkoutRating`, `FormAnalysis`; e alteração de `Workout`,
+  `WorkoutItem`, `Exercise` (deleção lógica + vídeo).
+- A migração é **destrutiva em forma** (troca `Json` por colunas, reestrutura a
+  hierarquia), porém sobre **tabelas vazias** — o esqueleto (PR #14) é
+  schema-only, sem slice de API que escreva. Não há dado em produção, mas a área
+  é **dado clínico-adjacente**: pela Política de Merge (CLAUDE.md), a
+  implementação exige **revisão humana obrigatória**, não auto-merge.
+- O worker ganha duas réguas: vencimento de plano (D-083) e liberação agendada
+  (D-084).
+- Os indicadores (D-092) nascem calculáveis por índices de data, sem entidade
+  de agregação — a tela é fase posterior.
+- A análise de forma (D-088) e a avaliação (D-087) tornam o app **nativo**
+  (câmera real, offline) um requisito, não um luxo — coerente com D-098
+  (ADR-0010).

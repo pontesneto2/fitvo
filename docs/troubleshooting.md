@@ -203,10 +203,61 @@ const unauthorized = await app.inject({
 expect(unauthorized.statusCode).toBe(401);
 ```
 
-> É o mesmo gênero de problema das seções 4 e da injeção de drift: **verde que
-> mente**. Um check só vale se você souber o que ele reprova.
+> É o mesmo gênero de problema da seção 4 (drift) e da seção 6 (vacuidade):
+> **verde que mente**. Um check só vale se você souber o que ele reprova.
 
-## 6. `prisma migrate reset` pede consentimento explícito
+## 6. Asserção sobre relação AUSENTE sem a relação no `include` — passa por vacuidade
+
+**Sintoma**
+
+Um check afirma que uma relação **não** existe, fica verde, e não prova nada:
+
+```ts
+const loaded = await prisma.anamnesis.findUniqueOrThrow({
+  where: { id },
+  include: { parq: true }, // <- `lifestyle` NAO esta aqui
+});
+expect(loaded.lifestyle).toBeUndefined(); // VERDE — e vazio
+```
+
+**Causa**
+
+O Prisma só devolve a relação **pedida no `include`**. A relação não pedida vem
+`undefined` **sempre** — a asserção fala sobre a *forma da query*, não sobre o
+banco. Ela passaria **idêntica** se a linha existisse. O check não tem como falhar,
+logo não reprova nada.
+
+A distinção que importa:
+
+- **`undefined`** = não perguntei (ausente do `include`).
+- **`null`** = perguntei e não existe. **Só este** é o dado.
+
+**Regra**
+
+> Para afirmar que uma seção/relação está **ausente**, ela precisa estar no
+> `include` e a asserção precisa ser contra **`null`**, nunca `undefined`. E
+> ancore contra uma relação **presente** no mesmo objeto — se as duas dessem o
+> mesmo resultado, o teste estaria quebrado.
+
+```ts
+const loaded = await prisma.anamnesis.findUniqueOrThrow({
+  where: { id },
+  include: { parq: true, lifestyle: true }, // as DUAS pedidas
+});
+expect(loaded.lifestyle).toBeNull(); // secao ausente = linha ausente
+expect(loaded.parq).not.toBeNull(); // ancora: prova que o include funciona
+```
+
+**Procedência**
+
+Este caso foi cometido **no PR que escreveu a seção 5 acima** — o autor aplicou a
+disciplina ao código de produção e não ao próprio check, no mesmo arquivo, no
+mesmo dia. Fica registrado com a procedência de propósito: **o padrão não se
+aplica sozinho, nem para quem acabou de escrevê-lo.** A pergunta certa nunca é
+"ele passa?", e sim **"o que este check reprova?"** — um check que não consegue
+falhar já falhou.
+
+## 7. `prisma migrate reset` pede consentimento explícito
 
 **Sintoma**
 

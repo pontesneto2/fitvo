@@ -169,11 +169,10 @@ FITVO.
 - **Schema de treino/fluxo (ADR-0009/0010)**: escrito e em **PR #26** (CI verde,
   rebaseado na main) — aguarda **revisão humana**, área clínico-adjacente, sem
   `--admin`. Não mergear sem aprovação explícita.
-- **Antropometria: anamnese ou avaliação? (ADR-0011)**: o D-102 cita
-  adipometria/bioimpedância como o que o profissional afere na anamnese, mas a
-  taxonomia do D-103 não tem bloco de medidas e o D-094 pôs medida recorrente no
-  `Assessment`. A primeira medida é seção da anamnese ou já é `Assessment`?
-  Define se o módulo de anamnese ganha seção de antropometria.
+- **Bloco de antropometria (ADR-0011)**: resolvido quanto ao desenho — bloco
+  visível no fluxo da anamnese, dado morando no `Assessment`, invisível em
+  `ONLINE`. Mas **construí-lo depende de tipar o `Assessment`** (D-063, abaixo).
+  Não bloqueia a tipagem da anamnese, que está completa sem ele.
 - **Campos finos de nutrição/medicina (D-063, ainda aberto)**: treino já foi
   fechado (ADR-0009/0010, benchmark MFit) e a anamnese pelo ADR-0011. Nutrição e
   medicina dependem de referência de produto própria (**Dietbox**) e decisão

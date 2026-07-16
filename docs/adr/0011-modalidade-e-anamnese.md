@@ -176,26 +176,34 @@ conduta.
   nutrição existir. Não tentar destravar por fora (ex.: log por item de alimento)
   — ver "Alternativas consideradas".
 
-## Ponto em aberto — onde vive a antropometria
+### Antropometria: bloco no fluxo, dado no `Assessment`
 
-O D-102 cita **adipometria e bioimpedância** como exemplos do que o profissional
-adiciona à anamnese no presencial. Mas:
+O D-102 cita adipometria e bioimpedância como o que o profissional afere no
+presencial, mas a taxonomia acima **não tem bloco de antropometria** — e não é
+esquecimento:
 
-- a **taxonomia do D-103 não tem bloco de antropometria/medidas** (o módulo de
-  nutrologia lista "exame físico"; o de nutrição, não);
-- e o **D-094 (ADR-0010) separou** a anamnese (gate, **uma** por vínculo) da
-  **avaliação/medidas** (`Assessment`, **recorrente**) — e medida é, por
-  natureza, recorrente: remede-se todo mês.
+- **O bloco é visível no fluxo** da anamnese: no presencial, o profissional afere
+  e registra ali, sem sair do processo.
+- **O dado mora no `Assessment`**, não na anamnese. Medida é **recorrente** por
+  natureza (remede-se todo mês) e o D-094 (ADR-0010) já reservou o `Assessment`
+  para avaliação/medidas. A "primeira medida" não é um tipo especial de dado: é
+  simplesmente o primeiro `Assessment`, criado de dentro do fluxo da anamnese.
+- **O bloco é invisível na modalidade `ONLINE`** (D-101): não há profissional
+  presente para aferir, e o paciente não faz a própria adipometria. Mostrar o
+  bloco seria pedir o impossível.
 
-Então: a adipometria da **primeira consulta** é seção da anamnese (com autoria do
-profissional), e as **seguintes** são `Assessment`? Ou toda medida vive em
-`Assessment` desde a primeira, e o D-102 só usou os termos como ilustração do que
-o profissional afere?
+**A consequência é a regra:** o **fluxo** da anamnese **não é 1:1 com a entidade**
+`Anamnesis`. Um passo do fluxo escreve em outra entidade. Uma implementação
+ingênua colocaria campos de antropometria em `Anamnesis` — e criaria a duplicação
+que esta decisão evita: a mesma medida em dois lugares, divergindo na segunda
+consulta.
 
-**Não decidido — não inventar.** Afeta se o módulo de anamnese ganha uma seção de
-antropometria ou não. A taxonomia de campos do `Assessment` continua deferida
-(D-063) de qualquer forma; esta pergunta só define de que lado da fronteira a
-primeira medida cai.
+**Decorre disso:** como o dado vive numa entidade própria e recorrente, a ausência
+de medida **não trava o gate** — o gate é da anamnese (D-093). E a **taxonomia dos
+campos de medida continua sendo o `Assessment`** (D-063, ainda aberto): o bloco de
+antropometria só é construível quando o `Assessment` for tipado, mas isso **não
+bloqueia a tipagem da anamnese** (D-103), que está completa sem ele — justamente
+porque a medida não vive lá.
 
 ## Impacto de modelagem
 
@@ -270,6 +278,11 @@ Sinalizado para decisão de sequenciamento — **nada implementado por este ADR*
   configurável):** daria flexibilidade sem migração, mas devolve a anamnese ao
   território não-tipado que o ADR-0009 acabou de abandonar — perde tipo,
   agregação segura e validação. Rejeitado — colunas tipadas (D-103).
+- **Antropometria como seção de campos da própria anamnese:** seria o caminho
+  óbvio (o profissional afere durante a anamnese, logo os campos ficam ali), mas
+  medida é recorrente — a segunda aferição não teria onde morar senão no
+  `Assessment`, e a mesma medida existiria em dois lugares, divergindo. Rejeitado
+  — bloco no fluxo, dado no `Assessment` (D-103).
 - **`MealLog` por item de alimento (contornando a falta do nível `Meal`):**
   destravaria o D-104 sem tocar a estrutura de nutrição, mas contradiz a decisão
   ("marca que consumiu a **refeição**") e produziria aderência sem sentido

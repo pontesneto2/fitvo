@@ -27,6 +27,10 @@ Cadastro → app vazio → convite do profissional → vínculo criado
 - Com vínculo mas **sem anamnese respondida**, o aluno vê a estrutura do app e
   **o que precisa fazer** ("responda sua anamnese para receber seu treino") —
   **nunca tela morta**. Boa UX é requisito, não enfeite.
+  > O texto do estado vazio depende da **modalidade do vínculo** (D-101,
+  > ADR-0011): num vínculo `PRESENCIAL` o paciente não deve responder nada — o
+  > profissional preenche na consulta —, então mandá-lo "responder a anamnese"
+  > está errado. O gate continua existindo; a mensagem é que muda.
 - O profissional só monta o plano **depois** da anamnese respondida.
 - **Conceito novo de produto: gates obrigatórios.** O app trava o aluno até ele
   fornecer o que o profissional precisa. Resolve a dor real de o profissional
@@ -40,6 +44,14 @@ Cadastro → app vazio → convite do profissional → vínculo criado
   barato, não vale o risco de divergência.
 
 ### D-094 — Anamnese: uma por profissional
+
+> ⚠️ **PARCIALMENTE REVISADO pelo D-102 (ADR-0011).** Este decisão assumia que
+> **o paciente responde** a anamnese — premissa falsa para nutrição e medicina,
+> onde a consulta presencial é a norma. O D-102 passa a permitir preenchimento
+> pelo paciente, pelo profissional ou por ambos, com **rastreio de autoria
+> obrigatório**. O resto desta decisão (uma por vínculo, documento de prontuário
+> não compartilhado, autopreenchimento, exceção do e-mail) **permanece válido**.
+> A taxonomia dos campos, deixada em aberto aqui, foi fechada pelo D-103.
 
 - **Anamnese nova a cada profissional.** É documento que o profissional anexa
   ao prontuário do paciente — **não é compartilhada automaticamente** (coerente

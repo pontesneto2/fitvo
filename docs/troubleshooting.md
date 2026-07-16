@@ -257,7 +257,89 @@ aplica sozinho, nem para quem acabou de escrevê-lo.** A pergunta certa nunca é
 "ele passa?", e sim **"o que este check reprova?"** — um check que não consegue
 falhar já falhou.
 
-## 7. `prisma migrate reset` pede consentimento explícito
+## 7. `git diff main branch` NÃO responde "posso deletar esta branch?"
+
+**Sintoma**
+
+Você quer saber se uma branch já mergeada pode ser removida. Roda o diff e vê
+centenas de arquivos diferentes:
+
+```bash
+git diff origin/main origin/feat/velha --stat
+# 286 files changed, 154 insertions(+), 25153 deletions(-)
+```
+
+Conclusão intuitiva: *"tem muita coisa exclusiva, não posso deletar"*. **Errado
+— e o inverso também acontece.**
+
+**Causa**
+
+`git diff A B` (dois pontos) compara os **estados finais** de A e B. Ele acusa
+diferença **nos dois sentidos** — inclusive tudo o que a `main` ganhou e a
+branch **não tem**. Uma branch velha e totalmente mergeada acusa milhares de
+linhas de diferença **só por estar atrás**. O diff responde *"os dois lados são
+iguais?"*, e a pergunta era outra.
+
+**Regra**
+
+> Para saber o que uma branch tem de **exclusivo**, use **três pontos**:
+> `git diff A...B` compara B contra o **merge-base** — o que a branch adicionou
+> desde que divergiu. Vazio = não contribui nada.
+
+```bash
+git diff origin/main...origin/feat/velha        # vazio = seguro deletar
+git rev-list --count origin/main..origin/feat/velha   # quantos commits exclusivos
+git merge-base --is-ancestor origin/feat/velha origin/main && echo "ja na main"
+```
+
+**Caso real**
+
+Uma branch acusava 286 arquivos no diff de dois pontos. No de três pontos: vazio.
+Os 2 commits exclusivos eram um commit de doc **e o revert dele** — somavam zero.
+O teste errado quase preservou lixo; o mesmo erro, com o sinal trocado, **deleta
+trabalho**. É `git diff` respondendo com precisão a uma pergunta que você não fez.
+
+## 8. `2>/dev/null` num comando de git esconde a falha, e você trabalha sobre a base errada
+
+**Sintoma**
+
+Você cria uma branch a partir da `main`, o comando não reclama, e horas depois
+descobre que a base estava velha — sem nenhum dos merges recentes.
+
+**Causa**
+
+Num **worktree**, `git checkout main` **falha** se a `main` já está em uso por
+outro worktree (o principal, tipicamente):
+
+```
+fatal: 'main' is already used by worktree at '/Users/.../fitvo'
+```
+
+Com `git checkout main 2>/dev/null`, esse `fatal` **desaparece**. O `git pull`
+seguinte atualiza outra coisa, e o `git checkout -b nova` sai de onde o HEAD
+estiver — **uma base antiga**. Nada avisa. O CI fica verde, porque o código está
+correto: só está construído sobre a árvore errada.
+
+**Regra**
+
+> Nunca silencie o `stderr` de um comando de git. Ele não é ruído: é o único
+> lugar onde o git diz que não fez o que você pediu.
+
+E, ao criar branch, **confirme a base em vez de assumi-la**:
+
+```bash
+git fetch origin
+git checkout -b nova origin/main          # explicito, nao depende do HEAD atual
+git rev-parse --short HEAD origin/main    # os dois tem que bater
+```
+
+> Primo das seções 4, 5 e 6, com a mecânica invertida. Lá o check **não
+> conseguia falhar** (nada foi reprovado porque nada podia reprovar). Aqui a
+> falha **aconteceu** — o git disse `fatal:` — e foi jogada fora antes de chegar
+> aos seus olhos. Nos dois casos o resultado é o mesmo: verde que não significa
+> nada. Silenciar erro de git é desligar o alarme porque ele estava apitando.
+
+## 9. `prisma migrate reset` pede consentimento explícito
 
 **Sintoma**
 

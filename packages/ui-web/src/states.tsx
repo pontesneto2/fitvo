@@ -1,3 +1,5 @@
+import { iconStroke } from '@fitvo/brand-tokens';
+import { AlertTriangle, Inbox } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { Button } from './button';
@@ -8,8 +10,10 @@ import { cn } from './cn';
  * EmptyState (vazio) e ErrorState (erro). Sucesso e via Toast (§13) — nao e um
  * componente proprio aqui.
  *
- * EmptyState/ErrorState compoem o `Button` existente (reuso antes de criar). Icones
- * sao slots com padroes desenhados em SVG inline (lucide segue travado, §19).
+ * EmptyState/ErrorState compoem o `Button` existente (reuso antes de criar).
+ * Icones padrao sao Lucide (§19) em 48px — fora dos tokens `iconSize` (sm/md/lg,
+ * pensados para icone inline/interativo), mas ainda no `iconStroke` (1.5) da
+ * familia. Por isso usam o componente Lucide direto, nao o wrapper `Icon`.
  */
 
 // --- Skeleton (loading) ---
@@ -54,31 +58,18 @@ export function Skeleton({ variant = 'rect', width, height, className }: Skeleto
 
 function InboxIcon(): ReactNode {
   return (
-    <svg viewBox="0 0 48 48" className="h-12 w-12 text-neutral-300" fill="none" aria-hidden="true">
-      <path
-        d="M8 28l6-16h20l6 16M8 28v10h32V28M8 28h9l3 5h8l3-5h9"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <Inbox size={48} strokeWidth={iconStroke} className="text-neutral-300" aria-hidden="true" />
   );
 }
 
 function AlertIcon(): ReactNode {
   return (
-    <svg viewBox="0 0 48 48" className="h-12 w-12 text-danger-400" fill="none" aria-hidden="true">
-      <path
-        d="M24 8 4 40h40L24 8Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M24 20v9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M24 34v.02" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-    </svg>
+    <AlertTriangle
+      size={48}
+      strokeWidth={iconStroke}
+      className="text-danger-400"
+      aria-hidden="true"
+    />
   );
 }
 

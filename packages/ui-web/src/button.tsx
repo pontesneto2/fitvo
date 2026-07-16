@@ -1,6 +1,8 @@
+import { Loader2 } from 'lucide-react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 import { cn } from './cn';
+import { Icon } from './icon';
 
 /**
  * Button WEB (design-system-components.md §1). Consome os tokens via classes
@@ -80,21 +82,7 @@ const variantClasses: Record<ButtonVariant, string> = {
 function Spinner(): ReactNode {
   return (
     <span className="absolute inline-flex items-center justify-center" aria-hidden="true">
-      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-        <circle
-          className="opacity-25"
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          strokeWidth="4"
-        />
-        <path
-          className="opacity-90"
-          fill="currentColor"
-          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-        />
-      </svg>
+      <Icon icon={Loader2} size="sm" className="animate-spin" />
     </span>
   );
 }

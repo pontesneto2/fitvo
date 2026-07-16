@@ -14,6 +14,7 @@ export * from './cn';
 export * from './css-variables';
 export * from './field';
 export * from './field-styles';
+export * from './icon';
 export * from './input';
 export * from './logo';
 export * from './modal';

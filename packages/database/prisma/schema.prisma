@@ -106,6 +106,9 @@ model Account {
   patientProfile      PatientProfile?
   platformAdmin       PlatformAdmin?
   clinicMemberships   ClinicMembership[]
+  notifications       Notification[] // central in-app / sininho (D-097/D-028)
+  attendancesOpened   Attendance[] // atendimentos abertos por esta conta (D-096)
+  attendanceMessages  AttendanceMessage[] // mensagens enviadas por esta conta (D-096)
 
   @@map("account")
 }
@@ -144,13 +147,18 @@ model Tenant {
   paymentAccount PaymentAccount? // subconta Asaas + taxa por tenant (ADR-0004/D-058)
   subscriptions  Subscription[] // assinaturas de plano da plataforma (Fluxo A)
   charges        Charge[] // cobrancas paciente->profissional (Fluxo B, via split)
-  workouts       Workout[] // conteudo de treino escopado ao tenant (ADR-0006)
-  mealPlans      MealPlan[] // conteudo de nutricao escopado ao tenant (ADR-0006)
-  encounters     Encounter[] // atendimentos escopados ao tenant (ADR-0006)
-  medicalRecords MedicalRecord[] // prontuarios escopados ao tenant (ADR-0006)
-  prescriptions  Prescription[] // folhas de receita escopadas ao tenant (ADR-0006)
-  assessments    Assessment[] // anamnese/avaliacao escopadas ao tenant (ADR-0006)
-  progressPhotos ProgressPhoto[] // fotos de evolucao escopadas ao tenant (ADR-0006)
+  workoutPlans    WorkoutPlan[] // planos de treino escopados ao tenant (ADR-0009)
+  workouts        Workout[] // conteudo de treino escopado ao tenant (ADR-0006)
+  workoutSessions WorkoutSession[] // execucoes escopadas ao tenant (ADR-0009)
+  formAnalyses    FormAnalysis[] // analises de forma escopadas ao tenant (ADR-0009)
+  mealPlans       MealPlan[] // conteudo de nutricao escopado ao tenant (ADR-0006)
+  encounters      Encounter[] // atendimentos escopados ao tenant (ADR-0006)
+  medicalRecords  MedicalRecord[] // prontuarios escopados ao tenant (ADR-0006)
+  prescriptions   Prescription[] // folhas de receita escopadas ao tenant (ADR-0006)
+  anamneses       Anamnesis[] // anamneses escopadas ao tenant (ADR-0010)
+  assessments     Assessment[] // avaliacao/medidas escopadas ao tenant (ADR-0006)
+  progressPhotos  ProgressPhoto[] // fotos de evolucao escopadas ao tenant (ADR-0006)
+  attendances     Attendance[] // atendimentos (ticket) escopados ao tenant (ADR-0010)
 
   @@map("tenant")
 }
@@ -242,14 +250,20 @@ model ProfessionalSpecialty {
 model PatientProfile {
   id        String   @id @default(cuid())
   accountId String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  /// Ultima atualizacao cadastral (D-095 — ADR-0010). A cada 6 meses o aluno
+  /// revisa os dados; a varredura e de worker e usa este campo como base. Nulo =
+  /// nunca revisado desde o cadastro. O "objetivo mudou?" a cada plano novo vive
+  /// em WorkoutPlan.goal, no momento natural da montagem.
+  lastCadastralReviewAt DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   account            Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
   bonds              Bond[]
   consents           Consent[] // autorizacoes que ESTE paciente concedeu (D-016)
   sharingSuggestions SharingSuggestion[] // sugestoes do motor para este paciente (D-017)
 
+  @@index([lastCadastralReviewAt]) // varredura da revisao semestral (worker — D-095)
   @@map("patient_profile")
 }
 
@@ -337,12 +351,17 @@ model Bond {
   professionalProfile ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
   specialty           Specialty           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
   charges             Charge[] // cobrancas penduram no vinculo (Fluxo B — ADR-0004)
+  workoutPlans        WorkoutPlan[] // N planos ATIVOS simultaneos por vinculo (D-079)
   workouts            Workout[] // treinos isolados por vinculo (ADR-0006/ADR-0001)
+  workoutSessions     WorkoutSession[] // execucoes/check-ins isolados por vinculo (D-086)
+  formAnalyses        FormAnalysis[] // analises de forma isoladas por vinculo (D-088)
   mealPlans           MealPlan[] // planos alimentares isolados por vinculo (ADR-0006/ADR-0001)
   encounters          Encounter[] // atendimentos isolados por vinculo (ADR-0006/ADR-0001)
   medicalRecord       MedicalRecord? // prontuario (um por vinculo — ADR-0006/ADR-0001)
-  assessments         Assessment[] // anamnese/avaliacao isoladas por vinculo (ADR-0006/ADR-0001)
+  anamnesis           Anamnesis? // GATE: uma anamnese por vinculo (D-093/D-094)
+  assessments         Assessment[] // avaliacao/medidas isoladas por vinculo (ADR-0006/ADR-0001)
   progressPhotos      ProgressPhoto[] // fotos de evolucao isoladas por vinculo (ADR-0006/ADR-0001)
+  attendances         Attendance[] // atendimentos (ticket) isolados por vinculo (D-096)
 
   @@unique([patientProfileId, professionalProfileId, specialtyId])
   @@index([tenantId])
@@ -612,15 +631,30 @@ model WebhookEvent {
 }
 
 // ---------------------------------------------------------------------------
-// Conteudo (esqueleto — ADR-0006 "Dominios de conteudo: esqueleto, detalhar
-// por fase"). DISCIPLINA DELIBERADA: apenas ENTIDADES + RELACOES estruturais
-// (ids, escopo/owner FKs, titulo estrutural, visibilidade, timestamps). TODO o
-// detalhe fino por especialidade — series/reps/carga, composicao/macros, campos
-// de anamnese, conteudo de prontuario/receita — e DEFERIDO para `detail Json?`
-// com marcador TODO(D-063), NAO inventado aqui. Modelos ligados a vinculo (Bond)
-// carregam tenantId denormalizado para escopo (D-002) e sao isolados POR VINCULO
-// (ADR-0001). Bibliotecas (Exercise/Food) = base compartilhada da plataforma +
-// itens do profissional (privados por padrao). Datas em UTC (D-067).
+// Conteudo. O D-063 (detalhe fino) esta PARCIALMENTE FECHADO:
+//
+//   TREINO — FECHADO (ADR-0009, D-079 a D-092). Colunas TIPADAS; o `detail Json?`
+//   foi REMOVIDO de Exercise/Workout/WorkoutItem. Nao reintroduzir Json aqui: o
+//   merge por campo do offline-first (D-099/ADR-0010) e IMPOSSIVEL sobre um blob
+//   Json — a tipagem deixou de ser preferencia e virou pre-requisito tecnico.
+//
+//   NUTRICAO / MEDICINA — ABERTO. Food/MealPlan/Encounter/MedicalRecord/
+//   Prescription seguem com `detail Json?` + TODO(D-063) ate a decisao de produto
+//   com referencia propria (Dietbox). NAO inventar.
+//
+//   ANAMNESE — DECIDIDA (D-103, ADR-0011), TIPAGEM PENDENTE. A taxonomia existe
+//   (nucleo + modulo por especialidade + condicionais) e a autoria por secao
+//   (D-102) tambem: o `detail Json?` abaixo esta com os dias contados e sera
+//   substituido por colunas tipadas em PR proprio. Nao construir em cima dele.
+//
+//   AVALIACAO/MEDIDAS (Assessment) — ABERTO. O ADR-0011 fechou a ANAMNESE, nao a
+//   taxonomia de medidas, que segue deferida (D-063). Ambas estao FORA do escopo
+//   de sync offline, entao o Json nao conflita com o D-099.
+//
+// Modelos ligados a vinculo (Bond) carregam tenantId denormalizado para escopo
+// (D-002) e sao isolados POR VINCULO (ADR-0001). Bibliotecas (Exercise/Food) =
+// base compartilhada da plataforma + itens do profissional (privados por
+// padrao), com DELECAO SEMPRE LOGICA (D-089). Datas em UTC (D-067).
 // ---------------------------------------------------------------------------
 
 /// Visibilidade de um item de biblioteca (D-063 / ADR-0006). PLATFORM = base
@@ -631,74 +665,481 @@ enum LibraryVisibility {
   PRIVATE // item proprio do profissional, privado por padrao
 }
 
+/// Ciclo de vida de um item de biblioteca (D-089 / ADR-0009). DELECAO E SEMPRE
+/// LOGICA — nunca fisica. DISCONTINUED some da busca mas CONTINUA funcionando
+/// nos treinos que ja o usam: o historico permanece integro. Regra geral do
+/// sistema (vale para exercicio, alimento, plano comercial, especialidade).
+enum LibraryItemStatus {
+  ACTIVE // aparece na busca; pode ser adicionado a treinos novos
+  DISCONTINUED // fora da busca; segue funcionando no historico (nunca apagar)
+}
+
+/// Organizacao de um plano de treino (D-080 / ADR-0009). Escolha POR PLANO, nao
+/// global: as duas formas coexistem no produto.
+enum PlanOrganization {
+  LETTER // A/B/C — o aluno executa na ordem que quiser
+  WEEKDAY // dias da semana — cada treino tem dia marcado
+}
+
+/// Estado de um plano de treino (D-083/D-084 / ADR-0009). SCHEDULED = montado e
+/// programado para liberacao futura (releaseAt); EXPIRED = validade vencida. As
+/// transicoes SCHEDULED->ACTIVE e ACTIVE->EXPIRED sao reguas de worker: o aluno
+/// NUNCA fica sem nada silenciosamente (D-083).
+enum WorkoutPlanStatus {
+  DRAFT // em montagem pelo profissional; invisivel ao aluno
+  SCHEDULED // programado para liberacao futura (releaseAt — D-084)
+  ACTIVE // liberado ao aluno
+  EXPIRED // validade vencida (D-083); aluno ve "aguarde novo treino"
+  ARCHIVED // encerrado; historico preservado (D-053)
+}
+
+/// Dia da semana de um treino quando o plano e organizado por dia (D-080). Enum
+/// em vez de Int 1..7 para que o estado invalido seja irrepresentavel.
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+/// Tecnica de uma serie (D-081 / ADR-0009). O enum guarda o CODIGO; o label
+/// exibido vive no i18n (D-066) — trocar a redacao e traducao, nao migracao.
+/// Catalogo deliberadamente MINIMO: so o que o ADR-0009 fundamenta (normal e
+/// drop-set). Adicionar tecnica nova exige migracao — raro e aceitavel; nao
+/// inventamos taxonomia aqui.
+///
+/// NOTA: bi-set/tri-set/circuito NAO sao tecnicas de serie — sao ESTRUTURA
+/// (agrupamento de itens via WorkoutItem.supersetGroup — D-082). Modela-los
+/// tambem aqui criaria duas fontes de verdade para conjugacao.
+enum SetTechnique {
+  NORMAL
+  DROP_SET
+}
+
+/// Reacao rapida da avaliacao de treino (D-087 / ADR-0009). O enum guarda o
+/// CODIGO; o label e o emoji ("morri 💀", "voei 🚀", "perna bamba 🦵") vivem no
+/// i18n/config (D-066), nunca no enum.
+enum WorkoutReaction {
+  DIED // "morri"
+  FLEW // "voei"
+  WOBBLY_LEGS // "perna bamba"
+}
+
+/// Estado de uma sessao de treino executada (D-086 / ADR-0009). IN_PROGRESS
+/// existe porque a execucao e offline-first: a sessao nasce no device e fica
+/// pendente ate sincronizar (D-099 — "execucoes pendentes" estao no escopo de
+/// sync).
+enum WorkoutSessionStatus {
+  IN_PROGRESS // iniciada (pode viver so no device ate o sync)
+  COMPLETED // concluida — conta como CHECK-IN do aluno (D-086)
+}
+
+/// Estagio da pre-analise de forma pela IA (D-088 / ADR-0009). A IA apenas
+/// PRE-analisa; nada chega ao aluno sem validacao do profissional.
+enum FormAnalysisAiStatus {
+  PENDING // video enviado, aguardando pre-analise
+  ANALYZED // pre-analise concluida, aguardando o profissional
+  FAILED // pre-analise falhou (o profissional segue podendo responder)
+}
+
+/// Validacao do profissional sobre a pre-analise da IA (D-088 / ADR-0009). O
+/// humano fica no circuito (D-023): a devolutiva so existe para o aluno quando
+/// APPROVED. IA nao fala de execucao com leigo sem o responsavel tecnico.
+enum FormAnalysisReviewStatus {
+  PENDING // na fila do profissional
+  APPROVED // validado — a devolutiva pode chegar ao aluno
+  REJECTED // descartado pelo profissional
+}
+
+/// Estado da anamnese de um vinculo (D-093/D-094 — ADR-0010). E o GATE: sem
+/// ANSWERED o profissional nao monta o plano e o aluno ve "responda sua
+/// anamnese" (nunca tela morta).
+enum AnamnesisStatus {
+  PENDING // gate fechado: aguardando o aluno responder
+  ANSWERED // gate aberto: o profissional pode montar o plano
+}
+
+/// Estado de um atendimento (D-096 — ADR-0010). Fica PENDING ate ser resolvido;
+/// as RESOLVED seguem visiveis ("mostra tambem as concluidas").
+enum AttendanceStatus {
+  PENDING // aberto, aguardando resolucao
+  RESOLVED // concluido — gera ticket com avaliacao (D-096)
+}
+
+/// Tipo de notificacao (D-097 — ADR-0010). Notificacao e PILAR DE RETENCAO, nao
+/// acessorio. Os casos sao exatamente os fundamentados no ADR-0010; nao
+/// inventar. O texto exibido vive no i18n (D-066), nunca no enum.
+enum NotificationType {
+  WORKOUT_DAY // dia de treino
+  PLAN_EXPIRING // plano vencendo (D-083)
+  ATTENDANCE_UNANSWERED // mensagem sem resposta (D-096)
+  INVITE_RECEIVED // convite recebido
+  CHARGE // cobranca
+  ACHIEVEMENT // conquista/meta batida
+}
+
 // --- Treino ----------------------------------------------------------------
 
-/// Item da biblioteca de exercicios (D-063). Base compartilhada da plataforma
-/// (ownerProfessionalProfileId nulo + visibility PLATFORM) OU item proprio do
-/// profissional (owner preenchido + PRIVATE por padrao). specialtyId estrutural
-/// (ex.: TRAINING). Detalhe fino do exercicio deferido para `detail Json?`.
+/// Item da biblioteca de exercicios (D-063/D-089/D-091 — ADR-0009). Base
+/// compartilhada da plataforma (ownerProfessionalProfileId nulo + visibility
+/// PLATFORM) OU item proprio do profissional (owner preenchido + PRIVATE por
+/// padrao). specialtyId estrutural (ex.: TRAINING).
+///
+/// SEPARACAO DE RESPONSABILIDADE (D-089): a BIBLIOTECA guarda o que o exercicio
+/// E (nome, descricao, video); o TREINO guarda o que foi PRESCRITO (carga,
+/// serie, tecnica — em WorkoutSet). Editar a biblioteca propaga para todo o app
+/// e NUNCA reescreve a prescricao.
+///
+/// DELECAO E LOGICA (D-089): `status` DISCONTINUED tira da busca sem quebrar os
+/// treinos que ja usam o item. Nunca DELETE fisico.
+///
+/// TAXONOMIA DE MUSCULO NAO MODELADA: o D-089 cita "musculo" como conteudo da
+/// biblioteca, mas NENHUM ADR decidiu a taxonomia (enum de grupos musculares x
+/// catalogo em tabela). Nao inventar — decisao de produto pendente.
 model Exercise {
   id                         String            @id @default(cuid())
   ownerProfessionalProfileId String? // nulo = item da plataforma; preenchido = item do profissional
   specialtyId                String? // especialidade a que o exercicio pertence (estrutural)
   name                       String
+  description                String? // descricao/instrucao de execucao (D-089)
+  videoStorageKey            String? // video demonstrativo: chave S3 (D-091; padrao de ProgressPhoto)
   visibility                 LibraryVisibility @default(PRIVATE) // itens do profissional privados por padrao
-  detail                     Json? // TODO(D-063): campos finos por fase — nao inventar
+  status                     LibraryItemStatus @default(ACTIVE) // delecao logica (D-089)
   createdAt                  DateTime          @default(now())
   updatedAt                  DateTime          @updatedAt
 
   ownerProfessionalProfile ProfessionalProfile? @relation(fields: [ownerProfessionalProfileId], references: [id], onDelete: Cascade)
   specialty                Specialty?           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
   workoutItems             WorkoutItem[]
+  formAnalyses             FormAnalysis[]
 
   @@index([ownerProfessionalProfileId])
   @@index([specialtyId])
   @@index([visibility])
+  @@index([status]) // busca so devolve ACTIVE (D-089)
   @@map("exercise")
 }
 
-/// Treino de um paciente, atado a um VINCULO (Bond — D-052). tenantId
-/// denormalizado para escopo (D-002). A estrutura de series/reps/carga vive nos
-/// itens (WorkoutItem.detail), deferida (TODO D-063). Datas em UTC (D-067).
+/// PLANO de treino de um paciente, atado a um VINCULO (Bond — D-052). E o nivel
+/// que faltava no esqueleto (D-079): o vinculo tem N PLANOS ATIVOS SIMULTANEOS
+/// (ex.: "Musculacao Julho" + "Cardio Julho"), todos do mesmo profissional — por
+/// isso NAO ha unique bloqueando plano ativo por vinculo.
+///
+/// Dono da organizacao (D-080), da validade (D-083) e do agendamento (D-084).
+/// tenantId denormalizado para escopo (D-002); isolado por vinculo (ADR-0001).
+/// Datas em UTC (D-067). Sincronizavel offline quando ACTIVE (D-099).
+model WorkoutPlan {
+  id           String            @id @default(cuid())
+  tenantId     String // tenant do profissional (escopo denormalizado — D-002)
+  bondId       String // vinculo dono do plano (isolamento por vinculo — ADR-0001)
+  title        String
+  organization PlanOrganization // A/B/C ou dias da semana — por plano (D-080)
+  status       WorkoutPlanStatus @default(DRAFT)
+  validityDays Int               @default(30) // validade padrao 30d, configuravel (D-083)
+  validUntil   DateTime? // vencimento calculado na liberacao (UTC — D-083)
+  releaseAt    DateTime? // liberacao programada (UTC — D-084); nulo = imediata
+  goal         String? // objetivo capturado na montagem do plano (D-095)
+
+  /// Linhagem da clonagem (D-090). DELIBERADAMENTE SEM RELATION: o plano de
+  /// origem pertence a OUTRO vinculo, e uma relacao criaria um caminho de join
+  /// que vazaria dado de outro paciente. E ponteiro de auditoria, nao rota de
+  /// leitura — o isolamento por vinculo (ADR-0001) continua inegociavel.
+  clonedFromWorkoutPlanId String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // tombstone: delecao logica (D-089) + pull do sync (D-099)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond     Bond      @relation(fields: [bondId], references: [id], onDelete: Cascade)
+  workouts Workout[]
+
+  @@index([bondId, status]) // planos ativos do aluno
+  @@index([tenantId])
+  @@index([status, validUntil]) // regua de vencimento (worker — D-083)
+  @@index([status, releaseAt]) // regua de liberacao agendada (worker — D-084)
+  @@index([bondId, updatedAt]) // cursor de sync pull-since (D-099)
+  @@map("workout_plan")
+}
+
+/// TREINO de um plano (D-079): o "A", o "B", ou o treino de terca. Filho de
+/// WorkoutPlan. `label` vale quando o plano e LETTER; `weekday` quando e WEEKDAY
+/// (D-080) — a coerencia entre plan.organization e o campo preenchido e
+/// invariante de dominio, nao do banco.
+///
+/// tenantId/bondId denormalizados para escopo (D-002) e para o filtro de sync
+/// sem join (D-099). Datas em UTC (D-067).
 model Workout {
-  id        String   @id @default(cuid())
-  tenantId  String // tenant do profissional (escopo denormalizado — D-002)
-  bondId    String // vinculo dono do treino (isolamento por vinculo — ADR-0001)
+  id        String    @id @default(cuid())
+  tenantId  String // escopo denormalizado (D-002)
+  bondId    String // isolamento por vinculo (ADR-0001)
+  planId    String // plano dono do treino (D-079)
   title     String
-  detail    Json? // TODO(D-063): campos finos por fase — nao inventar
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  label     String? // "A"/"B"/"C" quando o plano e LETTER (D-080)
+  weekday   Weekday? // dia marcado quando o plano e WEEKDAY (D-080)
+  position  Int       @default(0) // ordem estrutural dentro do plano
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // tombstone: delecao logica (D-089) + pull do sync (D-099)
 
-  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bond   Bond          @relation(fields: [bondId], references: [id], onDelete: Cascade)
-  items  WorkoutItem[]
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond     Bond             @relation(fields: [bondId], references: [id], onDelete: Cascade)
+  plan     WorkoutPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  items    WorkoutItem[]
+  sessions WorkoutSession[]
 
+  @@index([planId, position])
   @@index([bondId])
   @@index([tenantId])
+  @@index([bondId, updatedAt]) // cursor de sync pull-since (D-099)
   @@map("workout")
 }
 
-/// Item de um treino: referencia opcional a um exercicio da biblioteca + ordem.
-/// series/reps/carga sao DETALHE deferido para `detail Json?` (TODO D-063). Nao
-/// modelamos campos de treino regulados aqui.
+/// Item de um treino: um exercicio prescrito + ordem. As SERIES sao filhas
+/// (WorkoutSet — D-081), nunca um Json.
+///
+/// CONJUGADOS (D-082): itens com o mesmo `supersetGroup` (dentro do mesmo
+/// treino) sao executados em sequencia sem descanso — bi-set/tri-set/circuito.
+/// `supersetOrder` e a ordem DENTRO do grupo. As RODADAS de um circuito sao as
+/// SERIES (WorkoutSet.position = indice da rodada), nunca um contador: um
+/// `roundCount` forcaria rodadas identicas, violando o D-081. O tipo do grupo
+/// (bi/tri/circuito) e derivado da contagem de itens — nao ha atributo de grupo,
+/// por isso NAO existe entidade WorkoutBlock.
+///
+/// INVARIANTE DE DOMINIO (nao do banco): todos os itens de um mesmo
+/// `supersetGroup` tem a mesma contagem de series. Grupo malformado = erro de
+/// validacao na aplicacao.
 model WorkoutItem {
-  id         String   @id @default(cuid())
-  workoutId  String
-  exerciseId String? // exercicio da biblioteca (opcional; item livre permitido)
-  position   Int      @default(0) // ordem estrutural dentro do treino
-  detail     Json? // TODO(D-063): series/reps/carga por fase — nao inventar
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            String    @id @default(cuid())
+  workoutId     String
+  exerciseId    String? // exercicio da biblioteca (opcional; item livre permitido)
+  position      Int       @default(0) // ordem estrutural dentro do treino
+  supersetGroup Int? // itens com o mesmo valor sao conjugados (D-082); nulo = isolado
+  supersetOrder Int? // ordem dentro do grupo conjugado (D-082)
+  note          String? // observacao do profissional sobre o item
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime? // tombstone: delecao logica (D-089) + pull do sync (D-099)
 
-  workout  Workout   @relation(fields: [workoutId], references: [id], onDelete: Cascade)
-  exercise Exercise? @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+  workout  Workout      @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise?    @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  sets     WorkoutSet[]
 
-  @@index([workoutId])
+  @@index([workoutId, position])
+  @@index([workoutId, supersetGroup, supersetOrder]) // montagem/execucao do conjugado
   @@index([exerciseId])
   @@map("workout_item")
 }
 
+/// SERIE — o coracao do D-081: CADA SERIE E UMA LINHA PROPRIA, com seus proprios
+/// valores. Um exercicio pode ter series totalmente diferentes entre si (serie 1
+/// com 12 reps a 20kg; serie 3 ate a falha a 25kg em drop-set). Modelar como
+/// "3x12 a 20kg" (uniforme) e PROIBIDO — requisito explicito do ADR-0009.
+///
+/// CARGA EM COLUNAS TIPADAS SEPARADAS, nunca par polimorfico `valor + unidade`:
+/// o D-092 exige "evolucao de carga por exercicio", e com valor polimorfico uma
+/// agregacao mal escrita somaria gramas com segundos — bug SILENCIOSO. Colunas
+/// tipadas tornam o estado invalido irrepresentavel. O caso e real: o D-079 cita
+/// "Cardio Julho" convivendo com musculacao, entao serie de tempo/distancia
+/// convive com carga.
+///
+/// TUDO INTEIRO (gramas, segundos, metros) — nunca float; formatacao so na
+/// exibicao, mesma disciplina do dinheiro em centavos (D-069).
+///
+/// `position` = ordem da serie no exercicio E, num grupo conjugado, o indice da
+/// RODADA (D-082).
+model WorkoutSet {
+  id            String @id @default(cuid())
+  workoutItemId String
+  position      Int // ordem da serie; num conjugado, e o indice da rodada (D-082)
+
+  // Repeticoes — "ate a falha" e estado proprio, nao um valor magico em `reps`.
+  reps          Int? // repeticoes prescritas; nulo quando repsToFailure
+  repsToFailure Boolean @default(false) // "ate a falha" (D-081)
+
+  // Carga — colunas tipadas, inteiras, mutuamente coerentes por invariante de
+  // dominio (uma serie usa a grandeza do seu exercicio).
+  weightGrams     Int? // carga em GRAMAS (ex.: 22500 = 22,5kg) — nunca float
+  durationSeconds Int? // series por tempo (prancha, cardio)
+  distanceMeters  Int? // series por distancia (corrida, remo)
+  bodyweight      Boolean @default(false) // peso corporal: sem carga externa
+
+  restSeconds Int? // descanso apos a serie; num conjugado, zero ate o ultimo item (D-082)
+  technique   SetTechnique @default(NORMAL) // codigo; label no i18n (D-066)
+  note        String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // tombstone: delecao logica (D-089) + pull do sync (D-099)
+
+  workoutItem WorkoutItem @relation(fields: [workoutItemId], references: [id], onDelete: Cascade)
+  setLogs     SetLog[]
+
+  @@unique([workoutItemId, position]) // nao ha duas series na mesma ordem
+  @@index([workoutItemId])
+  @@map("workout_set")
+}
+
+// --- Treino: execucao (D-086 a D-088 — ADR-0009) ---------------------------
+// ESCRITA OFFLINE-FIRST (D-099): estas tabelas sao o alvo principal do sync. O
+// aluno registra a serie na academia, com ou sem sinal; o device e a fonte da
+// verdade e o servidor reconcilia. Por isso: colunas TIPADAS (merge por campo e
+// impossivel sobre Json), `deletedAt` (tombstone do pull) e `updatedAt`
+// indexado (cursor pull-since).
+// ---------------------------------------------------------------------------
+
+/// SESSAO = uma execucao de um treino pelo aluno (D-086). Concluir a sessao
+/// (COMPLETED) e obrigatorio e TAMBEM conta como CHECK-IN do aluno no app,
+/// alimentando os indicadores (D-092).
+///
+/// `performedAt` e indexado por vinculo: e a base da aderencia, do streak e do
+/// volume semanal (D-092), e o eixo do particionamento por data quando o
+/// historico crescer (D-100). Historico NUNCA e deletado (guarda legal — D-100).
+/// planId denormalizado evita join na linha do tempo. Datas em UTC (D-067).
+model WorkoutSession {
+  id          String               @id @default(cuid())
+  tenantId    String // escopo denormalizado (D-002)
+  bondId      String // isolamento por vinculo (ADR-0001)
+  workoutId   String
+  planId      String // denormalizado: linha do tempo sem join (D-092)
+  status      WorkoutSessionStatus @default(IN_PROGRESS)
+  performedAt DateTime // quando o treino foi executado (UTC) — eixo dos indicadores
+  completedAt DateTime? // conclusao = check-in (D-086)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  deletedAt   DateTime? // tombstone do sync (D-099); historico nao se apaga (D-100)
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond    Bond           @relation(fields: [bondId], references: [id], onDelete: Cascade)
+  workout Workout        @relation(fields: [workoutId], references: [id], onDelete: Restrict)
+  setLogs SetLog[]
+  rating  WorkoutRating?
+
+  @@index([bondId, performedAt]) // aderencia, streak, volume semanal (D-092)
+  @@index([workoutId])
+  @@index([tenantId, performedAt]) // aderencia agregada do profissional (D-092)
+  @@index([bondId, status]) // execucoes pendentes no escopo de sync (D-099)
+  @@index([bondId, updatedAt]) // cursor de sync pull-since (D-099)
+  @@map("workout_session")
+}
+
+/// REGISTRO DA SERIE EXECUTADA (D-086): a CARGA REAL usada, que pode divergir da
+/// prescrita — e o dado real que importa para a evolucao (D-085/D-092). Espelha
+/// as grandezas tipadas de WorkoutSet, pelo mesmo motivo (agregacao segura).
+///
+/// `workoutSetId` e opcional: o aluno pode executar uma serie extra que nao
+/// estava prescrita. onDelete Restrict porque a prescricao nunca e apagada
+/// fisicamente (D-089).
+model SetLog {
+  id           String  @id @default(cuid())
+  sessionId    String
+  workoutSetId String? // serie prescrita de referencia; nulo = serie livre do aluno
+
+  done       Boolean @default(false)
+  actualReps Int? // repeticoes realmente feitas
+
+  // Carga REAL — mesmas colunas tipadas inteiras da prescricao (D-081).
+  actualWeightGrams     Int?
+  actualDurationSeconds Int?
+  actualDistanceMeters  Int?
+
+  note String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // tombstone do sync (D-099)
+
+  session    WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  workoutSet WorkoutSet?    @relation(fields: [workoutSetId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId])
+  @@index([workoutSetId]) // evolucao de carga por exercicio (D-092)
+  @@map("set_log")
+}
+
+/// AVALIACAO DO TREINO (D-087) — obrigatoria ao concluir (D-086) e UMA POR
+/// SESSAO (@unique sessionId). Projetada para ser printada e compartilhada
+/// (aquisicao organica): nota, esforco percebido, comentario livre e REACOES
+/// rapidas.
+///
+/// `reactions` guarda CODIGOS (D-066): o label e o emoji ("morri 💀") vivem no
+/// i18n — trocar a redacao e traducao, nao migracao. O "instagramavel" e da UI;
+/// aqui so o dado.
+///
+/// Avaliacao muito dificil/facil e sinal de ajuste para o profissional (D-092).
+model WorkoutRating {
+  id              String            @id @default(cuid())
+  sessionId       String            @unique // uma avaliacao por sessao executada (D-087)
+  score           Int // nota 1 a 5 (D-087)
+  perceivedEffort Int // nivel de esforco percebido (D-087)
+  comment         String? // comentario livre (D-087)
+  reactions       WorkoutReaction[] // codigos; label/emoji no i18n (D-066)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime? // tombstone do sync (D-099)
+
+  session WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([score]) // alunos avaliando como muito dificil/facil (D-092)
+  @@map("workout_rating")
+}
+
+/// ANALISE DE FORMA POR IA (D-088) — ASSINCRONA e com HUMANO NO CIRCUITO. O
+/// aluno grava um video; a IA pre-analisa (pose estimation) e sugere pontos de
+/// atencao; o PROFISSIONAL VALIDA antes de qualquer devolutiva ao aluno. NAO e
+/// analise ao vivo por camera.
+///
+/// Regra de aplicacao inegociavel: nada chega ao aluno enquanto
+/// reviewStatus != APPROVED. Captura markerless por camera unica nao e
+/// grau-laboratorio, e o profissional e o responsavel tecnico — IA dando
+/// devolutiva direta a leigo e risco de lesao e de responsabilidade civil
+/// (D-023/D-088).
+///
+/// `aiResult Json?` e Json LEGITIMO: e o payload BRUTO do provider de pose
+/// estimation (formato externo, semiestruturado), nao conteudo de dominio. A
+/// regra de matar o Json (D-063/ADR-0009) vale para o dominio, nao para a
+/// resposta crua de terceiro. Fora do escopo de sync offline (D-099).
+model FormAnalysis {
+  id         String  @id @default(cuid())
+  tenantId   String // escopo denormalizado (D-002)
+  bondId     String // isolamento por vinculo (ADR-0001) — e dado clinico
+  exerciseId String? // exercicio analisado (biblioteca)
+  sessionId  String? // sessao em que ocorreu, quando houver
+
+  videoStorageKey String // video da execucao: chave S3 (o binario nunca vive aqui)
+
+  aiStatus FormAnalysisAiStatus @default(PENDING)
+  aiResult Json? // payload BRUTO do provider (Json legitimo — ver doc acima)
+
+  reviewStatus                  FormAnalysisReviewStatus @default(PENDING)
+  reviewedByProfessionalProfile String? // profissional que validou (D-088)
+  professionalFeedback          String? // devolutiva do profissional ao aluno
+  reviewedAt                    DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // delecao logica (D-089)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond     Bond      @relation(fields: [bondId], references: [id], onDelete: Cascade)
+  exercise Exercise? @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@index([bondId])
+  @@index([tenantId])
+  @@index([reviewStatus]) // fila de validacao do profissional (D-088)
+  @@index([aiStatus]) // fila de pre-analise (worker)
+  @@map("form_analysis")
+}
+
 // --- Nutricao --------------------------------------------------------------
+// ESCOPO: o D-063 continua ABERTO para nutricao (ADR-0009 fechou so treino).
+// Estes modelos permanecem com `detail Json?` ate a decisao de produto com
+// referencia propria (Dietbox) — nao inventar. Ganham apenas `status` de
+// delecao logica, que e regra GERAL do sistema (D-089).
+// ---------------------------------------------------------------------------
 
 /// Item da biblioteca de alimentos (D-063). Mesmo modelo de biblioteca do
 /// Exercise: base da plataforma (PLATFORM, sem dono) OU item do profissional
@@ -709,6 +1150,7 @@ model Food {
   specialtyId                String? // especialidade (ex.: NUTRITION) — estrutural
   name                       String
   visibility                 LibraryVisibility @default(PRIVATE)
+  status                     LibraryItemStatus @default(ACTIVE) // delecao logica — regra geral (D-089)
   detail                     Json? // TODO(D-063): composicao/macros por fase — nao inventar
   createdAt                  DateTime          @default(now())
   updatedAt                  DateTime          @updatedAt
@@ -720,6 +1162,7 @@ model Food {
   @@index([ownerProfessionalProfileId])
   @@index([specialtyId])
   @@index([visibility])
+  @@index([status]) // busca so devolve ACTIVE (D-089)
   @@map("food")
 }
 
@@ -827,9 +1270,55 @@ model Prescription {
 
 // --- Transversal (isolado por vinculo — ADR-0001) --------------------------
 
-/// Anamnese / avaliacao / medidas, atada a um VINCULO (Bond) e ISOLADA POR
-/// VINCULO (ADR-0001). Sem formulario generico unico: os campos POR ESPECIALIDADE
-/// sao deferidos para `detail Json?` (TODO D-063). tenantId denormalizado para
+/// ANAMNESE — o GATE do fluxo de entrada (D-093/D-094 — ADR-0010). Separada de
+/// Assessment de proposito: sao ciclos de vida diferentes. A anamnese e UMA POR
+/// VINCULO (@unique bondId) e e documento que o profissional anexa ao prontuario;
+/// a avaliacao/medidas (Assessment) e RECORRENTE.
+///
+/// "Uma por profissional" (D-094) = uma por VINCULO, porque o vinculo ja
+/// encapsula (paciente + profissional + especialidade). NUNCA compartilhada
+/// automaticamente: cruzar para outro profissional exige consentimento explicito
+/// do paciente (D-016/ADR-0003).
+///
+/// GATE (D-093): enquanto status != ANSWERED, o profissional nao monta o plano e
+/// o aluno ve o que precisa fazer. A fonte da verdade do gate e ESTE registro —
+/// nao ha flag duplicada no Bond, que poderia divergir.
+///
+/// CAMPOS: TAXONOMIA JA DECIDIDA — TIPAGEM EM PR SEGUINTE. O `detail Json?`
+/// abaixo e TEMPORARIO e nao deve ser usado como base para nada: o D-103
+/// (ADR-0011) fechou a taxonomia (nucleo comum + modulo por especialidade +
+/// perguntas condicionais) e o D-102 exige autoria POR SECAO, o que empurra a
+/// modelagem para blocos com autor + timestamp, nao para uma tabela larga. A
+/// substituicao por colunas tipadas sai em PR proprio (nao foi feita aqui para
+/// nao inflar um PR de area critica).
+///
+/// O ADR-0011 tambem REVISA o D-094: a anamnese pode ser preenchida pelo
+/// paciente, pelo profissional ou por AMBOS, e pode NASCER do profissional na
+/// consulta presencial (D-102) — o gate e satisfeito independente de quem
+/// preencheu. A modalidade do vinculo (D-101) e que define o fluxo.
+model Anamnesis {
+  id         String          @id @default(cuid())
+  tenantId   String // escopo denormalizado (D-002)
+  bondId     String          @unique // uma por vinculo (D-094); isolamento (ADR-0001)
+  status     AnamnesisStatus @default(PENDING) // o GATE (D-093)
+  answeredAt DateTime? // quando o aluno respondeu (UTC)
+  detail     Json? // TEMPORARIO — TODO(D-103, ADR-0011): taxonomia ja decidida; tipar em PR proprio
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status]) // alunos com gate aberto/fechado
+  @@map("anamnesis")
+}
+
+/// Avaliacao / medidas recorrentes, atada a um VINCULO (Bond) e ISOLADA POR
+/// VINCULO (ADR-0001). Distinta da Anamnesis (gate, unica — D-094): esta e
+/// RECORRENTE. Sem formulario generico unico: os campos POR ESPECIALIDADE
+/// seguem deferidos para `detail Json?` (TODO D-063) — o ADR-0009 fechou a
+/// prescricao de treino, nao a taxonomia de medidas. tenantId denormalizado para
 /// escopo (D-002). Datas em UTC (D-067).
 model Assessment {
   id        String   @id @default(cuid())
@@ -865,4 +1354,125 @@ model ProgressPhoto {
   @@index([bondId])
   @@index([tenantId])
   @@map("progress_photo")
+}
+
+// ---------------------------------------------------------------------------
+// Atendimento (D-096 — ADR-0010)
+//
+// NAO e "chat" (promete instantaneidade) nem "suporte" (soa a bug do app). E um
+// TICKET: o aluno abre por formulario interativo, vira conversa, fica PENDING
+// ate ser resolvido e gera avaliacao ao concluir.
+//
+// E DADO CLINICO (D-096): isolado por vinculo (ADR-0001), escopado por tenant
+// (D-002) e FORA DO ALCANCE DO ADMIN PURO (D-015). Qualquer query sem escopo de
+// vinculo/tenant aqui e vazamento, nao bug de listagem. Tira a conversa do
+// WhatsApp e cria registro auditavel.
+//
+// A ESCALADA (2h push -> 24h push+email -> 48h alerta no painel) e regua de
+// WORKER: ela le `readAt`/`lastMessageAt` e avanca `escalationLevel`. A
+// insistencia MIGRA DE CANAL de proposito — martelar o mesmo canal faz o
+// profissional silenciar a notificacao e perde-se o canal.
+//
+// IA AQUI E TRIAGEM, NAO RESPOSTA (D-096/D-023): a sugestao e transiente, o
+// profissional edita e envia. Por isso NAO ha campo de rascunho de IA — nada de
+// IA responde direto ao aluno sobre treino/saude.
+// ---------------------------------------------------------------------------
+
+/// Atendimento = thread/ticket de um vinculo (D-096). Dado clinico.
+model Attendance {
+  id              String           @id @default(cuid())
+  tenantId        String // escopo denormalizado (D-002)
+  bondId          String // isolamento por vinculo (ADR-0001) — dado clinico
+  openedByAccountId String // quem abriu (normalmente o aluno)
+  subject         String // vem do formulario interativo de abertura (D-096)
+  status          AttendanceStatus @default(PENDING)
+  lastMessageAt   DateTime         @default(now()) // relogio da escalada + ordenacao (D-096)
+  escalationLevel Int              @default(0) // 0=nenhuma, 1=2h, 2=24h, 3=48h (worker — D-096)
+  resolvedAt      DateTime? // conclusao (UTC)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond     Bond                @relation(fields: [bondId], references: [id], onDelete: Cascade)
+  openedBy Account             @relation(fields: [openedByAccountId], references: [id], onDelete: Cascade)
+  messages AttendanceMessage[]
+  rating   AttendanceRating?
+
+  @@index([bondId, status]) // pendentes/concluidas do vinculo
+  @@index([tenantId, status]) // painel do profissional (D-098)
+  @@index([status, lastMessageAt]) // varredura da escalada (worker — D-096)
+  @@map("attendance")
+}
+
+/// Mensagem de um atendimento (D-096). `readAt` e o que sustenta a escalada
+/// ("nao leu em 2h", "nao leu em 24h") e o indicador de mensagens sem resposta
+/// (D-092).
+model AttendanceMessage {
+  id              String    @id @default(cuid())
+  attendanceId    String
+  senderAccountId String
+  body            String
+  readAt          DateTime? // nulo = nao lida; base da escalada (D-096)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  attendance Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  sender     Account    @relation(fields: [senderAccountId], references: [id], onDelete: Cascade)
+
+  @@index([attendanceId, createdAt])
+  @@index([attendanceId, readAt]) // nao lidas -> escalada (D-096)
+  @@map("attendance_message")
+}
+
+/// Avaliacao do atendimento resolvido (D-096) — uma por atendimento.
+model AttendanceRating {
+  id           String   @id @default(cuid())
+  attendanceId String   @unique // uma avaliacao por ticket (D-096)
+  score        Int
+  comment      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  attendance Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+
+  @@map("attendance_rating")
+}
+
+// ---------------------------------------------------------------------------
+// Notificacoes (D-097 — ADR-0010 / D-028 — ADR-0005)
+//
+// O D-028 (ADR-0005) DESCREVEU a central in-app com soft delete e o log legal de
+// notificacoes sensiveis, mas o modelo NUNCA foi criado no schema. Nasce aqui.
+//
+// Notificacao e PILAR DE RETENCAO (D-097), nao acessorio. O disparo multi-canal
+// (push/FCM, e-mail, SMS) vive em @fitvo/notifications; aqui persiste o canal
+// IN-APP (o sininho) e o rastro.
+// ---------------------------------------------------------------------------
+
+/// Notificacao in-app de uma conta (D-097/D-028). Soft delete: a central
+/// persiste ate o usuario apagar. `sensitive` marca as notificacoes financeiras
+/// e de consentimento, que sao mantidas em log por obrigacao legal e NAO devem
+/// ser expurgadas junto com o resto (D-028/ADR-0005).
+///
+/// `data Json?` e Json LEGITIMO: e payload de ROTEAMENTO (deep-link, ids de
+/// destino), nao conteudo de dominio — a regra de matar o Json (ADR-0009) mira o
+/// dominio. O texto exibido vem do i18n a partir de `type` (D-066).
+model Notification {
+  id        String           @id @default(cuid())
+  accountId String // destinatario
+  type      NotificationType
+  title     String
+  body      String
+  data      Json? // payload de deep-link/roteamento (Json legitimo — ver doc acima)
+  sensitive Boolean          @default(false) // financeiro/consentimento: retido por lei (D-028)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  deletedAt DateTime? // soft delete da central in-app (D-028)
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, readAt]) // sininho: nao lidas
+  @@index([accountId, createdAt]) // feed da central (cursor — D-036)
+  @@map("notification")
 }

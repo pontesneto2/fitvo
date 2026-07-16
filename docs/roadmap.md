@@ -3,7 +3,7 @@
 > Fonte única do plano de execução. Substitui qualquer backlog interno de
 > sessão — o backlog do agente deve espelhar este documento, nunca o
 > contrário. Atualizar sempre que uma fase mudar de status. As decisões de
-> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-073); a
+> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-121); a
 > identidade visual em `docs/design-system.md`.
 
 Convenção de status: **FEITO** (mergeado em `main`, com PR), **EM ANDAMENTO**,
@@ -43,47 +43,112 @@ RESPONSÁVEL** (decisão que só você pode tomar), **BLOQUEADO — TERCEIROS**
 
 ## PENDENTE (ordem de execução pretendida)
 
-Reordenado em 2026-07-15 a pedido do responsável: conteúdo (D-063) vem antes
-de dashboard/relatórios e de IA. Motivo — dashboard/relatórios exibem dados
-que vêm do conteúdo (treino, dieta, avaliação); sem conteúdo é gráfico de
-tabela vazia. Treino e nutrição são o coração do produto: sem eles não existe
-FITVO.
+Reordenado em 2026-07-16 a pedido do responsável: **a AGENDA sobe**. Motivo — o
+fluxo de nutrição e medicina **começa no agendamento**; é a porta de entrada
+dessas especialidades (a consulta é onde a anamnese presencial acontece —
+D-101/D-102). Mantém-se a ordem anterior no resto: conteúdo antes de
+dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
+
+> **Ressalva do agente (leitura, não objeção):** agenda antes de nutrição é
+> sequenciamento de **produto**, não dependência **técnica** — o plano alimentar
+> pendura no vínculo, não no agendamento; os dois poderiam ir em paralelo. E a
+> agenda tem uma parte **gated**: as peças 2 e 3 do D-107 (escrever no Google, ler
+> free/busy) dependem de credenciais OAuth. Por isso ela entra **partida em dois
+> itens**: o motor próprio (ungated, é a porta de entrada) e o sync Google
+> (gated). Assim a agenda subir não trava nada.
 
 1. **Apps web** (`web-personal`, `web-admin`, `site`) — App Router + TanStack
    Query + client de API + tema/dark + fontes; telas de auth e shell de
    dashboard derivadas do design system. Depende do merge do PR #18.
-2. **Domínios de conteúdo — regra fina** (D-063): treino, nutrição e
-   prontuário/prescrição médica hoje são só schema (PR #14). Preencher
-   comportamento/regra de negócio real é decisão humana com referências
-   (ex.: MFit, Dietbox) — ver BLOQUEADO — RESPONSÁVEL. **Coração do produto —
-   prioridade alta.**
-3. **IA (D-022)** — a abstração multi-provider já existe
+2. **Agenda — motor próprio** (D-106/D-108 a D-111, **ADR-0012**): banco e motor
+   próprios (disponibilidade, detecção de conflito, agendamento por vínculo),
+   confirmação de presença + lembretes configuráveis + no-show (D-108), política
+   de retorno por profissional (D-109 — grátis/reduzido/cheio; **não** se aplica a
+   personal), estatísticas (D-110), tudo em UTC (D-111). **Não** depende de
+   credencial: é a porta de entrada de nutrição/medicina. Toca **financeiro**
+   (D-109) → **revisão humana obrigatória**.
+3. **Agenda — sync Google Calendar** (D-107, ADR-0012): package `calendar` novo
+   (interface + adapter Google + fake, padrão da ADR-0005). As 3 peças: FITVO é
+   fonte da verdade; todo agendamento aparece no Google do profissional; FITVO lê
+   **free/busy** (nunca o conteúdo do evento). Push notification + sync token, com
+   polling ~15min de fallback. **Gated em credenciais OAuth** (ver BLOQUEADO —
+   TERCEIROS) — o fake permite construir e testar sem elas. Escopo estreito de
+   propósito: sem bidirecional de campos, sem Outlook/Apple, sem recorrência
+   complexa.
+4. **Anamnese tipada + modalidade** (D-101 a D-103, **ADR-0011**): modalidade do
+   vínculo (`ONLINE`/`PRESENCIAL`/`HIBRIDO`) no `Bond` e no `PatientInvite`,
+   anamnese em colunas tipadas com **autoria por seção**, núcleo + módulo treino.
+   **Em andamento** — ver EM ANDAMENTO. Dado clínico → **revisão humana
+   obrigatória**.
+5. **Domínio de nutrição** (D-112 a D-121, **ADR-0013**) — o D-063 fecha para
+   nutrição:
+   - Cria o nível **`Meal`** que falta (`MealPlan → Meal → MealPlanItem`) e
+     **destrava o D-118/D-104**; mata o `detail Json?` de nutrição.
+   - **`FoodGroup` com equivalência** (D-114) — substituição por grupo, não item a
+     item; referência TACO.
+   - Plano **por dia da semana** (até 7 ativos — D-112), **calculado ou texto
+     livre** (D-115), com meta calórica e macros em tempo real (D-116).
+   - **`MealLog`** três estados + foto (D-118), check-in, sync offline, alertas
+     nos horários.
+   - Templates + base compartilhada (D-117), entregáveis (D-119), indicadores
+     (D-120). Dado clínico → **revisão humana obrigatória**.
+6. **Videoconferência — treino e nutrição** (D-074/D-075, ADR-0007): package
+   `video` novo (interface + adapter Daily/Prebuilt + fake, mesmo padrão dos
+   demais adapters da ADR-0005). Habilitado nos ambientes de treino e
+   nutrição; **bloqueado em medicina** por exigência regulatória (ver item 8 e
+   BLOQUEADO — TERCEIROS). Ancora-se num atendimento/vínculo já modelado.
+7. **IA (D-022)** — a abstração multi-provider já existe
    (`packages/ai`, `AnthropicAIProvider` + `FakeAIProvider`, PR #15) com
    `embed()` propositalmente não suportado (Anthropic não oferece
    embeddings). Falta definir os casos de uso de produto que consomem IA
-   (sugestão automática, geração de plano, etc.) — não inventar sem ADR.
-   Depende do item 2 (IA sobre conteúdo pressupõe que o conteúdo exista).
-4. **Agenda** — modelagem e slice de API para agendamento de atendimentos por
-   vínculo (mencionado em D-001 como dado por vínculo; sem ADR de detalhe
-   ainda — regra fina fica em BLOQUEADO — RESPONSÁVEL).
-5. **Check-in** — registro de check-in do paciente por vínculo/especialidade
-   (mencionado em D-001; mesma situação: sem ADR de detalhe).
-6. **Notificações reais** (push/email/SMS ao vivo) — a estrutura de adapter já
-   existe (`packages/notifications`, PR #15); falta o disparo ao vivo, que
-   depende de credenciais (Firebase, provedor de e-mail/SMS) — ver BLOQUEADO —
-   TERCEIROS.
-7. **Dashboard e relatórios** — telas de indicadores para profissional/clínica
-   (financeiro, atendimentos, adesão, **e adesão/evolução de conteúdo** —
-   depende do item 2 já ter dado real para exibir). ADR-0004 já antecipa
-   "dashboards e relatórios" para dados financeiros ricos como evolução
-   futura, não escopo fechado ainda.
-8. **Mobile (Expo)** — app "3-em-1" (aluno + profissional), Expo Router +
-   TanStack Query. Ainda não iniciado; bloco próprio, depende de apps web e
-   design mobile estarem maduros.
-9. **Testes ao vivo das integrações** (Asaas sandbox, IA real, FCM, e-mail,
-   SMS) — hoje todos gated por ausência de credenciais no ambiente. Rodar
-   exige as credenciais reais (ver BLOQUEADO — TERCEIROS).
-10. **Deploy** (Vercel + Railway) — infraestrutura de deploy ainda não
+   (sugestão automática, geração de plano, etc.) — não inventar sem ADR. Inclui a
+   **análise de forma** (D-088): o `FormAnalysis` já existe no schema; falta o
+   worker de pré-análise. Pressupõe conteúdo existente (itens 4/5).
+8. **Telemedicina + receita eletrônica** (D-011/D-075, mesma fase): vídeo em
+   medicina e prescrição eletrônica dependem ambos de a FITVO se registrar
+   como pessoa jurídica prestadora no CRM do estado + assessoria jurídica
+   (Resolução CFM nº 2.314/2022) — ver BLOQUEADO — TERCEIROS. Até lá, receita
+   permanece impressa/assinatura física e vídeo permanece bloqueado nesse
+   ambiente. **Traz junto o módulo de nutrologia da anamnese** (D-103), que
+   depende de exames laboratoriais (D-076).
+9. **Check-in genérico** — registro por vínculo/especialidade (mencionado em
+   D-001; sem ADR de detalhe genérico). **Já resolvido nos dois domínios que
+   importam:** conclusão de treino conta como check-in (D-086) e registro de
+   refeição também (D-118). Restou pouco — reavaliar se o item genérico ainda faz
+   sentido ou se some.
+10. **Notificações reais** (push/email/SMS ao vivo) — a estrutura de adapter já
+   existe (`packages/notifications`, PR #15) e o modelo `Notification` entrou no
+   #26; falta o disparo ao vivo, que depende de credenciais (Firebase, provedor
+   de e-mail/SMS) — ver BLOQUEADO — TERCEIROS.
+11. **Dashboard e relatórios** — telas de indicadores para profissional/clínica
+   (financeiro, atendimentos, adesão, **e adesão/evolução de conteúdo** — precisa
+   dos itens 4/5 com dado real para exibir). Agora com fonte definida: D-092
+   (treino), D-110 (agenda) e D-120 (nutrição).
+12. **Perfil público do profissional** (D-077, ADR-0008): página opt-in no app
+    `site` (`fitvo.com.br/<slug>`), com selo de verificação (D-010) e botão
+    "solicitar contato" reaproveitando o convite profissional→paciente
+    (D-006/D-055) já existente. Sem busca/vitrine/ranking/reviews/comissão —
+    fora de escopo por decisão (ver ADR-0008). Depende de apps web (item 1)
+    pelo componente `Logo`/design system compartilhado com o `site`.
+11. **White-label estrutural** (D-078, ADR-0008): campos de marca por tenant
+    (nome/logo/tokens) no schema, **sem ativação** — MVP sempre renderiza
+    FITVO. Esqueleto acompanha a modelagem de tenant existente; não é item
+    isolado de execução enquanto não houver demanda comercial de ativação.
+12. **Mobile (Expo)** — app "3-em-1" (aluno + profissional), Expo Router +
+    TanStack Query. Ainda não iniciado; bloco próprio, depende de apps web e
+    design mobile estarem maduros.
+12b. **Offline-first do app do aluno** (D-099/D-100, ADR-0010): WatermelonDB
+    (SQLite como fonte da verdade) + **servidor de sync próprio** (dois
+    endpoints pull/push + conflito idempotente — item mais caro do lote),
+    escopo delimitado (planos ativos + execuções pendentes), criptografia local
+    obrigatória, tombstones (`deletedAt`) + `updatedAt` indexado nas tabelas
+    sincronizáveis. **Exige development build** (adeus Expo Go). Depende do item
+    12 (mobile) e do item 2 (treino tipado — merge por campo exige colunas, não
+    `Json`).
+13. **Testes ao vivo das integrações** (Asaas sandbox, IA real, FCM, e-mail,
+    SMS, Daily) — hoje todos gated por ausência de credenciais no ambiente.
+    Rodar exige as credenciais reais (ver BLOQUEADO — TERCEIROS).
+14. **Deploy** (Vercel + Railway) — infraestrutura de deploy ainda não
     configurada; requer credenciais + ordem explícita de publicação.
 
 ## BLOQUEADO — RESPONSÁVEL (decisão que só você pode tomar)
@@ -100,10 +165,74 @@ FITVO.
 - **Agenda / Check-in**: não há ADR de detalhe — regra de negócio fina
   (janelas de disponibilidade, política de remarcação, frequência de
   check-in) precisa ser definida antes de implementar além do esqueleto.
-- **Campos finos de treino/nutrição/medicina (D-063)**: decisão humana com
-  referências de produto (MFit/Dietbox citados como benchmark).
+- **Adendo ao D-103 (taxonomia da anamnese) — campos adicionais a avaliar**:
+  lacunas identificadas depois de o ADR-0011 fechar a taxonomia. Nenhuma é
+  bloqueante; entram por decisão sua, não por iniciativa do agente.
+
+  *Núcleo / módulo treino:*
+  - **Local de treino** (academia / casa / box / ar livre) — determina o que
+    pode ser prescrito.
+  - **Tempo por sessão** (30/45/60/90/120 min) — hoje há dias/semana, não
+    duração.
+  - **Histórico esportivo** (modalidades praticadas).
+  - **Suplementos em uso** — campo de **texto livre** (decisão do responsável).
+
+  *Módulo nutrição (quando o domínio fechar):*
+  - **Escala de Bristol** — instrumento clínico para o "hábito intestinal" que o
+    D-103 já pede.
+  - **Histórico de peso** (mín/máx adulto, efeito sanfona, bariátrica,
+    medicamento para emagrecer).
+  - **Comportamento alimentar** (compulsão, fome emocional).
+  - **Preferências e aversões alimentares.**
+
+  *Módulo nutrologia (quando o domínio fechar):*
+  - **Perfil hormonal masculino/feminino** — é o **núcleo** da nutrologia
+    esportiva, não acessório.
+  - **Histórico hormonal** (TRT, GH, peptídeos, anabolizantes — substância,
+    dose, tempo de uso). O D-103 só tem "uso de esteroides" no módulo de treino:
+    **raso demais para o médico**.
+  - **Catálogo de exames laboratoriais** — como catálogo do que o médico
+    **solicita** (D-076), não campo de anamnese.
+
+  *Transversal:*
+  - **Objetivos mensuráveis** (peso alvo, % gordura alvo, **data** objetivo,
+    evento específico) — vai além de anamnese: vira **meta com prazo** e
+    alimenta dashboard.
+
+  **Rejeitado (com o motivo, para não voltar à mesa):**
+  - *Anamnese única compartilhada entre profissionais* — contradiz o D-094
+    (documento de prontuário), o D-004 (isolamento por vínculo) e o D-016
+    (consentimento). O autopreenchimento já resolve a repetição.
+  - *Avaliação física/bioimpedância na anamnese* — medida mora no `Assessment`
+    (decisão registrada no ADR-0011: bloco no fluxo, dado no `Assessment`).
+  - *Score de Saúde por IA visível ao paciente* — perigosamente perto de
+    diagnóstico; contradiz D-023/D-088 (humano no circuito). Se entrar, é
+    visível **só ao profissional**, como sugestão, nunca veredito.
+  - *Saúde sexual/fertilidade no núcleo* — dado sensível (LGPD); só no módulo de
+    nutrologia.
+- **Bloco de antropometria (ADR-0011)**: resolvido quanto ao desenho — bloco
+  visível no fluxo da anamnese, dado morando no `Assessment`, invisível em
+  `ONLINE`. Mas **construí-lo depende de tipar o `Assessment`** (D-063, abaixo).
+  Não bloqueia a tipagem da anamnese, que está completa sem ele.
+- **Campos finos de nutrição/medicina (D-063, ainda aberto)**: treino já foi
+  fechado (ADR-0009/0010, MFit) e a anamnese pelo ADR-0011. **Nutrição fechou**
+  pelo ADR-0013 (Dietbox) — resta **medicina** (prontuário/prescrição), que
+  depende de decisão humana e traz junto os **exames laboratoriais** (D-076) e o
+  **módulo de nutrologia** da anamnese (D-103).
+- **Gaps do domínio de nutrição (ADR-0013)** — citados nas decisões, sem
+  definição; não modelar sem ADR:
+  - **Hidratação**: o D-120 pede o indicador, mas nenhuma decisão diz onde a meta
+    é prescrita nem como o paciente registra. Não é refeição, não cabe em `Meal`.
+  - **Receitas** (D-119): entregável citado, estrutura indefinida — texto livre?
+    ingredientes + preparo? vira `Food` do tipo preparação?
+  - **Gasto energético** (D-116): a meta calórica sai do "gasto estimado", mas
+    qual fórmula (Harris-Benedict, Mifflin-St Jeor, FAO/OMS) e se o sistema
+    calcula ou o profissional informa não foi decidido. É regra clínica.
+  - **Tabelas nutricionais além da TACO**: o Dietbox usa múltiplas; se `Food`
+    precisa registrar a origem (TACO/IBGE/USDA), é atributo não decidido.
 - **Dashboard e relatórios**: quais indicadores, para qual persona, com que
-  nível de detalhe — não especificado nos ADRs.
+  nível de detalhe — **parcialmente resolvido**: D-092 (treino), D-110 (agenda) e
+  D-120 (nutrição) já definem o que exibir. Falta a decisão de tela/persona.
 - **Casos de uso de IA (D-022)**: quais features realmente usam IA generativa
   no produto (a abstração técnica já existe, falta a decisão de produto).
 - **Símbolo final do Logo**: ícones já resolvidos (Lucide oficial); wordmark
@@ -112,14 +241,22 @@ FITVO.
   componente usa um mark geométrico PROVISÓRIO.
 - **shadcn/ui**: adoção para a camada web adiada — decisão condicionada à
   identidade visual (shadcn customizado vs. primitivos puros).
+- **Ativação de white-label (D-078)**: quando (e para qual tenant/parceiro)
+  vale a pena ligar marca própria — hoje é só estrutura, sem gatilho de
+  produto definido.
 
 ## BLOQUEADO — TERCEIROS (jurídico, credenciais, design externo)
 
 - **Textos jurídicos** (política de estorno, termos, D-021/D-025) → advogado.
 - **Credenciais de produção**: Asaas (chaves reais), provedor de e-mail/SMS,
-  Firebase Cloud Messaging, chave de API de IA em produção → nenhuma pode ser
-  gerada pelo agente; repositório é público (ver aviso de segurança no topo
-  deste arquivo).
+  Firebase Cloud Messaging, chave de API de IA em produção, Daily (D-074),
+  **Google Calendar OAuth (D-107)** → nenhuma pode ser gerada pelo agente;
+  repositório é público (ver aviso de segurança no topo deste arquivo). O
+  **motor de agenda (D-106) não depende disso** — só as peças 2 e 3 do sync
+  ficam gated, e o fake do adapter permite construir e testar sem elas.
+- **Telemedicina/receita eletrônica** (D-011/D-075): registro da FITVO como
+  pessoa jurídica prestadora no CRM do estado + assessoria jurídica
+  (Resolução CFM nº 2.314/2022) → ação humana fora do repositório.
 - **Deploy**: contas Vercel/Railway configuradas, domínio Registro.br
   apontado → ação humana fora do repositório.
 - **Design visual não fechado**: qualquer tela sem direção definida em

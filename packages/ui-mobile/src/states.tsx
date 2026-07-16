@@ -1,4 +1,13 @@
-import { duration, fontFamily, fontSize, fontWeight, radius, space } from '@fitvo/brand-tokens';
+import {
+  duration,
+  fontFamily,
+  fontSize,
+  fontWeight,
+  iconStroke,
+  radius,
+  space,
+} from '@fitvo/brand-tokens';
+import { AlertTriangle, Inbox } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useEffect, useRef } from 'react';
 import type { DimensionValue, StyleProp, ViewStyle } from 'react-native';
@@ -95,16 +104,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 300,
   },
-  emptyIcon: { width: 44, height: 44, borderRadius: radius.md, borderWidth: 2 },
-  errorIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  errorGlyph: { fontSize: 24, fontWeight: '700', lineHeight: 28 },
   actionSpacer: { marginTop: space[1] },
 });
 
@@ -128,7 +127,7 @@ export function EmptyState({
   const theme = useTheme();
   return (
     <View style={[styles.shell, style]}>
-      {icon ?? <View style={[styles.emptyIcon, { borderColor: emptyIconColor }]} />}
+      {icon ?? <Inbox size={44} strokeWidth={iconStroke} color={emptyIconColor} />}
       <Text style={[styles.title, { color: theme.colors.textPrincipal }]}>{title}</Text>
       {description ? (
         <Text style={[styles.desc, { color: theme.colors.textAuxiliar }]}>{description}</Text>
@@ -160,11 +159,7 @@ export function ErrorState({
   const theme = useTheme();
   return (
     <View accessibilityRole="alert" style={[styles.shell, style]}>
-      {icon ?? (
-        <View style={[styles.errorIcon, { borderColor: errorIconColor }]}>
-          <Text style={[styles.errorGlyph, { color: errorIconColor }]}>!</Text>
-        </View>
-      )}
+      {icon ?? <AlertTriangle size={44} strokeWidth={iconStroke} color={errorIconColor} />}
       <Text style={[styles.title, { color: theme.colors.textPrincipal }]}>{title}</Text>
       {message ? (
         <Text style={[styles.desc, { color: theme.colors.textAuxiliar }]}>{message}</Text>

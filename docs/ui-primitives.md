@@ -25,8 +25,14 @@ trabalho: `worktree-brand-tokens`.
     `@testing-library/react`+jsdom, sem jest-dom, asserts com `toBeTruthy()`).
   - Mobile: `packages/ui-mobile/src/<nome>-variants.ts` (lógica de cor/dimensão
     PURA, sem `react-native`) + `<nome>-variants.test.ts` (vitest, env node) +
-    `<nome>.tsx` (componente RN). **Render RN completo não é montado** — exige
-    harness próprio (jest + preset RN), decisão de infra separada e PENDENTE.
+    `<nome>.tsx` (componente RN). **Render RN real**: `<nome>.test.tsx`, via
+    `@testing-library/react-native` + `jest` (preset `react-native`), separado do
+    vitest (`jest.config.cjs`/`babel.config.cjs` do pacote — `.cjs` porque o
+    pacote é `"type": "module"`); usar `renderWithTheme` de `test-utils.tsx`
+    (a maioria dos componentes lê `useTheme()`, exige `<ThemeProvider>`). Ambos
+    rodam em sequência via `"test": "vitest run && jest"`. Cobertura ainda
+    parcial (Button/Badge/Card) — estender aos demais componentes conforme
+    forem revisitados, não é bloqueante.
 - **Controlável:** usa a prop de valor se dada (`value !== undefined`), senão
   estado interno.
 - **Overlays** (Select, Modal, Toast, Tooltip): web = elemento posicionado +
@@ -71,7 +77,8 @@ Cada item: web + mobile + testes + galeria (artifact HTML light/dark), um commit
 | 18 | Avatar + AvatarGroup | `abe9f0f` | sizes token `avatarSize`; fallback iniciais brand-100/700; borda 2px; grupo "+N". `getInitials` pura. Fallback agnóstico. |
 | 15 | Skeleton/EmptyState/ErrorState | `8be0370` | estados de tela; compõem `Button`; `role=alert`; msg amigável (ADR-0005). Skeleton: web pulse nativo / mobile Animated cor; dark neutral-800→700. Sucesso = Toast. |
 | 9/20 | Logo + assets de marca | `1aef665`+`8a19427` | wordmark (arte oficial, cores baked=tokens) + **ícone provisório**. Web embute SVG; mobile via `source` PNG do app. |
-| 17 | Gráficos — `LineChart`/`BarChart` | (branch `feat/dataviz-charts`) | web = Recharts; mobile = `victory-native` v36 (SVG puro via `react-native-svg`, sem Skia/Reanimated — a v41 XL exige nativo pesado, sem app RN real pra validar). `seriesColor`/`dashPattern`/`ChartSeriesConfig` movidos para `@fitvo/brand-tokens/charts` (lógica pura, compartilhada entre os dois pacotes, evita duplicação). `chartGrid` corrigido: era cor fixa sem dark — agora reusa `borderDefault` (mesmo par, §21 "sobe na rampa"). Cor nunca é o único diferenciador (§17): line usa padrão de traço por série; bar sempre mostra a legenda. |
+| 17 | Gráficos — `LineChart`/`BarChart` | `7d0d77b` | web = Recharts; mobile = `victory-native` v36 (SVG puro via `react-native-svg`, sem Skia/Reanimated — a v41 XL exige nativo pesado, sem app RN real pra validar). `seriesColor`/`dashPattern`/`ChartSeriesConfig` movidos para `@fitvo/brand-tokens/charts` (lógica pura, compartilhada entre os dois pacotes, evita duplicação). `chartGrid` corrigido: era cor fixa sem dark — agora reusa `borderDefault` (mesmo par, §21 "sobe na rampa"). Cor nunca é o único diferenciador (§17): line usa padrão de traço por série; bar sempre mostra a legenda. |
+| 19 | Ícones (Lucide) + componente `Icon` | `757bd88` | `lucide-react`/`lucide-react-native` (imports nomeados, tree-shaking ok). Substitui TODO o SVG inline/desenho manual anterior (Select, Badge, Toast, Modal, Checkbox, Button spinner, Table sort, states, Logo ícone provisório no mobile — agora `SvgXml` da mesma arte do web, não mais um "V" de texto). |
 
 **Contagem de testes:** ui-web **130**, ui-mobile **81** (+ lógica de série testada em `brand-tokens`).
 
@@ -86,13 +93,7 @@ Cada item: web + mobile + testes + galeria (artifact HTML light/dark), um commit
 
 ## Pendências (aguardando decisão/execução)
 
-- **§19 Ícones (Lucide)** — DESTRAVADO: adotar `lucide-react`/`lucide-react-native`,
-  criar componente `Icon` (wrapper fino sobre tokens `icon-size-*`/`icon-stroke`/
-  `icon-color-*`), e **substituir todo o SVG inline / desenho manual** dos
-  componentes existentes (dívida de duplicação). Roteado ao **agente principal**.
 - **§20 restante** — ilustrações, gráficos avançados, componentes de domínio,
   onboarding, impressão: DEFERIDO (dependem de decisões que ainda não existem).
   A **logo** já foi definida (símbolo isolado ainda provisório).
-- **Harness de render RN** (jest + preset RN) — implementar para tornar os testes
-  de mobile completos (hoje cobrem só a lógica pura dos `*-variants`).
 - Cola do preset num app real (Next) + `content` do Tailwind apontando p/ ui-web.

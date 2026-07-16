@@ -149,14 +149,14 @@ model Tenant {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  professionals  ProfessionalProfile[]
-  memberships    ClinicMembership[]
-  invites        ProfessionalInvite[]
-  patientInvites PatientInvite[]
-  bonds          Bond[]
-  paymentAccount PaymentAccount? // subconta Asaas + taxa por tenant (ADR-0004/D-058)
-  subscriptions  Subscription[] // assinaturas de plano da plataforma (Fluxo A)
-  charges        Charge[] // cobrancas paciente->profissional (Fluxo B, via split)
+  professionals   ProfessionalProfile[]
+  memberships     ClinicMembership[]
+  invites         ProfessionalInvite[]
+  patientInvites  PatientInvite[]
+  bonds           Bond[]
+  paymentAccount  PaymentAccount? // subconta Asaas + taxa por tenant (ADR-0004/D-058)
+  subscriptions   Subscription[] // assinaturas de plano da plataforma (Fluxo A)
+  charges         Charge[] // cobrancas paciente->profissional (Fluxo B, via split)
   workoutPlans    WorkoutPlan[] // planos de treino escopados ao tenant (ADR-0009)
   workouts        Workout[] // conteudo de treino escopado ao tenant (ADR-0006)
   workoutSessions WorkoutSession[] // execucoes escopadas ao tenant (ADR-0009)
@@ -169,6 +169,7 @@ model Tenant {
   assessments     Assessment[] // avaliacao/medidas escopadas ao tenant (ADR-0006)
   progressPhotos  ProgressPhoto[] // fotos de evolucao escopadas ao tenant (ADR-0006)
   attendances     Attendance[] // atendimentos (ticket) escopados ao tenant (ADR-0010)
+  appointments    Appointment[] // agendamentos escopados ao tenant (ADR-0012)
 
   @@map("tenant")
 }
@@ -204,16 +205,19 @@ model ProfessionalProfile {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  account          Account                 @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  tenant           Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  specialties      ProfessionalSpecialty[]
-  patientInvites   PatientInvite[]
-  bonds            Bond[]
-  consentsReceived Consent[] // consentimentos em que este profissional e o grantee (D-016)
-  suggestionsAsA   SharingSuggestion[]     @relation("SuggestionProfessionalA")
-  suggestionsAsB   SharingSuggestion[]     @relation("SuggestionProfessionalB")
-  ownedExercises   Exercise[] // itens de biblioteca proprios do profissional (privados — ADR-0006)
-  ownedFoods       Food[] // itens de biblioteca proprios do profissional (privados — ADR-0006)
+  account                Account                     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tenant                 Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  specialties            ProfessionalSpecialty[]
+  patientInvites         PatientInvite[]
+  bonds                  Bond[]
+  consentsReceived       Consent[] // consentimentos em que este profissional e o grantee (D-016)
+  suggestionsAsA         SharingSuggestion[]         @relation("SuggestionProfessionalA")
+  suggestionsAsB         SharingSuggestion[]         @relation("SuggestionProfessionalB")
+  ownedExercises         Exercise[] // itens de biblioteca proprios do profissional (privados — ADR-0006)
+  ownedFoods             Food[] // itens de biblioteca proprios do profissional (privados — ADR-0006)
+  agendaSettings         ProfessionalAgendaSettings? // fuso das janelas + lembretes (ADR-0012)
+  availabilityRules      AvailabilityRule[] // janelas recorrentes (ADR-0012)
+  availabilityExceptions AvailabilityException[] // bloqueios pontuais (ADR-0012)
 
   @@index([tenantId])
   @@map("professional_profile")
@@ -247,8 +251,9 @@ model ProfessionalSpecialty {
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
-  professionalProfile ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
-  specialty           Specialty           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+  professionalProfile ProfessionalProfile   @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
+  specialty           Specialty             @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+  services            ProfessionalService[] // oferta por especialidade (D-109 — ADR-0012)
 
   @@unique([professionalProfileId, specialtyId])
   @@index([specialtyId])
@@ -258,8 +263,8 @@ model ProfessionalSpecialty {
 /// Perfil de paciente (1:1 com a conta). Dados corporais globais e vinculos
 /// entram na fase do dominio de paciente.
 model PatientProfile {
-  id        String   @id @default(cuid())
-  accountId String   @unique
+  id                    String    @id @default(cuid())
+  accountId             String    @unique
   /// Ultima atualizacao cadastral (D-095 — ADR-0010). A cada 6 meses o aluno
   /// revisa os dados; a varredura e de worker e usa este campo como base. Nulo =
   /// nunca revisado desde o cadastro. O "objetivo mudou?" a cada plano novo vive
@@ -350,7 +355,7 @@ model PatientInvite {
 /// "Leo nutricionista" sao vinculos distintos. Encerrar vira ARQUIVO, nunca
 /// apaga (D-053). tenantId denormalizado = tenant do profissional (escopo — D-002).
 model Bond {
-  id                    String     @id @default(cuid())
+  id                    String       @id @default(cuid())
   tenantId              String // tenant do profissional (escopo denormalizado — D-002)
   patientProfileId      String
   professionalProfileId String
@@ -361,9 +366,9 @@ model Bond {
   /// NAO ha flag de gate espelhada aqui: o gate le do Anamnesis (fonte unica de
   /// verdade — D-093), senao poderia divergir.
   modality              CareModality
-  status                BondStatus @default(ACTIVE)
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  status                BondStatus   @default(ACTIVE)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
   archivedAt            DateTime? // momento do encerramento (UTC), null enquanto ativo (D-053)
 
   tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -382,8 +387,13 @@ model Bond {
   assessments         Assessment[] // avaliacao/medidas isoladas por vinculo (ADR-0006/ADR-0001)
   progressPhotos      ProgressPhoto[] // fotos de evolucao isoladas por vinculo (ADR-0006/ADR-0001)
   attendances         Attendance[] // atendimentos (ticket) isolados por vinculo (D-096)
+  appointments        Appointment[] // agendamentos isolados por vinculo (ADR-0012)
 
   @@unique([patientProfileId, professionalProfileId, specialtyId])
+  /// Alvo da FK COMPOSTA do Appointment. Redundante como chave (id ja e unico),
+  /// mas e o que torna `Appointment.professionalProfileId` divergente do vinculo
+  /// IRREPRESENTAVEL em vez de apenas proibido (ADR-0012).
+  @@unique([id, professionalProfileId])
   @@index([tenantId])
   @@index([professionalProfileId, status])
   @@index([patientProfileId, status])
@@ -831,6 +841,8 @@ enum NotificationType {
   INVITE_RECEIVED // convite recebido
   CHARGE // cobranca
   ACHIEVEMENT // conquista/meta batida
+  APPOINTMENT_REMINDER // lembrete de consulta, N horas antes (D-108 — ADR-0012)
+  APPOINTMENT_CONFIRMATION // pedido de confirmacao de presenca, com acao direta (D-108)
 }
 
 // --- Treino ----------------------------------------------------------------
@@ -1264,9 +1276,15 @@ model MealPlanItem {
 /// vinculo + quando ocorreu. Conteudo clinico deferido para `detail Json?`
 /// (TODO D-063). Isolado por vinculo (ADR-0001). Datas em UTC (D-067).
 model Encounter {
-  id         String    @id @default(cuid())
-  tenantId   String // escopo denormalizado (D-002)
-  bondId     String // isolamento por vinculo (ADR-0001)
+  id       String @id @default(cuid())
+  tenantId String // escopo denormalizado (D-002)
+  bondId   String // isolamento por vinculo (ADR-0001)
+
+  /// O agendamento que originou este atendimento (ADR-0012). OPCIONAL de
+  /// proposito: o D-018/D-109 querem tudo passando pelo app, mas nao podem
+  /// impedir o mundo real — a consulta pode ocorrer sem ter sido marcada aqui.
+  appointmentId String? @unique
+
   occurredAt DateTime? // quando o atendimento ocorreu (estrutural; UTC)
   detail     Json? // TODO(D-063): conteudo clinico por fase — nao inventar
   createdAt  DateTime  @default(now())
@@ -1274,6 +1292,7 @@ model Encounter {
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond          Bond           @relation(fields: [bondId], references: [id], onDelete: Cascade)
+  appointment   Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
   prescriptions Prescription[]
 
   @@index([bondId])
@@ -1358,13 +1377,13 @@ model Anamnesis {
   bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
 
   // Secoes (D-103). Cada uma e OPCIONAL: secao ausente = linha ausente.
-  parq            AnamnesisParq?
-  goal            AnamnesisGoal?
-  clinicalHistory AnamnesisClinicalHistory?
-  familyHistory   AnamnesisFamilyHistory?
-  lifestyle       AnamnesisLifestyle?
+  parq             AnamnesisParq?
+  goal             AnamnesisGoal?
+  clinicalHistory  AnamnesisClinicalHistory?
+  familyHistory    AnamnesisFamilyHistory?
+  lifestyle        AnamnesisLifestyle?
   emergencyContact AnamnesisEmergencyContact?
-  training        AnamnesisTraining?
+  training         AnamnesisTraining?
 
   @@index([tenantId])
   @@index([status]) // alunos com gate aberto/fechado
@@ -1447,8 +1466,8 @@ model AnamnesisParq {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
-  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+  anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
 
   @@map("anamnesis_parq")
 }
@@ -1470,8 +1489,8 @@ model AnamnesisGoal {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
-  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+  anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
 
   @@map("anamnesis_goal")
 }
@@ -1495,8 +1514,8 @@ model AnamnesisClinicalHistory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
-  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+  anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
 
   conditions  AnamnesisCondition[]
   surgeries   AnamnesisSurgery[]
@@ -1586,8 +1605,8 @@ model AnamnesisFamilyHistory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
-  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+  anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
 
   conditions AnamnesisFamilyCondition[]
 
@@ -1620,10 +1639,10 @@ model AnamnesisLifestyle {
   sleepHoursPerNight Int? // horas por noite
   stressLevel        Int? // escala (faixa validada na aplicacao — UX do D-103)
 
-  smokes       Boolean
-  smokingNote  String? // condicional: so quando `smokes`
+  smokes        Boolean
+  smokingNote   String? // condicional: so quando `smokes`
   drinksAlcohol Boolean
-  alcoholNote  String? // condicional: so quando `drinksAlcohol`
+  alcoholNote   String? // condicional: so quando `drinksAlcohol`
 
   authoredBy          AnamnesisAuthor
   authoredByAccountId String
@@ -1632,8 +1651,8 @@ model AnamnesisLifestyle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
-  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+  anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
 
   @@map("anamnesis_lifestyle")
 }
@@ -1655,8 +1674,8 @@ model AnamnesisEmergencyContact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
-  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+  anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
 
   @@map("anamnesis_emergency_contact")
 }
@@ -1691,8 +1710,8 @@ model AnamnesisTraining {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
-  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+  anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
 
   injuries AnamnesisInjury[]
 
@@ -1702,7 +1721,7 @@ model AnamnesisTraining {
 /// Dor/lesao musculoesqueletica — o D-103 pede "detalhada", entao e lista com
 /// regiao + descricao, nao um campo de texto solto.
 model AnamnesisInjury {
-  id         String   @id @default(cuid())
+  id         String @id @default(cuid())
   trainingId String
 
   bodyRegion  String
@@ -1787,17 +1806,17 @@ model ProgressPhoto {
 
 /// Atendimento = thread/ticket de um vinculo (D-096). Dado clinico.
 model Attendance {
-  id              String           @id @default(cuid())
-  tenantId        String // escopo denormalizado (D-002)
-  bondId          String // isolamento por vinculo (ADR-0001) — dado clinico
+  id                String           @id @default(cuid())
+  tenantId          String // escopo denormalizado (D-002)
+  bondId            String // isolamento por vinculo (ADR-0001) — dado clinico
   openedByAccountId String // quem abriu (normalmente o aluno)
-  subject         String // vem do formulario interativo de abertura (D-096)
-  status          AttendanceStatus @default(PENDING)
-  lastMessageAt   DateTime         @default(now()) // relogio da escalada + ordenacao (D-096)
-  escalationLevel Int              @default(0) // 0=nenhuma, 1=2h, 2=24h, 3=48h (worker — D-096)
-  resolvedAt      DateTime? // conclusao (UTC)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  subject           String // vem do formulario interativo de abertura (D-096)
+  status            AttendanceStatus @default(PENDING)
+  lastMessageAt     DateTime         @default(now()) // relogio da escalada + ordenacao (D-096)
+  escalationLevel   Int              @default(0) // 0=nenhuma, 1=2h, 2=24h, 3=48h (worker — D-096)
+  resolvedAt        DateTime? // conclusao (UTC)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond     Bond                @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -1882,4 +1901,201 @@ model Notification {
   @@index([accountId, readAt]) // sininho: nao lidas
   @@index([accountId, createdAt]) // feed da central (cursor — D-036)
   @@map("notification")
+}
+
+// =============================================================================
+// AGENDA (ADR-0012 — D-106 a D-111)
+// =============================================================================
+//
+// FUSO (D-111 + adendo): duas naturezas de dado, e confundi-las e o bug.
+// - INSTANTE (Appointment, AvailabilityException) -> `timestamptz`. Ponto unico
+//   na linha do tempo.
+// - JANELA RECORRENTE (AvailabilityRule) -> hora de PAREDE (minutos desde a
+//   meia-noite) + fuso IANA. "Atendo 9h-18h" NAO e instante: guardar em UTC
+//   congela um offset e a janela desliza uma hora quando o DST entra/sai.
+//
+// TIMESTAMPTZ e nao TIMESTAMP: o Prisma mapeia DateTime para `timestamp(3)` SEM
+// fuso por padrao — guardar UTC ali e convencao por esperanca. Verificado: com a
+// sessao em America/Sao_Paulo, `DEFAULT CURRENT_TIMESTAMP` numa coluna sem fuso
+// grava a hora LOCAL (3h de erro, sem erro nenhum). Tabelas novas: sem custo.
+//
+// O PAR PRESCRICAO -> EXECUCAO, pela terceira vez: Appointment (marcado) ->
+// Encounter (realizado) e o mesmo shape de WorkoutPlan->WorkoutSession (D-086) e
+// MealPlan->MealLog (D-118). As estatisticas do D-110 sao o indicador de
+// aderencia DESSE par — "no-show" e "prescrito e nao executado".
+// -----------------------------------------------------------------------------
+
+/// Estado do agendamento (D-108/D-110).
+enum AppointmentStatus {
+  SCHEDULED // marcado, aguardando confirmacao do paciente
+  CONFIRMED // paciente confirmou presenca (D-108)
+  CANCELLED // desmarcado — alimenta a estatistica de desmarcacoes (D-110)
+  COMPLETED // ocorreu -> tipicamente gera Encounter (D-110)
+  NO_SHOW // paciente faltou sem desmarcar — prejuizo direto (D-108/D-110)
+}
+
+/// Tipo do servico oferecido (D-109). O ciclo consulta -> retorno e conceito de
+/// NUTRICAO e MEDICINA; personal trainer tem consultoria continua e simplesmente
+/// NAO tem linha de servico RETURN — ausencia de linha, nao flag.
+enum ProfessionalServiceType {
+  FIRST_VISIT // primeira consulta
+  RETURN // retorno (D-109)
+  OTHER // avaliacao fisica, reavaliacao etc.
+}
+
+/// Servico do profissional POR ESPECIALIDADE (D-109). Nao por profissional: uma
+/// pessoa pode ter TRAINING e NUTRITION (ProfessionalSpecialty e N:N), e retorno
+/// nao se aplica a personal — politica por profissional mentiria para uma das duas.
+///
+/// SUBSTITUI a "ReturnPolicy" que o D-109 sugeria. O enum grátis/reduzido/cheio
+/// seria DERIVAVEL do preco (0 = gratis; menor que o FIRST_VISIT = reduzido;
+/// igual = cheio) — e o teste do ADR-0011 diz: se a fonte mudar, este campo deve
+/// mudar junto? SIM (mudar o preco do retorno muda a politica). Logo: DERIVE, nao
+/// armazene. Guardar os dois seria o `Bond.anamnesisCompletedAt` (D-093) de novo.
+///
+/// "Nao faco retorno" = NENHUMA linha RETURN. "Faco e nao cobro" = linha com
+/// priceCents = 0. O enum colapsaria os dois — mesma disciplina do "secao ausente
+/// = linha ausente" da anamnese (D-103).
+model ProfessionalService {
+  id                      String                  @id @default(cuid())
+  professionalSpecialtyId String
+  name                    String // "Consulta inicial", "Retorno", "Avaliacao fisica"
+  durationMinutes         Int // sem isto nao existe slot a oferecer (D-106)
+  priceCents              Int // centavos inteiros, nunca float (D-069)
+  type                    ProfessionalServiceType
+  active                  Boolean                 @default(true) // delecao logica (D-089): servico descontinuado some da oferta mas sobrevive no historico
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  professionalSpecialty ProfessionalSpecialty @relation(fields: [professionalSpecialtyId], references: [id], onDelete: Cascade)
+  appointments          Appointment[]
+
+  @@index([professionalSpecialtyId, active]) // oferta vigente da especialidade
+  @@map("professional_service")
+}
+
+/// Configuracao de agenda do profissional. Existe para que o fuso das janelas
+/// seja UM SO: se `timezone` morasse em cada AvailabilityRule, seria
+/// representavel ter segunda em Sao Paulo e terca em Lisboa.
+///
+/// NAO deriva de `Account.preferredTimezone`: aquilo e preferencia de EXIBICAO
+/// (D-067). Trocar o fuso de exibicao nao pode mover silenciosamente o horario de
+/// atendimento de ninguem — sao dois fatos diferentes que costumam coincidir.
+model ProfessionalAgendaSettings {
+  id                    String @id @default(cuid())
+  professionalProfileId String @unique
+
+  /// Fuso IANA das JANELAS de disponibilidade (D-111 adendo). Ex.: "America/Sao_Paulo".
+  timezone String
+
+  /// Lembretes: horas antes do agendamento (D-108). Lista porque o profissional
+  /// configura quantos quiser (ex.: [48, 2]). Vazio = sem lembrete.
+  reminderHoursBefore Int[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  professionalProfile ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
+
+  @@map("professional_agenda_settings")
+}
+
+/// Janela recorrente de disponibilidade (D-106). HORA DE PAREDE, nao instante —
+/// ver o bloco de fuso no topo. A expansao para instantes UTC acontece na
+/// CONSULTA, aplicando o DST vigente naquela data.
+///
+/// `startMinute`/`endMinute` = minutos desde a meia-noite (0..1440), hora LOCAL do
+/// fuso de ProfessionalAgendaSettings. Int e nao `@db.Time` de proposito: o Prisma
+/// devolveria `@db.Time` como um `Date` completo com data falsa (1970-01-01) — um
+/// tipo que mente. Inteiro nao mente: e deslocamento dentro do dia.
+///
+/// Por PROFISSIONAL, nao por especialidade: o tempo dele e fisico e unico (ele nao
+/// atende treino e nutricao as 9h). A especialidade entra pelo VINCULO do
+/// agendamento.
+model AvailabilityRule {
+  id                    String  @id @default(cuid())
+  professionalProfileId String
+  weekday               Weekday
+  startMinute           Int // minutos desde 00:00, hora local (ex.: 540 = 09:00)
+  endMinute             Int // minutos desde 00:00, hora local (ex.: 1080 = 18:00)
+  active                Boolean @default(true)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  professionalProfile ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
+
+  @@index([professionalProfileId, weekday])
+  @@map("availability_rule")
+}
+
+/// Bloqueio pontual: ferias, feriado, compromisso (D-106). OCORRENCIA CONCRETA,
+/// nao regra — por isso INSTANTE (`timestamptz`), diferente da AvailabilityRule.
+model AvailabilityException {
+  id                    String   @id @default(cuid())
+  professionalProfileId String
+  startsAt              DateTime @db.Timestamptz(3)
+  endsAt                DateTime @db.Timestamptz(3)
+  reason                String? // texto livre; nenhum ADR decidiu taxonomia de motivo
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  professionalProfile ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
+
+  @@index([professionalProfileId, startsAt])
+  @@map("availability_exception")
+}
+
+/// Agendamento (D-106). Atado ao VINCULO (isolamento — ADR-0001) + tenantId
+/// denormalizado (D-002). Uma consulta com nutrologo E informacao clinica por
+/// contexto: escopo de tenant e isolamento por vinculo valem aqui como no resto, e
+/// admin puro nao ve conteudo clinico (D-015).
+///
+/// `professionalProfileId` DENORMALIZADO do Bond: a constraint EXCLUDE precisa de
+/// todas as colunas na MESMA linha, e o conflito e "dois agendamentos do mesmo
+/// profissional se sobrepoem". Nao vira fonte divergente: a FK e COMPOSTA
+/// (bondId + professionalProfileId -> Bond.id + Bond.professionalProfileId), entao
+/// um valor que nao bata com o vinculo e IRREPRESENTAVEL — o banco recusa.
+/// Construir, nao validar (D-102).
+///
+/// TERMOS CONGELADOS (`priceCentsAtBooking`, `serviceTypeAtBooking`): o preco e o
+/// tipo do ProfessionalService MUDAM quando o profissional reajusta a tabela. Ler
+/// pelo FK na hora de cobrar um agendamento antigo seria o join com o preco ATUAL
+/// — exatamente o que o ADR-0011 proibe. Mesmo teste, resposta oposta a do
+/// ReturnPolicy: aqui a fonte muda e este campo NAO deve mudar junto (o preco
+/// acordado e historico) -> ARMAZENE. E o preco registrado na compra.
+model Appointment {
+  id                    String @id @default(cuid())
+  tenantId              String // escopo denormalizado (D-002)
+  bondId                String // isolamento por vinculo (ADR-0001)
+  professionalProfileId String // denormalizado do Bond; FK composta impede divergir
+  serviceId             String
+
+  startsAt DateTime          @db.Timestamptz(3) // INSTANTE, UTC (D-111)
+  endsAt   DateTime          @db.Timestamptz(3)
+  status   AppointmentStatus @default(SCHEDULED)
+
+  /// Termos acordados no ato da marcacao — congelados (ver nota acima).
+  priceCentsAtBooking  Int
+  serviceTypeAtBooking ProfessionalServiceType
+
+  confirmedAt DateTime? @db.Timestamptz(3) // confirmacao de presenca (D-108)
+  cancelledAt DateTime? @db.Timestamptz(3) // desmarcacao (D-110). QUEM desmarcou nao esta decidido — nao inventar.
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant  Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond    Bond                @relation(fields: [bondId, professionalProfileId], references: [id, professionalProfileId], onDelete: Cascade)
+  service ProfessionalService @relation(fields: [serviceId], references: [id], onDelete: Restrict) // servico descontinuado nao pode sumir do historico
+
+  encounter Encounter? // o par prescricao->execucao (ver bloco do topo)
+
+  @@index([professionalProfileId, startsAt]) // agenda do dia + suporte ao EXCLUDE
+  @@index([bondId, startsAt]) // historico do vinculo
+  @@index([tenantId, startsAt]) // estatisticas da clinica (D-110)
+  @@index([status, startsAt]) // varredura do worker de lembretes (D-108)
+  @@map("appointment")
 }

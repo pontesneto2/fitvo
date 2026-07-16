@@ -122,7 +122,48 @@ Ou os scripts do package: `pnpm --filter @fitvo/database db:migrate`.
 
 ---
 
-## 4. `prisma migrate reset` pede consentimento explícito
+## 4. CI verde **não** prova que a migração aplica
+
+**Sintoma**
+
+Tudo verde no PR, e o `prisma migrate deploy` quebra no deploy — ou no primeiro
+`pnpm db:migrate` de quem acabou de clonar o repo.
+
+**Causa**
+
+Os jobs de `lint`, `typecheck`, `test` e `build` **não tocam banco**. Eles provam
+que o código compila e passa nos testes, **não** que a cadeia de migrações
+aplica. Dois furos passavam batido:
+
+1. uma migração quebrada ou fora de ordem — ninguém aplica a cadeia do zero;
+2. **drift**: alguém edita o `schema.prisma` e esquece de gerar a migração. O
+   código continua compilando (o client é gerado do schema), então **todo o CI
+   fica verde** — e o erro só aparece quando o banco real é migrado.
+
+**Solução (já aplicada)**
+
+O CI tem um job **`migrate`** que sobe um Postgres em container e faz as duas
+verificações: aplica a cadeia num banco vazio (`migrate deploy`) e compara
+schema × migrações (`migrate diff --exit-code`). Antes dele, o verde mentia sobre
+a migração.
+
+**Ao mexer no schema, rode o mesmo localmente antes de abrir o PR:**
+
+```bash
+docker exec fitvo-postgres psql -U fitvo -d fitvo -c 'CREATE DATABASE verify;'
+export DATABASE_URL="postgresql://fitvo:fitvo@localhost:5434/verify?schema=public"
+pnpm --filter @fitvo/database exec prisma migrate deploy       # aplica do zero
+pnpm --filter @fitvo/database exec prisma migrate diff \
+  --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma \
+  --shadow-database-url "postgresql://fitvo:fitvo@localhost:5434/verify_shadow?schema=public" \
+  --exit-code                                                  # 0 = sem drift
+docker exec fitvo-postgres psql -U fitvo -d fitvo -c 'DROP DATABASE verify;'
+```
+
+> O shadow database precisa ser **outro banco**: o Prisma o usa como rascunho e
+> o reinicia.
+
+## 5. `prisma migrate reset` pede consentimento explícito
 
 **Sintoma**
 

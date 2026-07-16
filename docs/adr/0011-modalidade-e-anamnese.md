@@ -85,6 +85,92 @@ nutrição e medicina.
 nunca compartilhado automaticamente (D-016); autopreenchimento dos dados
 evidentes com edição; e a exceção do e-mail (troca só por código verificado).
 
+#### Por que a autoria é ARMAZENADA se é derivável — derivação congelada
+
+A objeção é correta e precisa ser respondida no papel, porque a resposta óbvia
+está errada:
+
+`authoredBy` (o papel) **é derivável** de `authoredByAccountId` + o vínculo. Hoje
+a derivação é uma igualdade simples e **estável** — o vínculo é
+`paciente ↔ (profissional + especialidade)` com unique nessa tripla (ADR-0001),
+tem **exatamente um** profissional, e trocá-lo não é mutação: é outro vínculo.
+Nenhuma decisão hoje permite um segundo profissional escrever num vínculo alheio
+(D-014: *"profissionais não enxergam o trabalho uns dos outros por padrão"*).
+
+**Portanto a justificativa NÃO é "o profissional do vínculo pode mudar".** Isso é
+falso, e um campo defendido por um motivo falso cai na primeira revisão.
+
+**A justificativa é que a autoria é uma DERIVAÇÃO CONGELADA.** O critério que
+separa os dois casos:
+
+> **Se a fonte mudar, este campo deve mudar junto?**
+> **Sim → derive.** **Não → armazene.**
+
+- **Sim** — `Bond.anamnesisCompletedAt` (rejeitado no D-093): duplicaria um fato
+  **presente** cuja fonte da verdade é a linha de `Anamnesis`. Os dois descrevem
+  *agora*; divergir significa que um está **velho** — é bug. Derive.
+- **Não** — `authoredBy`: registra um fato **passado**. O vínculo descreve *agora*.
+  Se um dia divergirem, o enum **não está velho: ele é história**, e quem mudou foi
+  o vínculo. Não existe valor "correto" a recomputar.
+
+É a mesma razão pela qual se guarda o **preço no momento da compra** em vez de
+fazer join com o preço atual do produto. Ninguém chama isso de duplicação.
+
+**O cenário concreto que fecha o argumento.** O D-012 (REVISADO) torna a clínica
+o **coração comercial** do produto — vender para clínicas que centralizam toda a
+operação — e o D-014 diz que profissionais não veem o trabalho uns dos outros
+**"por padrão"**: a porta está deliberadamente entreaberta, e o D-012 já prevê
+compartilhamento intra-clínica **sob consentimento**. No dia em que qualquer
+decisão permitir um segundo ator escrever num vínculo (cobertura de colega,
+supervisão, admin que também é profissional), a derivação passa a devolver
+**"nenhum dos dois"** para linhas **já escritas**.
+
+Isso não seria um bug novo: seria uma **mudança de schema reescrevendo
+retroativamente o que um documento jurídico afirma**. É precisamente o que este
+D-102 existe para impedir. Armazenar é o que torna o documento **imune a decisões
+futuras** — que é o requisito de um prontuário.
+
+> Nada aqui decide que o segundo profissional poderá escrever. Não está decidido,
+> e este ADR não o decide. O ponto é que o custo de armazenar é uma coluna, e o
+> custo de derivar só aparece **depois** que a decisão for tomada — sobre dado
+> antigo, quando não há mais o que fazer.
+
+#### Como a autoria é gravada: CONSTRUIR, não validar
+
+Como o par (`authoredBy`, `authoredByAccountId`) é independente no schema, ele
+**permite estado inválido**: `PATIENT` gravado com a conta do profissional, ou uma
+conta **de outro tenant** — a FK só exige "alguma `Account`". O schema não tem como
+impedir (exigiria atravessar `bond → profiles → accounts`; `CHECK` do Postgres não
+aceita subquery). A regra vive na aplicação — e a forma importa:
+
+- **`authoredByAccountId` vem da conta AUTENTICADA, nunca do corpo da requisição.**
+- **`authoredBy` é derivado no WRITE**, uma vez, da relação do ator com o vínculo,
+  e **congelado** ali.
+- **Ator sem relação com o vínculo → 403 no guard de acesso**, antes de qualquer
+  autoria existir.
+
+Assim não há par errado **a formar**: o estado inválido deixa de ser rejeitado e
+passa a ser **irrepresentável** — o mesmo argumento que colocou a autoria junto do
+dado. As regras (`PATIENT` ⇒ conta do paciente daquele vínculo; `PROFESSIONAL` ⇒
+conta de profissional com acesso àquele vínculo; nunca conta de outro tenant)
+valem como **consequência da construção**, não como checagem que alguém pode
+esquecer de chamar.
+
+**Consequência inegociável: a validação é só no WRITE e NUNCA é refeita no READ.**
+Revalidar a autoria na leitura reprovaria documento antigo **legítimo** assim que o
+vínculo mudasse (profissional saiu da clínica, acesso revogado). O congelamento é o
+produto — revalidar o descongela e devolve exatamente o problema que o campo
+resolve.
+
+**Guard no banco (trigger): rejeitado.** Não pelo custo, mas porque **o trigger vê
+linhas, não sessões**: a pergunta real é *"quem estava autenticado?"*, e isso só
+existe na aplicação. Ele protegeria contra um `INSERT` manual no psql, não contra o
+erro que de fato vai acontecer — e duplicaria a regra de acesso numa segunda
+linguagem, que diverge quando as regras de clínica chegarem (o defeito que estamos
+prevenindo, agora em SQL) e é invisível para quem lê o `schema.prisma`. Defesa em
+profundidade no banco já tem dono registrado: **RLS** (ADR-0001, baixa prioridade),
+decisão futura do responsável — um trigger ad hoc a atropelaria com solução pior.
+
 ### D-103 — Taxonomia da anamnese (fecha o `TODO(D-094)`)
 
 Estrutura em três camadas: **núcleo comum** + **módulo por especialidade** +
@@ -278,6 +364,29 @@ Sinalizado para decisão de sequenciamento — **nada implementado por este ADR*
   modelagem, mas mistura *declaração do paciente* com *aferição do profissional*
   num documento de prontuário — que têm pesos jurídicos diferentes. Rejeitado —
   autoria obrigatória (D-102).
+- **Derivar `authoredBy` em vez de armazená-lo:** ele *é* derivável de
+  `authoredByAccountId` + o vínculo, e hoje a derivação é estável — o vínculo tem
+  exatamente um profissional (ADR-0001). Rejeitado: a autoria é uma **derivação
+  congelada**, não um cache de estado presente. Derivar acopla o significado de um
+  documento jurídico ao estado *atual* do vínculo — e quando a clínica
+  multiprofissional chegar (D-012/D-014), a derivação devolveria "nenhum dos dois"
+  para linhas já escritas, **reescrevendo retroativamente** o que o prontuário
+  afirma. Critério geral: *se a fonte mudar, este campo deve mudar junto?* Sim →
+  derive; não → armazene. Mesma razão do preço registrado na compra. Distinto do
+  `Bond.anamnesisCompletedAt` (D-093), que duplicava fato **presente** e por isso
+  foi rejeitado — a assimetria é intencional, não incoerência.
+- **Validar o par de autoria no application service (em vez de construí-lo):**
+  seria o caminho óbvio para o requisito, mas validação é chamada — e pode ser
+  esquecida, contornada por outro caminho de escrita, ou aceitar autoria vinda do
+  corpo da requisição. Rejeitado — a autoria é **construída** do ator autenticado +
+  guard de acesso ao vínculo (D-102), o que torna o par errado irrepresentável em
+  vez de rejeitável.
+- **Trigger no banco para garantir a autoria (defesa em profundidade):** tentador
+  por ser dado clínico. Rejeitado — o trigger **vê linhas, não sessões**, e a
+  pergunta real é *"quem estava autenticado?"*; ele barraria `INSERT` manual no
+  psql, não o erro real. Além disso duplica a regra de acesso em SQL (diverge
+  quando as regras de clínica chegarem) e fica invisível no `schema.prisma`. A
+  defesa em profundidade registrada é **RLS** (ADR-0001).
 - **Autoria por CAMPO (em vez de por seção):** seria a granularidade máxima, mas
   dobraria o schema (uma coluna de autoria por campo) ou exigiria uma tabela de
   auditoria genérica — e o retorno é nulo: o peso jurídico vive no **bloco**

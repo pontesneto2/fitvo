@@ -28,6 +28,18 @@ treino.
 
 - Todo **vínculo** tem uma modalidade declarada: **`ONLINE`**, **`PRESENCIAL`**
   ou **`HIBRIDO`**, escolhida no estabelecimento do vínculo.
+- **Quem define: o profissional.** É ele quem sabe como atende. O aluno/paciente
+  **não escolhe** a modalidade do serviço que está contratando.
+- **Quando: no convite** (D-006/D-048). O vínculo já **nasce** com modalidade —
+  não há vínculo sem ela.
+- **Muda? Sim.** É atributo **mutável** do vínculo, não imutável. O caso é real:
+  o paciente que fazia presencial se muda de cidade e passa a online; o aluno
+  online resolve fazer presencial. Forçar um vínculo novo por isso quebraria o
+  histórico (D-053) sem ganho nenhum.
+- **Mudar a modalidade NÃO invalida a anamnese existente nem reabre o gate**
+  (D-093). Só muda os fluxos **dali para frente**. A anamnese já respondida
+  continua válida — quem a preencheu e quando está registrado (D-102), e isso não
+  se altera retroativamente.
 - A modalidade **define o fluxo** da anamnese:
   - **`ONLINE`** — o paciente/aluno preenche sozinho; é **pré-requisito** (gate
     D-093) antes de o profissional montar o plano.
@@ -61,6 +73,11 @@ nutrição e medicina.
   paciente declarou X"* tem peso jurídico **diferente** de *"o profissional
   aferiu Y"*. Sem autoria, o documento perde valor probatório e mistura
   declaração com aferição.
+- **Granularidade: por SEÇÃO/bloco**, não por campo. O peso jurídico está no
+  bloco — *"histórico: declarado pelo paciente"* × *"adipometria: aferida pelo
+  profissional"*. Ninguém vai a juízo discutir quem preencheu o campo "dorme
+  quantas horas". Autoria por campo dobraria o schema ou exigiria tabela de
+  auditoria: **custo sem retorno** (ver "Alternativas consideradas").
 - **O gate (D-093) é satisfeito independentemente de quem preencheu.** O gate
   exige que a anamnese esteja respondida, não que o paciente a tenha respondido.
 
@@ -143,27 +160,63 @@ conduta.
   semana"), espelhando os indicadores de treino (D-092).
 - **Entra no escopo de sync offline** (D-099), junto com as execuções.
 
+**O D-104 nasce BLOQUEADO — e não por si mesmo.**
+
+- "Marcar que consumiu a **refeição**" **não tem a que se referir**: o schema vai
+  de `MealPlan` **direto ao alimento** (`MealPlanItem`), sem a refeição no meio.
+  Falta o nível **`Meal`** (café da manhã, almoço, jantar):
+  `MealPlan → Meal → MealPlanItem`.
+- É **o mesmo padrão** encontrado no treino: lá faltava o nível **"plano"**
+  (D-079, ADR-0009); aqui falta o nível **"refeição"**. Em ambos os casos, o
+  esqueleto do ADR-0006 pulou um degrau da hierarquia real do domínio.
+- Essa hierarquia é o **D-063 para nutrição**, que **ainda não foi fechado com o
+  responsável** — depende das referências de produto (Dietbox), como o treino
+  dependeu do MFit.
+- **Consequência:** o `MealLog` só é implementável **depois** de a estrutura de
+  nutrição existir. Não tentar destravar por fora (ex.: log por item de alimento)
+  — ver "Alternativas consideradas".
+
+## Ponto em aberto — onde vive a antropometria
+
+O D-102 cita **adipometria e bioimpedância** como exemplos do que o profissional
+adiciona à anamnese no presencial. Mas:
+
+- a **taxonomia do D-103 não tem bloco de antropometria/medidas** (o módulo de
+  nutrologia lista "exame físico"; o de nutrição, não);
+- e o **D-094 (ADR-0010) separou** a anamnese (gate, **uma** por vínculo) da
+  **avaliação/medidas** (`Assessment`, **recorrente**) — e medida é, por
+  natureza, recorrente: remede-se todo mês.
+
+Então: a adipometria da **primeira consulta** é seção da anamnese (com autoria do
+profissional), e as **seguintes** são `Assessment`? Ou toda medida vive em
+`Assessment` desde a primeira, e o D-102 só usou os termos como ilustração do que
+o profissional afere?
+
+**Não decidido — não inventar.** Afeta se o módulo de anamnese ganha uma seção de
+antropometria ou não. A taxonomia de campos do `Assessment` continua deferida
+(D-063) de qualquer forma; esta pergunta só define de que lado da fronteira a
+primeira medida cai.
+
 ## Impacto de modelagem
 
 Sinalizado para decisão de sequenciamento — **nada implementado por este ADR**.
 
-1. **`Bond` ganha modalidade** (D-101): enum `ONLINE`/`PRESENCIAL`/`HIBRIDO`. Em
-   aberto: **quem a define e quando** — o vínculo nasce do aceite do convite
-   (D-006/D-055), então a modalidade precisaria ser escolhida pelo profissional
-   **no convite** e carregada para o vínculo, ou definida após a criação. E se
-   ela **muda** ao longo do tempo (paciente migra de presencial para online), é
-   edição do vínculo ou dado histórico? Não decidido — não inventar.
+1. **`Bond` ganha modalidade** (D-101): enum `ONLINE`/`PRESENCIAL`/`HIBRIDO`,
+   **mutável**. Como o profissional a define **no convite** e o vínculo nasce do
+   aceite (D-006/D-055), o **`PatientInvite` também carrega a modalidade** e a
+   propaga na criação do vínculo — senão não há como o vínculo nascer com ela.
+   Mudança posterior é edição do vínculo; não invalida a anamnese nem reabre o
+   gate.
 2. **`Anamnesis.detail Json?` morre** (D-103): a taxonomia existe, então a
    anamnese vira **colunas tipadas**, como o treino (ADR-0009). A estrutura
    núcleo + módulo mapeia naturalmente para um registro de núcleo + registros de
    módulo por especialidade; listas (medicamentos com posologia, alergias,
    cirurgias, lesões, R24h) pedem **entidades filhas**, não arrays de texto.
-3. **Autoria (D-102) é o ponto mais difícil da modelagem.** "Quem preencheu cada
-   **parte**" exige decidir a **granularidade**: por seção/bloco (barato, e
-   provavelmente suficiente para o peso jurídico — "histórico: declarado pelo
-   paciente" × "adipometria: aferida pelo profissional") ou por campo (caro:
-   dobra o schema ou exige tabela de auditoria). Recomendação a discutir na fase
-   de modelagem — não decidir aqui.
+3. **Autoria por seção (D-102)** implica que a **seção é uma entidade**, não um
+   agrupamento visual: cada bloco preenchido carrega autor (paciente ou
+   profissional) e timestamp. Isso empurra a modelagem para **registros de seção**
+   (núcleo e módulos como blocos com autoria própria) em vez de uma tabela larga
+   única — a autoria é o que decide a forma, mais do que a taxonomia.
 4. **`MealLog` (D-104) esbarra num nível que não existe.** O schema atual é
    `MealPlan → MealPlanItem` (alimento + ordem) — **não há entidade de
    refeição**. "Marcar que consumiu a **refeição**" (café da manhã, almoço) não
@@ -191,6 +244,20 @@ Sinalizado para decisão de sequenciamento — **nada implementado por este ADR*
   modelagem, mas mistura *declaração do paciente* com *aferição do profissional*
   num documento de prontuário — que têm pesos jurídicos diferentes. Rejeitado —
   autoria obrigatória (D-102).
+- **Autoria por CAMPO (em vez de por seção):** seria a granularidade máxima, mas
+  dobraria o schema (uma coluna de autoria por campo) ou exigiria uma tabela de
+  auditoria genérica — e o retorno é nulo: o peso jurídico vive no **bloco**
+  ("histórico: declarado pelo paciente" × "adipometria: aferida pelo
+  profissional"), não no campo "dorme quantas horas". **Custo sem retorno.**
+  Rejeitado — autoria por seção (D-102). Mesma disciplina do D-093: não pagar
+  complexidade que nenhuma decisão de negócio consome.
+- **Modalidade imutável (mudar exige vínculo novo):** simplificaria o modelo,
+  mas o caso de mudança é real e banal (paciente muda de cidade e migra para
+  online) — forçar vínculo novo quebraria o histórico preservado (D-053) sem
+  ganho. Rejeitado — modalidade é atributo mutável do vínculo (D-101).
+- **Modalidade escolhida pelo paciente:** ele não escolhe a modalidade do serviço
+  que está contratando — quem sabe como atende é o profissional. Rejeitado —
+  definida pelo profissional, no convite (D-101).
 - **Modalidade como atributo do profissional (atende online × presencial):**
   parece natural, mas a modalidade é da **relação**, não da pessoa — o mesmo
   profissional atende um aluno online e outro presencialmente. Rejeitado — vive

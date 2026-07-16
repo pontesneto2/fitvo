@@ -169,15 +169,11 @@ FITVO.
 - **Schema de treino/fluxo (ADR-0009/0010)**: escrito e em **PR #26** (CI verde,
   rebaseado na main) — aguarda **revisão humana**, área clínico-adjacente, sem
   `--admin`. Não mergear sem aprovação explícita.
-- **Modalidade — quem define e quando (D-101, ADR-0011)**: o vínculo nasce do
-  aceite do convite (D-006/D-055), então a modalidade precisa ser escolhida pelo
-  profissional **no convite** e carregada, ou definida depois. E se ela **muda**
-  (paciente migra de presencial para online), é edição do vínculo ou dado
-  histórico? Não decidido — bloqueia a modelagem do D-101.
-- **Granularidade da autoria da anamnese (D-102, ADR-0011)**: rastrear quem
-  preencheu **por seção/bloco** (barato, provavelmente suficiente para o peso
-  jurídico) ou **por campo** (caro: dobra o schema ou exige tabela de
-  auditoria). Decisão de modelagem que precisa do seu aval.
+- **Antropometria: anamnese ou avaliação? (ADR-0011)**: o D-102 cita
+  adipometria/bioimpedância como o que o profissional afere na anamnese, mas a
+  taxonomia do D-103 não tem bloco de medidas e o D-094 pôs medida recorrente no
+  `Assessment`. A primeira medida é seção da anamnese ou já é `Assessment`?
+  Define se o módulo de anamnese ganha seção de antropometria.
 - **Campos finos de nutrição/medicina (D-063, ainda aberto)**: treino já foi
   fechado (ADR-0009/0010, benchmark MFit) e a anamnese pelo ADR-0011. Nutrição e
   medicina dependem de referência de produto própria (**Dietbox**) e decisão

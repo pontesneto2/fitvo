@@ -89,9 +89,7 @@ Vínculo (bond = paciente ↔ profissional+especialidade = "ambiente")
 - **Invariante** (camada de domínio): todos os itens de um mesmo grupo têm a
   mesma contagem de séries. Grupo malformado é erro de validação.
 - **Fora de escopo:** circuito por tempo com rodadas indeterminadas (AMRAP,
-  EMOM) não é expressável por rodada-como-série e **não foi decidido por nenhum
-  ADR** — exigiria bloco com teto de tempo e alvo. Não modelar sem decisão de
-  produto explícita.
+  EMOM) — ver "Gaps conhecidos" abaixo.
 
 ### D-083 — Validade do plano
 
@@ -223,6 +221,37 @@ o **dado** precisa nascer certo, com índices por data):
 
 Todos os indicadores são **derivados** de execuções e séries registradas — não
 há entidade nova de indicador, há índices planejados.
+
+## Gaps conhecidos (decisão de produto pendente — não modelar sem ADR)
+
+Registrados aqui para ficarem **visíveis, não esquecidos**. Nenhum é bloqueante
+do MVP; nenhum deve ser modelado por conta própria.
+
+### Blocos com teto de tempo — AMRAP/EMOM
+
+- **Não são expressáveis no modelo atual.** A rodada-como-série (D-082) cobre
+  circuito de rodadas **conhecidas** ("3 rodadas de A+B+C"). Não cobre AMRAP
+  ("máximo de rounds em 12 min") nem EMOM ("a cada minuto, por 10 min"), onde a
+  contagem de rodadas é **indeterminada na prescrição**.
+- Um contador de rodadas (`roundCount`) **também não resolveria** — o problema
+  não é contar, é que não há número a prescrever.
+- Resolver exigiria um **bloco com teto de tempo e alvo** (entidade nova com
+  `durationCapSeconds` + critério de pontuação) — mudança estrutural, não campo
+  extra.
+- **Relevante se** CrossFit/HIIT/treino funcional entrarem no escopo de verdade.
+  Nenhum ADR decidiu isso. Exige decisão de produto explícita.
+
+### Taxonomia de grupo muscular
+
+- O D-089 cita "músculo" como conteúdo da biblioteca, mas **nenhum ADR decidiu a
+  taxonomia** (enum fixo de grupos × catálogo em tabela × múltiplos músculos por
+  exercício com primário/secundário). Não modelado — decisão de produto pendente.
+
+### Catálogo de técnicas de série
+
+- O `SetTechnique` nasce **mínimo de propósito** (só o que este ADR fundamenta:
+  normal e drop-set). Ampliar o catálogo (rest-pause, pirâmide, isometria,
+  negativa...) é decisão de produto + migração, não invenção do agente (D-087).
 
 ## Impacto de modelagem e inconsistências herdadas (D-063 fechado)
 

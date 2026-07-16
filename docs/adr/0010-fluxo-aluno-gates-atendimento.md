@@ -30,8 +30,14 @@ Cadastro → app vazio → convite do profissional → vínculo criado
 - O profissional só monta o plano **depois** da anamnese respondida.
 - **Conceito novo de produto: gates obrigatórios.** O app trava o aluno até ele
   fornecer o que o profissional precisa. Resolve a dor real de o profissional
-  ficar cobrando informação por WhatsApp. O estado do gate é um sinal no vínculo
-  (ver "Impacto de modelagem").
+  ficar cobrando informação por WhatsApp.
+- **O gate tem uma única fonte de verdade: o próprio registro de anamnese**
+  (`Anamnesis.status`/`answeredAt`, um por vínculo). Uma flag espelhada no
+  vínculo (`Bond.anamnesisCompletedAt`) foi **considerada e rejeitada**: seria
+  uma segunda fonte de verdade capaz de divergir da primeira — o mesmo defeito
+  que rejeitou a carga polimórfica no D-081 (estado inválido representável). O
+  vínculo já tem a anamnese numa relação 1:1; a leitura do gate é um join
+  barato, não vale o risco de divergência.
 
 ### D-094 — Anamnese: uma por profissional
 
@@ -166,8 +172,9 @@ Cadastro → app vazio → convite do profissional → vínculo criado
 Entidades novas e alterações a modelar (detalhe apresentado ao responsável
 **antes de qualquer código**):
 
-- **Gate de anamnese:** sinal no `Bond` (ex.: `anamnesisCompletedAt`) que
-  bloqueia a criação de plano e alimenta a UX "responda sua anamnese".
+- **Gate de anamnese:** lido do próprio `Anamnesis` (relação 1:1 com o vínculo),
+  que bloqueia a criação de plano e alimenta a UX "responda sua anamnese". **Sem
+  flag espelhada no `Bond`** — fonte única de verdade (ver D-093).
 - **Anamnese × Avaliação:** o esqueleto tem `Assessment` conflatando
   "anamnese / avaliação / medidas". D-094 separa a **anamnese** (gate, uma por
   vínculo, documento do prontuário) da **avaliação/medidas** (recorrente).
@@ -188,6 +195,11 @@ Entidades novas e alterações a modelar (detalhe apresentado ao responsável
 
 ## Alternativas consideradas
 
+- **Flag do gate espelhada no vínculo (`Bond.anamnesisCompletedAt`):** evitaria
+  um join na checagem do gate, mas cria uma segunda fonte de verdade que pode
+  divergir de `Anamnesis.answeredAt` — estado inválido representável, o mesmo
+  defeito que rejeitou a carga polimórfica (D-081). Rejeitado — o gate lê do
+  registro de anamnese (D-093).
 - **Nomear "chat" ou "suporte":** "chat" promete instantaneidade que o
   profissional não dá; "suporte" soa como bug do app. Rejeitado — "Atendimento"
   (D-096).

@@ -30,6 +30,38 @@ um passivo.
   exigiria **abrir o FITVO inteiro** ou comprar licença comercial. É armadilha
   para SaaS proprietário, e o custo aparece tarde demais para voltar atrás.
 
+#### Adendo — detecção de conflito: `EXCLUDE` no banco, e por que aqui vale
+
+O "Impacto de modelagem" (item 2) deixou em aberto: regra na aplicação **ou**
+exclusion constraint. **Decisão: `EXCLUDE USING gist` no banco.**
+
+**A checagem só na aplicação tem corrida (TOCTOU):** dois agendamentos simultâneos
+consultam "livre", ambos passam, ambos inserem. É o mesmo problema que o aceite de
+convite já resolve com constraint (D-055). Overbooking é **exatamente** o que este
+ADR existe para evitar — e ele nasceria de uma corrida, não de um bug de lógica.
+
+**Por que aqui vale e no ADR-0011 não valeu.** Lá, o trigger de autoria foi
+rejeitado porque **vê linhas, não sessões**: a pergunta era *"quem estava
+autenticado?"*. Aqui a pergunta é *"estes dois intervalos se sobrepõem?"* — **é
+puramente linhas**. Nenhuma sessão envolvida, e nenhuma política de negócio que
+evolua: sobreposição de horário do mesmo profissional é fato físico. **O argumento
+não transfere, e a conclusão oposta é a correta.**
+
+**Consequências aceitas:**
+
+1. **O `EXCLUDE` é INVISÍVEL ao drift check — nos dois sentidos.** Verificado: com a
+   constraint aplicada no banco e no shadow, o `migrate diff --exit-code` devolve
+   `0` ("No difference detected"). O Prisma ignora o que não modela. Isso é bom
+   (não quebra o job `migrate`, que é required check) **e ruim**: se alguém
+   derrubar a constraint, **o CI não percebe**. **Aceito** — a alternativa (TOCTOU
+   em agendamento) é pior.
+2. **A compensação é teste, não check:** um teste de integração **prova a
+   constraint** — dois agendamentos sobrepostos, o segundo **falha**. Se alguém
+   derrubar o `EXCLUDE`, **esse teste quebra**. É o que o drift check não faz, e é
+   por isso que ele é obrigatório, não opcional.
+3. Vive em **SQL cru** na migração (o Prisma não expressa `EXCLUDE`) e exige a
+   extensão **`btree_gist`**.
+
 ### D-107 — Sincronização com Google Calendar (3 peças, escopo delimitado)
 
 **Princípio:** o profissional precisa ter **um lugar só para olhar**. "Depende"
@@ -112,6 +144,69 @@ usuário (`Account.preferredTimezone`, já existente). **Crítico** para atendim
 remoto global — a modalidade `ONLINE` (D-101, ADR-0011) permite profissional e
 paciente em fusos diferentes, e um agendamento com fuso errado é uma consulta
 perdida.
+
+#### Adendo — INSTANTE × JANELA RECORRENTE são dois tipos de dado
+
+O texto acima diz "toda data/hora em UTC". Está **certo para instantes** e
+**insuficiente para janelas recorrentes** — e a diferença não é acadêmica.
+
+- **`Appointment` é um INSTANTE.** "Consulta em 12/03 às 14h" aponta para um ponto
+  único na linha do tempo. UTC no banco, convertido na exibição. O D-111 original
+  cobre isso.
+- **`AvailabilityRule` é uma JANELA RECORRENTE — hora de PAREDE.** "Atendo seg-sex,
+  9h–18h" **não é um instante**: é uma regra que se repete, ancorada no relógio da
+  parede do profissional.
+
+**Por que a distinção é obrigatória:** guardar a janela em UTC congela um offset.
+Quando o horário de verão entrar ou sair, o offset muda e a janela **desliza uma
+hora** — silenciosamente, duas vezes por ano. O sintoma não diz "fuso": diz *"sumiu
+meu horário das 18h"*, e ninguém liga uma coisa à outra.
+
+O Brasil aboliu o horário de verão em 2019, o que torna o bug **invisível aqui** —
+mas o D-111 se justifica pelo **atendimento remoto global**, e a modalidade
+`ONLINE` (D-101) coloca profissional e paciente em fusos diferentes. Um profissional
+em país com DST quebra.
+
+**Decisão:**
+
+- **`Appointment`** — `DateTime` em **UTC**, coluna **`timestamptz`**.
+- **`AvailabilityRule`** — **hora local do dia** (minutos a partir da meia-noite) +
+  **`timezone` IANA** do profissional. A expansão para instantes UTC acontece **na
+  consulta**, aplicando as regras de DST vigentes naquela data.
+- **`AvailabilityException`** (bloqueio pontual) — é **ocorrência concreta**, não
+  regra: **instante**, `timestamptz`.
+
+> **A regra geral:** *regra recorrente* guarda hora de parede + fuso; *ocorrência
+> concreta* guarda instante. Converter cedo demais — na escrita da regra — destrói
+> a informação de que aquilo era "9h no relógio dele".
+
+#### Adendo — `timestamptz`, não `timestamp`: a coluna deve saber o que guarda
+
+O Prisma mapeia `DateTime` para **`timestamp(3)` sem fuso** por padrão. Guardar UTC
+ali é **convenção por esperança**: funciona enquanto todo mundo lembrar.
+
+**Verificado empiricamente** — dois `INSERT` com ~1ms de diferença, mudando só o
+`TimeZone` da sessão:
+
+| Sessão | `TIMESTAMP(3)` | `TIMESTAMPTZ(3)` |
+|---|---|---|
+| `UTC` | `22:36:26.964` | `22:36:26+00` |
+| `America/Sao_Paulo` | **`19:36:26.965`** | `22:36:26+00` |
+
+`DEFAULT CURRENT_TIMESTAMP` numa coluna **sem** fuso grava a **hora local da
+sessão** — errado por 3 horas, **sem erro nenhum**. Com fuso, é imune.
+
+**Decisão: as tabelas da agenda usam `@db.Timestamptz(3)`.** O D-111 *decide* UTC;
+o `timestamptz` *faz a coluna saber disso*. Como são tabelas novas, **não há custo
+de migração**.
+
+> O `tsrange` resolveria o `EXCLUDE` (ver D-106) sem trocar o tipo — mas manteria o
+> campo **mentindo sobre o tipo do dado**. Rejeitado.
+
+**Dívida sinalizada, fora do escopo deste ADR:** as **54 tabelas existentes** usam
+`timestamp(3)`, com **56 colunas** em `DEFAULT CURRENT_TIMESTAMP` — expostas ao
+mesmo defeito. Hoje está correto **por circunstância** (o servidor está em UTC e o
+Prisma não muda o fuso da sessão), não por construção. Ver `docs/roadmap.md`.
 
 ## Impacto de modelagem
 

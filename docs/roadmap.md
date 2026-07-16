@@ -170,6 +170,19 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   consegue se mover atomicamente** — e client 7 com CLI 6 (ou o inverso) quebra.
   Não é má sorte: é a configuração garantindo o erro. Foi o que derrubou os PRs
   #5, #12, #32 e #33. Os dois têm que subir no mesmo commit.
+- **`timestamptz` nas 54 tabelas existentes** — o D-067/D-111 decidem "tudo em
+  UTC", mas o Prisma mapeia `DateTime` para **`timestamp(3)` sem fuso**: a coluna
+  guarda UTC **sem saber que é UTC**. Verificado: `DEFAULT CURRENT_TIMESTAMP` numa
+  coluna sem fuso grava a **hora local da sessão** — 3h de erro, silencioso. São
+  **56 colunas** com esse default. Hoje está correto **por circunstância** (o
+  servidor está em UTC; o Prisma não muda o fuso da sessão), não por construção; o
+  caminho do Prisma Client é seguro, a exposição é o default do banco e qualquer
+  SQL cru/psql/BI. **A janela para corrigir é agora, com o banco vazio:** a
+  conversão (`ALTER ... USING x AT TIME ZONE 'UTC'`) é instantânea e
+  **trivialmente correta** sem dados. Com dados, além do rewrite com lock, a
+  conversão passa a **apostar** que nenhuma sessão jamais escreveu em fuso local —
+  a certeza que existe hoje não volta. As tabelas novas da agenda já nascem
+  `@db.Timestamptz` (ADR-0012). **Decisão do responsável.**
 - **Agenda / Check-in**: não há ADR de detalhe — regra de negócio fina
   (janelas de disponibilidade, política de remarcação, frequência de
   check-in) precisa ser definida antes de implementar além do esqueleto.

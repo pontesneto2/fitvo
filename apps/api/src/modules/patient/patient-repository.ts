@@ -1,4 +1,4 @@
-import type { BondStatus, InviteStatus } from '@fitvo/database';
+import type { BondStatus, CareModality, InviteStatus } from '@fitvo/database';
 
 /** Projecao do convite profissional->paciente usada pela slice (D-006). */
 export interface PatientInviteRecord {
@@ -7,6 +7,8 @@ export interface PatientInviteRecord {
   professionalProfileId: string;
   specialtyId: string;
   email: string;
+  /** Modalidade do vinculo futuro, escolhida pelo profissional no convite (D-101). */
+  modality: CareModality;
   status: InviteStatus;
   /** Validade do convite (UTC — D-067). */
   expiresAt: Date;
@@ -24,6 +26,8 @@ export interface BondRecord {
   patientName: string;
   patientEmail: string;
   specialtyId: string;
+  /** Modalidade do atendimento (D-101). Herdada do convite; mutavel depois. */
+  modality: CareModality;
   status: BondStatus;
   createdAt: Date;
   /** Momento do arquivamento (UTC), null enquanto ativo (D-053). */
@@ -35,6 +39,8 @@ export interface CreatePatientInviteInput {
   professionalProfileId: string;
   specialtyId: string;
   email: string;
+  /** Modalidade do vinculo futuro (D-101) — propagada ao Bond no aceite. */
+  modality: CareModality;
   /** Hash do token de uso unico — o segredo em claro nunca chega ao repositorio. */
   tokenHash: string;
   expiresAt: Date;

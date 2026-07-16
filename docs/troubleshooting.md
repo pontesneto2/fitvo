@@ -163,7 +163,50 @@ docker exec fitvo-postgres psql -U fitvo -d fitvo -c 'DROP DATABASE verify;'
 > O shadow database precisa ser **outro banco**: o Prisma o usa como rascunho e
 > o reinicia.
 
-## 5. `prisma migrate reset` pede consentimento explícito
+## 5. Teste de guard (401/403) que passa a provar validação — e continua verde
+
+**Sintoma**
+
+Um teste afirma `401` (sem autenticação) ou `403` (sem permissão), continua
+**verde**, e não prova mais nada: ele passou a exercitar a **validação de
+schema**, não o guard.
+
+**Causa**
+
+No Fastify, a **validação do `schema` da rota roda ANTES do handler**. Se o
+`payload` do teste ficar inválido — tipicamente porque um campo **novo e
+obrigatório** foi adicionado ao body e o teste não foi atualizado —, a requisição
+morre em `400` antes de chegar ao guard.
+
+E o teste que espera `401` **quebra ruidosamente** (bom). O perigoso é o inverso:
+um teste que espera `400` para "campo faltando" continua verde **mesmo se o guard
+sumir**, porque a validação responde primeiro.
+
+**Regra**
+
+> **Teste de guard precisa de payload VÁLIDO.** O único campo que pode faltar num
+> teste de `401`/`403` é a credencial.
+
+Ao adicionar campo obrigatório num body, varra os testes daquela rota: os que
+mandam payload parcial mudam de significado sem mudar de cor.
+
+**Exemplo real** (D-101, modalidade obrigatória no convite):
+
+```ts
+const unauthorized = await app.inject({
+  method: 'POST',
+  url: `/v1/patients/${TENANT}/invites`,
+  // Body VALIDO de proposito: sem `modality` o schema rejeitaria com 400
+  // antes do guard, e o teste passaria a provar validacao em vez do 401.
+  payload: { email: 'p@fitvo.dev', specialtyId: SPECIALTY, modality: 'ONLINE' },
+});
+expect(unauthorized.statusCode).toBe(401);
+```
+
+> É o mesmo gênero de problema das seções 4 e da injeção de drift: **verde que
+> mente**. Um check só vale se você souber o que ele reprova.
+
+## 6. `prisma migrate reset` pede consentimento explícito
 
 **Sintoma**
 

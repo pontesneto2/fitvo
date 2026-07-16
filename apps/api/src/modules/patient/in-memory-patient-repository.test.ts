@@ -1,3 +1,4 @@
+import type { CareModality } from '@fitvo/database';
 import { describe, expect, it } from 'vitest';
 
 import { hashInviteToken } from '../clinic/invite-token';
@@ -27,12 +28,14 @@ function inviteFor(
   email: string,
   tokenHash: string,
   ttlMs = 60_000,
+  modality: CareModality = 'ONLINE',
 ): CreatePatientInviteInput {
   return {
     tenantId: TENANT,
     professionalProfileId,
     specialtyId: SPECIALTY,
     email,
+    modality,
     tokenHash,
     expiresAt: new Date(Date.now() + ttlMs),
   };

@@ -110,6 +110,16 @@ model Account {
   attendancesOpened   Attendance[] // atendimentos abertos por esta conta (D-096)
   attendanceMessages  AttendanceMessage[] // mensagens enviadas por esta conta (D-096)
 
+  // Autoria de secoes da anamnese (D-102 — ADR-0011). onDelete Restrict nas
+  // secoes: apagar a conta nao pode apagar a autoria de um documento clinico.
+  anamnesisParqAuthored             AnamnesisParq[]
+  anamnesisGoalAuthored             AnamnesisGoal[]
+  anamnesisClinicalHistoryAuthored  AnamnesisClinicalHistory[]
+  anamnesisFamilyHistoryAuthored    AnamnesisFamilyHistory[]
+  anamnesisLifestyleAuthored        AnamnesisLifestyle[]
+  anamnesisEmergencyContactAuthored AnamnesisEmergencyContact[]
+  anamnesisTrainingAuthored         AnamnesisTraining[]
+
   @@map("account")
 }
 
@@ -313,6 +323,10 @@ model PatientInvite {
   professionalProfileId String // profissional que convida (D-006)
   specialtyId           String // especialidade-alvo do vinculo futuro (D-052)
   email                 String // e-mail do paciente convidado
+  /// Modalidade do vinculo FUTURO (D-101 — ADR-0011). Vive aqui porque o
+  /// profissional a escolhe NO CONVITE e o vinculo nasce do aceite: sem carrega-la
+  /// aqui, nao haveria como o Bond nascer com ela. Propagada em acceptInvite.
+  modality              CareModality
   status                InviteStatus @default(PENDING)
   tokenHash             String       @unique // sha256 do token de uso unico (nunca em claro)
   expiresAt             DateTime // validade (7 dias por padrao, aplicado na aplicacao — D-055)
@@ -341,6 +355,12 @@ model Bond {
   patientProfileId      String
   professionalProfileId String
   specialtyId           String
+  /// Modalidade do atendimento (D-101 — ADR-0011). Nasce do convite e e MUTAVEL
+  /// (paciente muda de cidade e migra para online). Muda-la NAO invalida a
+  /// anamnese existente nem reabre o gate — so muda os fluxos dali pra frente.
+  /// NAO ha flag de gate espelhada aqui: o gate le do Anamnesis (fonte unica de
+  /// verdade — D-093), senao poderia divergir.
+  modality              CareModality
   status                BondStatus @default(ACTIVE)
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
@@ -642,14 +662,16 @@ model WebhookEvent {
 //   Prescription seguem com `detail Json?` + TODO(D-063) ate a decisao de produto
 //   com referencia propria (Dietbox). NAO inventar.
 //
-//   ANAMNESE — DECIDIDA (D-103, ADR-0011), TIPAGEM PENDENTE. A taxonomia existe
-//   (nucleo + modulo por especialidade + condicionais) e a autoria por secao
-//   (D-102) tambem: o `detail Json?` abaixo esta com os dias contados e sera
-//   substituido por colunas tipadas em PR proprio. Nao construir em cima dele.
+//   ANAMNESE — FECHADA E TIPADA (D-102/D-103, ADR-0011). O `detail Json?` morreu:
+//   nucleo + modulo TREINO em colunas tipadas, com AUTORIA POR SECAO. Os modulos
+//   de nutricao e nutrologia entram na fase de nutricao/medicina (nutrologia
+//   depende de exames laboratoriais — D-076 — que ainda nao existem).
 //
 //   AVALIACAO/MEDIDAS (Assessment) — ABERTO. O ADR-0011 fechou a ANAMNESE, nao a
-//   taxonomia de medidas, que segue deferida (D-063). Ambas estao FORA do escopo
-//   de sync offline, entao o Json nao conflita com o D-099.
+//   taxonomia de medidas, que segue deferida (D-063). E aqui mora a antropometria
+//   (adipometria/bioimpedancia): bloco visivel no FLUXO da anamnese, dado no
+//   Assessment. Segue FORA do escopo de sync offline, entao o Json nao conflita
+//   com o D-099.
 //
 // Modelos ligados a vinculo (Bond) carregam tenantId denormalizado para escopo
 // (D-002) e sao isolados POR VINCULO (ADR-0001). Bibliotecas (Exercise/Food) =
@@ -755,11 +777,41 @@ enum FormAnalysisReviewStatus {
 }
 
 /// Estado da anamnese de um vinculo (D-093/D-094 — ADR-0010). E o GATE: sem
-/// ANSWERED o profissional nao monta o plano e o aluno ve "responda sua
-/// anamnese" (nunca tela morta).
+/// ANSWERED o profissional nao monta o plano e o aluno ve o que falta fazer
+/// (nunca tela morta). O gate e satisfeito INDEPENDENTE de quem preencheu
+/// (D-102, ADR-0011) — inclusive quando a anamnese nasce do profissional na
+/// consulta presencial.
 enum AnamnesisStatus {
-  PENDING // gate fechado: aguardando o aluno responder
+  PENDING // gate fechado: anamnese ainda nao respondida
   ANSWERED // gate aberto: o profissional pode montar o plano
+}
+
+/// Modalidade de atendimento de um VINCULO (D-101 — ADR-0011). ESTRUTURANTE:
+/// define o fluxo da anamnese e a UX do gate (dizer "responda sua anamnese" a um
+/// paciente PRESENCIAL esta errado — o profissional preenche na consulta).
+///
+/// Definida pelo PROFISSIONAL (quem sabe como atende; o paciente nao escolhe a
+/// modalidade do servico que contrata), NO CONVITE — por isso PatientInvite
+/// tambem a carrega e propaga no aceite. E MUTAVEL: o paciente muda de cidade e
+/// migra para online; forcar vinculo novo quebraria o historico (D-053) sem
+/// ganho. Mudar NAO invalida a anamnese existente nem reabre o gate.
+enum CareModality {
+  ONLINE // paciente preenche a anamnese sozinho; pre-requisito do gate
+  PRESENCIAL // profissional preenche com o paciente na frente, na consulta
+  HIBRIDO // paciente preenche o que sabe; profissional refina no presencial
+}
+
+/// Autor de uma SECAO da anamnese (D-102 — ADR-0011). RASTREIO OBRIGATORIO: e
+/// documento de prontuario, e "o paciente DECLAROU X" tem peso juridico
+/// diferente de "o profissional AFERIU Y". Sem autoria o documento mistura
+/// declaracao com afericao e perde valor probatorio.
+///
+/// Granularidade POR SECAO, nao por campo: o peso juridico vive no bloco;
+/// ninguem vai a juizo discutir quem preencheu "dorme quantas horas". Por campo
+/// dobraria o schema ou exigiria tabela de auditoria — custo sem retorno.
+enum AnamnesisAuthor {
+  PATIENT // declarado pelo paciente
+  PROFESSIONAL // preenchido/aferido pelo profissional
 }
 
 /// Estado de um atendimento (D-096 — ADR-0010). Fica PENDING ate ser resolvido;
@@ -1284,34 +1336,389 @@ model Prescription {
 /// o aluno ve o que precisa fazer. A fonte da verdade do gate e ESTE registro —
 /// nao ha flag duplicada no Bond, que poderia divergir.
 ///
-/// CAMPOS: TAXONOMIA JA DECIDIDA — TIPAGEM EM PR SEGUINTE. O `detail Json?`
-/// abaixo e TEMPORARIO e nao deve ser usado como base para nada: o D-103
-/// (ADR-0011) fechou a taxonomia (nucleo comum + modulo por especialidade +
-/// perguntas condicionais) e o D-102 exige autoria POR SECAO, o que empurra a
-/// modelagem para blocos com autor + timestamp, nao para uma tabela larga. A
-/// substituicao por colunas tipadas sai em PR proprio (nao foi feita aqui para
-/// nao inflar um PR de area critica).
+/// CAMPOS TIPADOS (D-103, ADR-0011): o `detail Json?` MORREU. Esta entidade e o
+/// CONTAINER + o gate; o conteudo vive nas SECOES (nucleo + modulo por
+/// especialidade), cada uma com autoria propria (D-102). Secao ausente = linha
+/// ausente — nao ha campo nulo representando "nao perguntado".
 ///
-/// O ADR-0011 tambem REVISA o D-094: a anamnese pode ser preenchida pelo
-/// paciente, pelo profissional ou por AMBOS, e pode NASCER do profissional na
-/// consulta presencial (D-102) — o gate e satisfeito independente de quem
-/// preencheu. A modalidade do vinculo (D-101) e que define o fluxo.
+/// O ADR-0011 REVISA o D-094: a anamnese pode ser preenchida pelo paciente, pelo
+/// profissional ou por AMBOS, e pode NASCER do profissional na consulta
+/// presencial (D-102) — o gate e satisfeito independente de quem preencheu. A
+/// modalidade do vinculo (D-101) e que define o fluxo.
 model Anamnesis {
   id         String          @id @default(cuid())
   tenantId   String // escopo denormalizado (D-002)
   bondId     String          @unique // uma por vinculo (D-094); isolamento (ADR-0001)
   status     AnamnesisStatus @default(PENDING) // o GATE (D-093)
-  answeredAt DateTime? // quando o aluno respondeu (UTC)
-  detail     Json? // TEMPORARIO — TODO(D-103, ADR-0011): taxonomia ja decidida; tipar em PR proprio
+  answeredAt DateTime? // quando a anamnese foi dada por respondida (UTC)
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
 
+  // Secoes (D-103). Cada uma e OPCIONAL: secao ausente = linha ausente.
+  parq            AnamnesisParq?
+  goal            AnamnesisGoal?
+  clinicalHistory AnamnesisClinicalHistory?
+  familyHistory   AnamnesisFamilyHistory?
+  lifestyle       AnamnesisLifestyle?
+  emergencyContact AnamnesisEmergencyContact?
+  training        AnamnesisTraining?
+
   @@index([tenantId])
   @@index([status]) // alunos com gate aberto/fechado
   @@map("anamnesis")
+}
+
+// --- Secoes da anamnese (D-102/D-103 — ADR-0011) -----------------------------
+//
+// A SECAO E ENTIDADE, nao agrupamento visual — a autoria (D-102) e que decide a
+// forma. Cada secao carrega o proprio autor + timestamp, COLOCADOS COM O DADO:
+// e impossivel existir dado sem autor. Uma tabela de autoria separada deixaria o
+// estado invalido representavel (dado orfao de autor), o mesmo defeito que
+// rejeitou a flag de gate no Bond (D-093) e a carga polimorfica (D-081).
+//
+// TRES PROPRIEDADES QUE A FORMA COMPRA:
+// 1. Autoria colocada na secao -> dado sem autor e irrepresentavel.
+// 2. SECAO AUSENTE = LINHA AUSENTE -> resolve "nao respondido" != "respondido
+//    como nao" no nivel do BLOCO, sem coluna de controle.
+// 3. CONDICIONAL = boolean explicito + filhas -> resolve no nivel do CAMPO:
+//    `takesMedication: false` -> zero linhas de medicamento; `null` -> nao
+//    perguntado. Ninguem responde tudo (D-103): saudavel responde ~15 perguntas
+//    em ~3min, complexo responde 40 porque precisa.
+//
+// ESCOPO DESTE PR: nucleo + modulo TREINO. Os modulos de nutricao e nutrologia
+// vem depois — nutrologia depende de exames laboratoriais (D-076) que nao
+// existem, e nutricao pertence ao dominio do D-063 (aguarda Dietbox). O GATE
+// funciona para TODAS as especialidades so com o nucleo, entao nada trava.
+//
+// ANTROPOMETRIA NAO MORA AQUI (ADR-0011): adipometria/bioimpedancia sao bloco
+// VISIVEL NO FLUXO da anamnese, mas o DADO vive no Assessment — medida e
+// recorrente por natureza, e a "primeira medida" e so o primeiro Assessment. O
+// FLUXO da anamnese NAO e 1:1 com esta entidade: um passo do fluxo escreve em
+// outra tabela. Colocar campos de medida aqui criaria a mesma medida em dois
+// lugares, divergindo na segunda consulta.
+//
+// Textos das perguntas vivem no i18n (D-066), nunca no schema.
+// -----------------------------------------------------------------------------
+
+/// PAR-Q — Questionario de Prontidao para Atividade Fisica (D-103). Padrao
+/// internacional de triagem de risco, considerado obrigatorio antes de qualquer
+/// programa de treinamento. Instrumento FECHADO: 7 perguntas sim/nao, por isso
+/// 7 colunas nomeadas e nao uma lista generica — o conjunto nao varia, e cada
+/// item tem significado clinico proprio. O TEXTO de cada pergunta vive no i18n
+/// (D-066); aqui so a resposta.
+model AnamnesisParq {
+  id          String @id @default(cuid())
+  anamnesisId String @unique // 1:1 com a anamnese (a secao ou existe, ou nao)
+
+  /// 1. Algum medico ja disse que voce possui problema cardiaco e que so deveria
+  /// fazer atividade fisica supervisionado por profissional de saude?
+  heartCondition Boolean
+
+  /// 2. Voce sente dor no peito quando pratica atividade fisica?
+  chestPainDuringActivity Boolean
+
+  /// 3. No ultimo mes, voce sentiu dor no peito ao praticar atividade fisica?
+  chestPainAtRest Boolean
+
+  /// 4. Voce apresenta desequilibrio devido a tontura e/ou perda de consciencia?
+  dizzinessOrFainting Boolean
+
+  /// 5. Voce possui algum problema osseo ou articular que poderia piorar com a
+  /// pratica de atividade fisica?
+  boneOrJointProblem Boolean
+
+  /// 6. Voce toma atualmente algum medicamento para pressao arterial ou problema
+  /// cardiaco?
+  bloodPressureOrHeartMedication Boolean
+
+  /// 7. Sabe de alguma outra razao pela qual nao deveria praticar atividade
+  /// fisica?
+  otherReason       Boolean
+  otherReasonDetail String? // condicional do item 7: so quando `otherReason`
+
+  // Autoria da secao (D-102)
+  authoredBy          AnamnesisAuthor
+  authoredByAccountId String
+  authoredAt          DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+
+  @@map("anamnesis_parq")
+}
+
+/// Objetivo e expectativa (D-103). Texto livre de proposito: nenhum ADR decidiu
+/// uma taxonomia de objetivos (emagrecimento/hipertrofia/...), e inventa-la aqui
+/// seria criar regra de negocio. Espelha WorkoutPlan.goal (D-095).
+model AnamnesisGoal {
+  id          String @id @default(cuid())
+  anamnesisId String @unique
+
+  goal        String // o que o paciente quer alcancar
+  expectation String? // o que ele espera do processo/profissional
+
+  authoredBy          AnamnesisAuthor
+  authoredByAccountId String
+  authoredAt          DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+
+  @@map("anamnesis_goal")
+}
+
+/// Historico clinico (D-103): doencas, cirurgias, medicamentos, alergias. Cada
+/// um e CONDICIONAL — boolean explicito + filhas. `false` = respondeu que nao
+/// tem; `null` (linha da secao ausente) = nao foi perguntado.
+model AnamnesisClinicalHistory {
+  id          String @id @default(cuid())
+  anamnesisId String @unique
+
+  hasConditions   Boolean // -> AnamnesisCondition[]
+  hasSurgeries    Boolean // -> AnamnesisSurgery[]
+  takesMedication Boolean // -> AnamnesisMedication[]
+  hasAllergies    Boolean // -> AnamnesisAllergy[]
+
+  authoredBy          AnamnesisAuthor
+  authoredByAccountId String
+  authoredAt          DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+
+  conditions  AnamnesisCondition[]
+  surgeries   AnamnesisSurgery[]
+  medications AnamnesisMedication[]
+  allergies   AnamnesisAllergy[]
+
+  @@map("anamnesis_clinical_history")
+}
+
+/// Doenca declarada. Lista, nunca texto corrido — o dado precisa ser consultavel.
+model AnamnesisCondition {
+  id                String   @id @default(cuid())
+  clinicalHistoryId String
+  name              String
+  note              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  clinicalHistory AnamnesisClinicalHistory @relation(fields: [clinicalHistoryId], references: [id], onDelete: Cascade)
+
+  @@index([clinicalHistoryId])
+  @@map("anamnesis_condition")
+}
+
+/// Cirurgia declarada. `year` em vez de data completa: o paciente raramente
+/// lembra o dia, e exigir precisao inexistente produz dado falso.
+model AnamnesisSurgery {
+  id                String   @id @default(cuid())
+  clinicalHistoryId String
+  name              String
+  year              Int?
+  note              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  clinicalHistory AnamnesisClinicalHistory @relation(fields: [clinicalHistoryId], references: [id], onDelete: Cascade)
+
+  @@index([clinicalHistoryId])
+  @@map("anamnesis_surgery")
+}
+
+/// Medicamento declarado. `posology` e OPCIONAL de proposito e e o exemplo
+/// canonico do D-102: no HIBRIDO o paciente declara "remedio pra pressao"
+/// (posologia nula) e o PROFISSIONAL refina para "Losartana 50mg 1x/dia" — a
+/// autoria da secao registra quem disse o que.
+model AnamnesisMedication {
+  id                String   @id @default(cuid())
+  clinicalHistoryId String
+  name              String
+  posology          String? // preenchido/refinado pelo profissional (D-102)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  clinicalHistory AnamnesisClinicalHistory @relation(fields: [clinicalHistoryId], references: [id], onDelete: Cascade)
+
+  @@index([clinicalHistoryId])
+  @@map("anamnesis_medication")
+}
+
+/// Alergia declarada (D-103, nucleo). Distinta de intolerancia alimentar, que e
+/// do modulo de nutricao (fase seguinte).
+model AnamnesisAllergy {
+  id                String   @id @default(cuid())
+  clinicalHistoryId String
+  name              String
+  reaction          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  clinicalHistory AnamnesisClinicalHistory @relation(fields: [clinicalHistoryId], references: [id], onDelete: Cascade)
+
+  @@index([clinicalHistoryId])
+  @@map("anamnesis_allergy")
+}
+
+/// Antecedentes familiares (D-103). Condicional: `hasFamilyHistory` + filhas.
+model AnamnesisFamilyHistory {
+  id          String @id @default(cuid())
+  anamnesisId String @unique
+
+  hasFamilyHistory Boolean
+
+  authoredBy          AnamnesisAuthor
+  authoredByAccountId String
+  authoredAt          DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+
+  conditions AnamnesisFamilyCondition[]
+
+  @@map("anamnesis_family_history")
+}
+
+/// Antecedente familiar: qual condicao, em quem. `relationship` livre (mae, pai,
+/// irmao) — nenhum ADR decidiu um enum de parentesco.
+model AnamnesisFamilyCondition {
+  id              String   @id @default(cuid())
+  familyHistoryId String
+  name            String
+  relationship    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  familyHistory AnamnesisFamilyHistory @relation(fields: [familyHistoryId], references: [id], onDelete: Cascade)
+
+  @@index([familyHistoryId])
+  @@map("anamnesis_family_condition")
+}
+
+/// Estilo de vida (D-103): sono, estresse, fumo, alcool. Fumo e alcool sao
+/// condicionais (boolean + detalhe). A FAIXA de `stressLevel` e validada no Zod
+/// (a "escala visual" do D-103 e UX): o banco guarda o inteiro, nao a regra.
+model AnamnesisLifestyle {
+  id          String @id @default(cuid())
+  anamnesisId String @unique
+
+  sleepHoursPerNight Int? // horas por noite
+  stressLevel        Int? // escala (faixa validada na aplicacao — UX do D-103)
+
+  smokes       Boolean
+  smokingNote  String? // condicional: so quando `smokes`
+  drinksAlcohol Boolean
+  alcoholNote  String? // condicional: so quando `drinksAlcohol`
+
+  authoredBy          AnamnesisAuthor
+  authoredByAccountId String
+  authoredAt          DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+
+  @@map("anamnesis_lifestyle")
+}
+
+/// Contato de emergencia (D-103). Nao vem do cadastro: e dado do contexto de
+/// atendimento, nao da identidade da conta.
+model AnamnesisEmergencyContact {
+  id          String @id @default(cuid())
+  anamnesisId String @unique
+
+  name         String
+  phone        String
+  relationship String?
+
+  authoredBy          AnamnesisAuthor
+  authoredByAccountId String
+  authoredAt          DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+
+  @@map("anamnesis_emergency_contact")
+}
+
+/// MODULO TREINO (D-103) — so em vinculos de TRAINING. Soma-se ao nucleo.
+///
+/// Fundamento juridico (ADR-0011): o profissional de educacao fisica responde
+/// por tudo que ocorrer em decorrencia dos exercicios prescritos — a
+/// documentacao e o respaldo dele. Nao e burocracia, e defesa.
+model AnamnesisTraining {
+  id          String @id @default(cuid())
+  anamnesisId String @unique
+
+  hasPreviousExperience Boolean
+  previousExperience    String? // condicional: so quando `hasPreviousExperience`
+
+  availableDaysPerWeek Int? // disponibilidade (D-103)
+  preferredTime        String? // horario preferido (texto livre — sem taxonomia decidida)
+
+  hasInjury Boolean // -> AnamnesisInjury[] (dor/lesao musculoesqueletica "detalhada")
+
+  usesAnabolicSteroids Boolean
+  anabolicSteroidsNote String? // condicional: so quando `usesAnabolicSteroids`
+
+  preferences String? // preferencias e aversoes (D-103)
+  aversions   String?
+
+  authoredBy          AnamnesisAuthor
+  authoredByAccountId String
+  authoredAt          DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  anamnesis Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
+  authoredByAccount Account @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
+
+  injuries AnamnesisInjury[]
+
+  @@map("anamnesis_training")
+}
+
+/// Dor/lesao musculoesqueletica — o D-103 pede "detalhada", entao e lista com
+/// regiao + descricao, nao um campo de texto solto.
+model AnamnesisInjury {
+  id         String   @id @default(cuid())
+  trainingId String
+
+  bodyRegion  String
+  description String
+  /// Desde quando (aproximado). Ver AnamnesisSurgery.year: exigir data exata de
+  /// memoria produz dado falso.
+  sinceYear   Int?
+  isCurrent   Boolean @default(false) // dor ativa x historico
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  training AnamnesisTraining @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+
+  @@index([trainingId])
+  @@map("anamnesis_injury")
 }
 
 /// Avaliacao / medidas recorrentes, atada a um VINCULO (Bond) e ISOLADA POR

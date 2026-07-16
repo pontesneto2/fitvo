@@ -19,11 +19,18 @@ export const bondParamsSchema = z.object({
 
 /**
  * Corpo do convite profissional->paciente (D-006): e-mail do paciente + a
- * especialidade-alvo do futuro vinculo (D-052). Um convite = uma especialidade.
+ * especialidade-alvo do futuro vinculo (D-052) + a MODALIDADE do atendimento
+ * (D-101). Um convite = uma especialidade.
+ *
+ * A modalidade e obrigatoria e vem do PROFISSIONAL: e ele quem sabe como atende,
+ * o paciente nao escolhe a modalidade do servico que contrata (D-101). Sem
+ * default — nenhum ADR elegeu uma modalidade padrao, e adivinhar aqui seria
+ * inventar regra de negocio.
  */
 export const createInviteSchema = z.object({
   email: z.string().email(),
   specialtyId: z.string().min(1),
+  modality: z.enum(['ONLINE', 'PRESENCIAL', 'HIBRIDO']),
 });
 
 /**

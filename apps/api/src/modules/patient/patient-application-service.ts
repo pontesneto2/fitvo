@@ -1,5 +1,5 @@
 import type { PasswordHasher } from '@fitvo/auth';
-import type { BondStatus, InviteStatus } from '@fitvo/database';
+import type { BondStatus, CareModality, InviteStatus } from '@fitvo/database';
 import { BOND_CREATED_EVENT, type BondCreatedEvent, type Queue } from '@fitvo/queue';
 
 import type { AccessTokenVerifier } from '../../shared/auth-context';
@@ -19,6 +19,7 @@ export interface PatientInviteView {
   id: string;
   email: string;
   specialtyId: string;
+  modality: CareModality;
   status: InviteStatus;
   expiresAt: string;
   createdAt: string;
@@ -31,6 +32,7 @@ export interface BondView {
   patientName: string;
   patientEmail: string;
   specialtyId: string;
+  modality: CareModality;
   status: BondStatus;
   createdAt: string;
   archivedAt: string | null;
@@ -70,6 +72,7 @@ function toInviteView(invite: PatientInviteRecord): PatientInviteView {
     id: invite.id,
     email: invite.email,
     specialtyId: invite.specialtyId,
+    modality: invite.modality,
     status: invite.status,
     expiresAt: invite.expiresAt.toISOString(),
     createdAt: invite.createdAt.toISOString(),
@@ -83,6 +86,7 @@ function toBondView(bond: BondRecord): BondView {
     patientName: bond.patientName,
     patientEmail: bond.patientEmail,
     specialtyId: bond.specialtyId,
+    modality: bond.modality,
     status: bond.status,
     createdAt: bond.createdAt.toISOString(),
     archivedAt: bond.archivedAt ? bond.archivedAt.toISOString() : null,
@@ -114,11 +118,15 @@ export class PatientApplicationService {
     private readonly bondEvents: Queue<BondCreatedEvent>,
   ) {}
 
-  /** Profissional convida um paciente para UMA especialidade. Devolve o token 1x. */
+  /**
+   * Profissional convida um paciente para UMA especialidade, declarando a
+   * MODALIDADE do atendimento (D-101). Devolve o token 1x. A modalidade viaja no
+   * convite porque o vinculo nasce do aceite — e nao ha vinculo sem ela.
+   */
   async createInvite(
     authorization: string | undefined,
     tenantId: string,
-    input: { email: string; specialtyId: string },
+    input: { email: string; specialtyId: string; modality: CareModality },
   ): Promise<CreatePatientInviteResult> {
     const { professionalProfileId } = await this.requireProfessionalOwningSpecialty(
       authorization,
@@ -141,6 +149,7 @@ export class PatientApplicationService {
       professionalProfileId,
       specialtyId: input.specialtyId,
       email: input.email,
+      modality: input.modality,
       tokenHash: hashInviteToken(token),
       expiresAt,
     });

@@ -54,3 +54,19 @@ limpo; a CSS var canônica (`--text-*`, `--surface-*`, `--border-*`) permanece:
 | `--tooltip-surface` | `bg-tooltip` / `--tooltip-text` → `text-tooltip-fg` |
 
 As rampas primitivas mantêm o nome (`bg-brand-500`, `text-danger-600`…).
+
+## Compatibilidade — travas de versão (consumidores)
+
+Quem consome este pacote (o preset + os componentes) herda duas travas, até a
+migração de major:
+
+- **Tailwind v3.** O `fitvoTailwindPreset` usa o formato v3 (`presets: []`,
+  `theme.extend`, `darkMode: 'class'`). O Tailwind v4 (config CSS-first) exige
+  adaptação — não adotar sem migrar o preset.
+- **React 18.** `peerDependencies.react` é `>=18` e os tipos/dev são `^18.3`. Um app
+  consumidor (ex.: `apps/web-personal`) fica em **React 18**, sobre **Next 15** — cujo
+  peer aceita `^18.2.0 || ^19` e **não exige React 19**. (Next 14 ficou fora: tem
+  vulnerabilidades High sem correção na linha 14.x — só em 15+; ver troubleshooting.)
+  A migração para React 19 (dívida do roadmap — *"não é bump, é migração"*: `ref` vira
+  prop) atravessa este pacote, mas é **separada** da versão do Next; quando for feita,
+  os apps sobem junto.

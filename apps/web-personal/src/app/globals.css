@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* As CSS vars semanticas (:root / .dark) vem do buildThemeCss(), injetado no
+   layout raiz. Aqui so a base tematizada da pagina. */
+@layer base {
+  body {
+    @apply bg-surface font-body text-fg antialiased;
+  }
+}

@@ -656,13 +656,48 @@ schema — não por acaso, e não deve ser o último tratado por reflexo como in
 
 ---
 
+## 15. Redis fora do ar: a API **sobe**, mas o login quebra
+
+O `docker compose` sobe Postgres **e** Redis. É fácil subir só o Postgres (ou o
+container do Redis parar) e não perceber: a API **não** falha no boot por causa
+disso — ela escuta na 3333 como se estivesse tudo certo.
+
+**Sintoma**
+
+- `pnpm --filter @fitvo/api dev` sobe normalmente, `/docs` responde e rotas sem
+  sessão (ex.: `register/professional`) funcionam.
+- Mas `POST /v1/auth/login` e `POST /v1/auth/refresh` **quebram** (erro/timeout),
+  e o log da API mostra o `ioredis` tentando reconectar
+  (`ECONNREFUSED 127.0.0.1:6379`).
+- A leitura enganosa é _"a API subiu, então o ambiente está de pé — o login é que
+  está bugado"_. Não está: falta o Redis.
+
+**Causa**
+
+Redis **não é cache opcional aqui — é onde a sessão vive.** O refresh token e a
+revogação de sessão são persistidos no Redis (`RedisRefreshTokenStore` /
+`RedisVerificationTokenStore`, ADR-0002/D-029). No login, o `startSession` grava
+o refresh token no Redis; sem Redis, a gravação falha e a operação inteira cai. A
+API sobe assim mesmo porque o `ioredis` conecta de forma preguiçosa e fica em
+retry — a conexão só é **exigida** quando uma rota de auth a usa.
+
+**Resolver**
+
+```bash
+docker compose -f docker/docker-compose.yml ps           # redis deve estar "healthy"
+docker compose -f docker/docker-compose.yml up -d redis  # se faltou / caiu
+redis-cli -p 6379 ping                                    # PONG
+```
+
+---
+
 # Integrações externas
 
 Armadilhas que não são do ambiente local, mas do **gateway/serviço de terceiros**.
 Mordem na implementação, não no setup: o comportamento do provider não é o que a
 intuição supõe, e o código escrito sobre a suposição fica errado em silêncio.
 
-## 15. Asaas / split: a taxa incide sobre o `netValue`, e o estorno reverte tudo
+## 16. Asaas / split: a taxa incide sobre o `netValue`, e o estorno reverte tudo
 
 **Sintoma**
 

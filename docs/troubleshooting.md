@@ -389,7 +389,66 @@ sobrevivente. O acaso foi o backup.
 > avisaria; a 9 age sobre um alvo que não é o que você pensou. Nos três, a
 > ferramenta obedeceu com precisão — a uma pergunta que não era a sua.
 
-## 10. Rodar o comando DA FERRAMENTA em vez do comando DO PROJETO
+## 10. `timestamp` → `timestamptz`: o Prisma gera o `ALTER` SEM `USING`, e isso corrompe dado
+
+**Sintoma**
+
+Você troca `DateTime` para `@db.Timestamptz(3)`, gera a migração, o CI fica verde,
+a migração aplica sem erro — e **os horários de quem tinha dados andam algumas
+horas**. Ninguém vê nada quebrar: só os valores estão errados.
+
+**Causa**
+
+O Prisma emite:
+
+```sql
+ALTER TABLE "x" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);
+```
+
+**Sem `USING`.** E sem `USING`, o Postgres interpreta o valor existente como
+**hora local da SESSÃO** — não como UTC. Se a sessão que roda a migração não
+estiver em UTC, todo o histórico desloca.
+
+**Verificado** — mesmo valor gravado como `14:00 UTC`, migrado com a sessão em
+`America/Sao_Paulo`:
+
+| Conversão | Resultado |
+|---|---|
+| `SET DATA TYPE TIMESTAMPTZ(3)` (o que o Prisma gera) | **`17:00 UTC`** — 3h de corrupção |
+| `... USING "createdAt" AT TIME ZONE 'UTC'` | **`14:00 UTC`** |
+
+**Regra**
+
+> **Toda** conversão de `timestamp` para `timestamptz` precisa de
+> **`USING "coluna" AT TIME ZONE 'UTC'`** — explícito, em cada coluna. O Prisma não
+> o gera; edite a migração à mão.
+
+```sql
+ALTER TABLE "x"
+  ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3)
+  USING "createdAt" AT TIME ZONE 'UTC';
+```
+
+**O princípio, que vale além deste caso**
+
+O `USING` faz duas coisas, e a segunda importa mais:
+
+1. Torna a conversão **independente da sessão**.
+2. **DECLARA a premissa em vez de assumi-la:** *"o que está gravado aqui É UTC"*.
+
+Sem ele, a migração está correta **por circunstância** — porque o servidor está em
+UTC, porque o banco está vazio, porque ninguém rodou `SET TimeZone`. Nada disso
+está escrito em lugar nenhum, e nada avisa quando deixa de valer.
+
+> **Migração que funciona por circunstância é a mesma classe de defeito que o verde
+> que mente** (seções 4/5/6). Nos dois casos algo passa, e nos dois casos o que
+> passou não é o que você acha que foi verificado. A diferença é só que aqui o
+> preço é dado corrompido em vez de bug não detectado.
+>
+> Quando uma condição é necessária para a correção, **escreva-a no código**. Se ela
+> só existe na sua cabeça — ou no fuso do servidor —, ela não existe.
+
+## 11. Rodar o comando DA FERRAMENTA em vez do comando DO PROJETO
 
 **Sintoma**
 
@@ -442,7 +501,7 @@ CI — dava **verde**. Eu estava errado, não a `main`.
 > Um check só vale quando você sabe **o que ele reprova**. Se não sabe, a cor dele
 > é decoração.
 
-## 11. `prisma migrate reset` pede consentimento explícito
+## 12. `prisma migrate reset` pede consentimento explícito
 
 **Sintoma**
 

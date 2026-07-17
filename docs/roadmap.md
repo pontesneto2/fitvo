@@ -170,7 +170,25 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   consegue se mover atomicamente** — e client 7 com CLI 6 (ou o inverso) quebra.
   Não é má sorte: é a configuração garantindo o erro. Foi o que derrubou os PRs
   #5, #12, #32 e #33. Os dois têm que subir no mesmo commit.
-- **`timestamptz` nas 54 tabelas existentes** — o D-067/D-111 decidem "tudo em
+- **React 19 + react-native 0.86** — **não é bump, é migração.** O Dependabot os
+  ofereceu num grupo de 11 pacotes (PR #38, fechado): `typecheck` e `test`
+  vermelhos. O React 19 muda tipos (`ref` como prop, `children` implícito removido)
+  e atravessa `ui-web` + `ui-mobile`; o RN 0.86 é salto grande. **PR próprio,
+  planejado, com verificação** — e provavelmente um para cada, não os dois juntos.
+- **`lucide-react` / `lucide-react-native` 0.469 → 1.24 (major)** — o Lucide entrou
+  no #20 e o Dependabot já ofereceu o major na sequência (PR #39, fechado). Subir
+  major de dependência recém-adotada, junto de patches, é pedir problema. Tarefa
+  própria, sem pressa: o 0.469 funciona.
+- **Testes de integração do Redis não rodam em lugar nenhum** —
+  `packages/cache/src/redis-cache-store.integration.test.ts` **se auto-pula** sem
+  `REDIS_URL` e aparece no CI como `4 tests | 4 skipped`. É **verde que mente em
+  forma de teste pulado**: existe, parece coberto, e nunca exercita nada. Unificar
+  com a convenção do harness (`test:integration` + serviço no CI): **falhar, não
+  pular** — se a infra não subir, o job quebra. Ver `.github/workflows/ci.yml`, job
+  `migrate`, e `packages/database/src/*.integration.test.ts`.
+- **`timestamptz` nas 54 tabelas existentes** — **APROVADO; PR #44 aberto,
+  aguardando revisão. Mover para FEITO quando mergear.** O contexto a seguir fica
+  registrado porque é o que fundamenta a decisão: o D-067/D-111 decidem "tudo em
   UTC", mas o Prisma mapeia `DateTime` para **`timestamp(3)` sem fuso**: a coluna
   guarda UTC **sem saber que é UTC**. Verificado: `DEFAULT CURRENT_TIMESTAMP` numa
   coluna sem fuso grava a **hora local da sessão** — 3h de erro, silencioso. São

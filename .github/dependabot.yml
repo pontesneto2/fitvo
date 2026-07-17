@@ -33,11 +33,28 @@ updates:
       # docs/ui-primitives.md (§17). Destravar junto com o app mobile.
       - dependency-name: 'victory-native'
         update-types: ['version-update:semver-major']
+    # AGRUPA SO patch/minor. O major fica DE FORA do grupo e vira PR PROPRIO.
+    #
+    # O `ignore` acima resolve as versoes travadas, mas nao o defeito do
+    # agrupamento: um major arriscado reprova o GRUPO INTEIRO e leva junto patches
+    # que passariam sozinhos. Aconteceu duas vezes na mesma semana — o #38 (React
+    # 19 + RN 0.86 + jest 30) e o #39 (lucide major) derrubaram `bullmq` 5.80.4 ->
+    # 5.80.5 e `@aws-sdk` patch, que nao tinham nada a ver.
+    #
+    # Com isto: patch/minor chegam juntos e verdes (baixo risco, merge rapido), e
+    # cada major chega sozinho — que e o tratamento que um major merece. React 19
+    # nao e um bump: e migracao, e precisa de PR proprio, planejado e verificado.
+    #
+    # Efeito colateral aceito: majors represados viram varios PRs de uma vez
+    # (`open-pull-requests-limit: 10`). E ruido VISIVEL e acionavel, ao contrario
+    # do grupo vermelho recorrente, que era ruido que escondia o que estava bom.
     groups:
       dev-dependencies:
         dependency-type: development
+        update-types: ['minor', 'patch']
       prod-dependencies:
         dependency-type: production
+        update-types: ['minor', 'patch']
   - package-ecosystem: github-actions
     directory: /
     schedule:

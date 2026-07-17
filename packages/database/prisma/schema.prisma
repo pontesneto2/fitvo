@@ -96,11 +96,11 @@ model Account {
   name              String
   document          String // CPF ou CNPJ da PESSOA (D-043)
   documentType      DocumentType
-  emailVerifiedAt   DateTime?
+  emailVerifiedAt   DateTime?    @db.Timestamptz(3)
   preferredLocale   String       @default("pt-BR") // i18n (D-066)
   preferredTimezone String       @default("America/Sao_Paulo") // exibicao (D-067)
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  createdAt         DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @db.Timestamptz(3)
 
   professionalProfile ProfessionalProfile?
   patientProfile      PatientProfile?
@@ -127,7 +127,7 @@ model Account {
 model PlatformAdmin {
   id        String   @id @default(cuid())
   accountId String   @unique
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -146,8 +146,8 @@ model Tenant {
   name         String
   document     String? // CNPJ da CLINICA mora aqui (D-043); solo herda o da conta
   documentType DocumentType?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
 
   professionals   ProfessionalProfile[]
   memberships     ClinicMembership[]
@@ -181,7 +181,7 @@ model ClinicMembership {
   accountId String
   tenantId  String
   role      ClinicRole @default(CLINIC_ADMIN)
-  createdAt DateTime   @default(now())
+  createdAt DateTime   @default(now()) @db.Timestamptz(3)
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -202,8 +202,8 @@ model ProfessionalProfile {
   accountId   String   @unique
   tenantId    String
   displayName String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   account                Account                     @relation(fields: [accountId], references: [id], onDelete: Cascade)
   tenant                 Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
@@ -248,8 +248,8 @@ model ProfessionalSpecialty {
   specialtyId           String
   verificationStatus    VerificationStatus @default(PENDING)
   councilDocument       String? // registro no conselho (CREF/CRN/CRM)
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  createdAt             DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime           @updatedAt @db.Timestamptz(3)
 
   professionalProfile ProfessionalProfile   @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
   specialty           Specialty             @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
@@ -269,9 +269,9 @@ model PatientProfile {
   /// revisa os dados; a varredura e de worker e usa este campo como base. Nulo =
   /// nunca revisado desde o cadastro. O "objetivo mudou?" a cada plano novo vive
   /// em WorkoutPlan.goal, no momento natural da montagem.
-  lastCadastralReviewAt DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  lastCadastralReviewAt DateTime? @db.Timestamptz(3)
+  createdAt             DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime  @updatedAt @db.Timestamptz(3)
 
   account            Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
   bonds              Bond[]
@@ -299,9 +299,9 @@ model ProfessionalInvite {
   email     String // e-mail do profissional convidado
   status    InviteStatus @default(PENDING)
   tokenHash String       @unique // sha256 do token de uso unico (nunca em claro)
-  expiresAt DateTime // validade (default de 7 dias aplicado na camada de aplicacao)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  expiresAt DateTime     @db.Timestamptz(3) // validade (default de 7 dias aplicado na camada de aplicacao)
+  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -334,9 +334,9 @@ model PatientInvite {
   modality              CareModality
   status                InviteStatus @default(PENDING)
   tokenHash             String       @unique // sha256 do token de uso unico (nunca em claro)
-  expiresAt             DateTime // validade (7 dias por padrao, aplicado na aplicacao — D-055)
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
+  expiresAt             DateTime     @db.Timestamptz(3) // validade (7 dias por padrao, aplicado na aplicacao — D-055)
+  createdAt             DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime     @updatedAt @db.Timestamptz(3)
 
   tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   professionalProfile ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
@@ -367,9 +367,9 @@ model Bond {
   /// verdade — D-093), senao poderia divergir.
   modality              CareModality
   status                BondStatus   @default(ACTIVE)
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
-  archivedAt            DateTime? // momento do encerramento (UTC), null enquanto ativo (D-053)
+  createdAt             DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime     @updatedAt @db.Timestamptz(3)
+  archivedAt            DateTime?    @db.Timestamptz(3) // momento do encerramento (UTC), null enquanto ativo (D-053)
 
   tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   patientProfile      PatientProfile      @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
@@ -429,10 +429,10 @@ model Consent {
   granteeProfessionalProfileId String // profissional que RECEBE o acesso
   specialtyId                  String // escopo do que pode ser compartilhado (granular por especialidade)
   status                       ConsentStatus @default(ACTIVE)
-  grantedAt                    DateTime      @default(now())
-  revokedAt                    DateTime? // preenchido na revogacao (UTC), null enquanto ACTIVE
-  createdAt                    DateTime      @default(now())
-  updatedAt                    DateTime      @updatedAt
+  grantedAt                    DateTime      @default(now()) @db.Timestamptz(3)
+  revokedAt                    DateTime?     @db.Timestamptz(3) // preenchido na revogacao (UTC), null enquanto ACTIVE
+  createdAt                    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt                    DateTime      @updatedAt @db.Timestamptz(3)
 
   patientProfile      PatientProfile      @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
   granteeProfessional ProfessionalProfile @relation(fields: [granteeProfessionalProfileId], references: [id], onDelete: Cascade)
@@ -466,8 +466,8 @@ model SharingSuggestion {
   professionalBId  String
   specialtyId      String // especialidade do vinculo que disparou a sugestao
   status           SuggestionStatus @default(PENDING)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt        DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @db.Timestamptz(3)
 
   patientProfile PatientProfile      @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
   professionalA  ProfessionalProfile @relation("SuggestionProfessionalA", fields: [professionalAId], references: [id], onDelete: Cascade)
@@ -541,8 +541,8 @@ model Plan {
   name      String
   tier      String // faixa comercial (ex.: intern/solo/clinic) — texto livre nesta fase
   active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   prices        PlanPrice[]
   subscriptions Subscription[]
@@ -558,8 +558,8 @@ model PlanPrice {
   planId      String
   periodicity Periodicity
   amountCents Int // centavos inteiros (D-069)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @db.Timestamptz(3)
 
   plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
@@ -579,8 +579,8 @@ model PaymentAccount {
   asaasWalletId    String? // preenchido no onboarding LIVE (GATED)
   feeBasisPoints   Int              @default(0) // taxa FITVO em basis points (config comercial — GATED)
   onboardingStatus OnboardingStatus @default(PENDING)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt        DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @db.Timestamptz(3)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -600,10 +600,10 @@ model Subscription {
   status              SubscriptionStatus @default(TRIALING)
   asaasSubscriptionId String? // preenchido pelo gateway LIVE (GATED)
   idempotencyKey      String             @unique // idempotencia financeira (D-035)
-  currentPeriodEnd    DateTime? // vencimento do periodo atual (base da regua)
-  trialEndsAt         DateTime? // fim do trial de 7 dias (D-062)
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  currentPeriodEnd    DateTime?          @db.Timestamptz(3) // vencimento do periodo atual (base da regua)
+  trialEndsAt         DateTime?          @db.Timestamptz(3) // fim do trial de 7 dias (D-062)
+  createdAt           DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime           @updatedAt @db.Timestamptz(3)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
@@ -634,9 +634,9 @@ model Charge {
   professionalWalletId String? // subconta destino do split (nulo ate onboarding — GATED)
   platformFeeCents     Int          @default(0) // taxa FITVO retida, capturada como dado (D-061)
   description          String?
-  dueDate              DateTime?
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
+  dueDate              DateTime?    @db.Timestamptz(3)
+  createdAt            DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime     @updatedAt @db.Timestamptz(3)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -654,8 +654,8 @@ model WebhookEvent {
   asaasEventId String   @unique // id do evento no Asaas (chave de dedupe)
   type         String // tipo do evento (ex.: PAYMENT_RECEIVED)
   payload      Json // payload cru para auditoria
-  processedAt  DateTime @default(now())
-  createdAt    DateTime @default(now())
+  processedAt  DateTime @default(now()) @db.Timestamptz(3)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
 
   @@map("webhook_event")
 }
@@ -872,8 +872,8 @@ model Exercise {
   videoStorageKey            String? // video demonstrativo: chave S3 (D-091; padrao de ProgressPhoto)
   visibility                 LibraryVisibility @default(PRIVATE) // itens do profissional privados por padrao
   status                     LibraryItemStatus @default(ACTIVE) // delecao logica (D-089)
-  createdAt                  DateTime          @default(now())
-  updatedAt                  DateTime          @updatedAt
+  createdAt                  DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt                  DateTime          @updatedAt @db.Timestamptz(3)
 
   ownerProfessionalProfile ProfessionalProfile? @relation(fields: [ownerProfessionalProfileId], references: [id], onDelete: Cascade)
   specialty                Specialty?           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
@@ -903,8 +903,8 @@ model WorkoutPlan {
   organization PlanOrganization // A/B/C ou dias da semana — por plano (D-080)
   status       WorkoutPlanStatus @default(DRAFT)
   validityDays Int               @default(30) // validade padrao 30d, configuravel (D-083)
-  validUntil   DateTime? // vencimento calculado na liberacao (UTC — D-083)
-  releaseAt    DateTime? // liberacao programada (UTC — D-084); nulo = imediata
+  validUntil   DateTime?         @db.Timestamptz(3) // vencimento calculado na liberacao (UTC — D-083)
+  releaseAt    DateTime?         @db.Timestamptz(3) // liberacao programada (UTC — D-084); nulo = imediata
   goal         String? // objetivo capturado na montagem do plano (D-095)
 
   /// Linhagem da clonagem (D-090). DELIBERADAMENTE SEM RELATION: o plano de
@@ -913,9 +913,9 @@ model WorkoutPlan {
   /// leitura — o isolamento por vinculo (ADR-0001) continua inegociavel.
   clonedFromWorkoutPlanId String?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime? // tombstone: delecao logica (D-089) + pull do sync (D-099)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3) // tombstone: delecao logica (D-089) + pull do sync (D-099)
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond     Bond      @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -945,9 +945,9 @@ model Workout {
   label     String? // "A"/"B"/"C" quando o plano e LETTER (D-080)
   weekday   Weekday? // dia marcado quando o plano e WEEKDAY (D-080)
   position  Int       @default(0) // ordem estrutural dentro do plano
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime? // tombstone: delecao logica (D-089) + pull do sync (D-099)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3) // tombstone: delecao logica (D-089) + pull do sync (D-099)
 
   tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond     Bond             @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -984,9 +984,9 @@ model WorkoutItem {
   supersetGroup Int? // itens com o mesmo valor sao conjugados (D-082); nulo = isolado
   supersetOrder Int? // ordem dentro do grupo conjugado (D-082)
   note          String? // observacao do profissional sobre o item
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime? // tombstone: delecao logica (D-089) + pull do sync (D-099)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt     DateTime? @db.Timestamptz(3) // tombstone: delecao logica (D-089) + pull do sync (D-099)
 
   workout  Workout      @relation(fields: [workoutId], references: [id], onDelete: Cascade)
   exercise Exercise?    @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
@@ -1035,9 +1035,9 @@ model WorkoutSet {
   technique   SetTechnique @default(NORMAL) // codigo; label no i18n (D-066)
   note        String?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime? // tombstone: delecao logica (D-089) + pull do sync (D-099)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3) // tombstone: delecao logica (D-089) + pull do sync (D-099)
 
   workoutItem WorkoutItem @relation(fields: [workoutItemId], references: [id], onDelete: Cascade)
   setLogs     SetLog[]
@@ -1070,11 +1070,11 @@ model WorkoutSession {
   workoutId   String
   planId      String // denormalizado: linha do tempo sem join (D-092)
   status      WorkoutSessionStatus @default(IN_PROGRESS)
-  performedAt DateTime // quando o treino foi executado (UTC) — eixo dos indicadores
-  completedAt DateTime? // conclusao = check-in (D-086)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
-  deletedAt   DateTime? // tombstone do sync (D-099); historico nao se apaga (D-100)
+  performedAt DateTime             @db.Timestamptz(3) // quando o treino foi executado (UTC) — eixo dos indicadores
+  completedAt DateTime?            @db.Timestamptz(3) // conclusao = check-in (D-086)
+  createdAt   DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime             @updatedAt @db.Timestamptz(3)
+  deletedAt   DateTime?            @db.Timestamptz(3) // tombstone do sync (D-099); historico nao se apaga (D-100)
 
   tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond    Bond           @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -1112,9 +1112,9 @@ model SetLog {
 
   note String?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime? // tombstone do sync (D-099)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3) // tombstone do sync (D-099)
 
   session    WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   workoutSet WorkoutSet?    @relation(fields: [workoutSetId], references: [id], onDelete: Restrict)
@@ -1141,9 +1141,9 @@ model WorkoutRating {
   perceivedEffort Int // nivel de esforco percebido (D-087)
   comment         String? // comentario livre (D-087)
   reactions       WorkoutReaction[] // codigos; label/emoji no i18n (D-066)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  deletedAt       DateTime? // tombstone do sync (D-099)
+  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime          @updatedAt @db.Timestamptz(3)
+  deletedAt       DateTime?         @db.Timestamptz(3) // tombstone do sync (D-099)
 
   session WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
@@ -1181,11 +1181,11 @@ model FormAnalysis {
   reviewStatus                  FormAnalysisReviewStatus @default(PENDING)
   reviewedByProfessionalProfile String? // profissional que validou (D-088)
   professionalFeedback          String? // devolutiva do profissional ao aluno
-  reviewedAt                    DateTime?
+  reviewedAt                    DateTime?                @db.Timestamptz(3)
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime? // delecao logica (D-089)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3) // delecao logica (D-089)
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond     Bond      @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -1216,8 +1216,8 @@ model Food {
   visibility                 LibraryVisibility @default(PRIVATE)
   status                     LibraryItemStatus @default(ACTIVE) // delecao logica — regra geral (D-089)
   detail                     Json? // TODO(D-063): composicao/macros por fase — nao inventar
-  createdAt                  DateTime          @default(now())
-  updatedAt                  DateTime          @updatedAt
+  createdAt                  DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt                  DateTime          @updatedAt @db.Timestamptz(3)
 
   ownerProfessionalProfile ProfessionalProfile? @relation(fields: [ownerProfessionalProfileId], references: [id], onDelete: Cascade)
   specialty                Specialty?           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
@@ -1239,8 +1239,8 @@ model MealPlan {
   bondId    String // isolamento por vinculo (ADR-0001)
   title     String
   detail    Json? // TODO(D-063): campos finos por fase — nao inventar
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond   Bond           @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -1259,8 +1259,8 @@ model MealPlanItem {
   foodId     String? // alimento da biblioteca (opcional; item livre permitido)
   position   Int      @default(0) // ordem estrutural dentro do plano
   detail     Json? // TODO(D-063): porcoes/macros por fase — nao inventar
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
 
   mealPlan MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
   food     Food?    @relation(fields: [foodId], references: [id], onDelete: SetNull)
@@ -1285,10 +1285,10 @@ model Encounter {
   /// impedir o mundo real — a consulta pode ocorrer sem ter sido marcada aqui.
   appointmentId String? @unique
 
-  occurredAt DateTime? // quando o atendimento ocorreu (estrutural; UTC)
+  occurredAt DateTime? @db.Timestamptz(3) // quando o atendimento ocorreu (estrutural; UTC)
   detail     Json? // TODO(D-063): conteudo clinico por fase — nao inventar
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond          Bond           @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -1309,8 +1309,8 @@ model MedicalRecord {
   tenantId  String // escopo denormalizado (D-002)
   bondId    String   @unique // um prontuario por vinculo (isolamento — ADR-0001)
   detail    Json? // TODO(D-063): entradas do prontuario por fase — nao inventar
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -1328,8 +1328,8 @@ model Prescription {
   tenantId    String // escopo denormalizado (D-002)
   encounterId String // atendimento dono da folha de receita
   detail      Json? // TODO(D-063): conteudo da receita por fase — nao inventar
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   encounter Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
@@ -1369,9 +1369,9 @@ model Anamnesis {
   tenantId   String // escopo denormalizado (D-002)
   bondId     String          @unique // uma por vinculo (D-094); isolamento (ADR-0001)
   status     AnamnesisStatus @default(PENDING) // o GATE (D-093)
-  answeredAt DateTime? // quando a anamnese foi dada por respondida (UTC)
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  answeredAt DateTime?       @db.Timestamptz(3) // quando a anamnese foi dada por respondida (UTC)
+  createdAt  DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime        @updatedAt @db.Timestamptz(3)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -1461,10 +1461,10 @@ model AnamnesisParq {
   // Autoria da secao (D-102)
   authoredBy          AnamnesisAuthor
   authoredByAccountId String
-  authoredAt          DateTime
+  authoredAt          DateTime        @db.Timestamptz(3)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
   authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
@@ -1484,10 +1484,10 @@ model AnamnesisGoal {
 
   authoredBy          AnamnesisAuthor
   authoredByAccountId String
-  authoredAt          DateTime
+  authoredAt          DateTime        @db.Timestamptz(3)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
   authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
@@ -1509,10 +1509,10 @@ model AnamnesisClinicalHistory {
 
   authoredBy          AnamnesisAuthor
   authoredByAccountId String
-  authoredAt          DateTime
+  authoredAt          DateTime        @db.Timestamptz(3)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
   authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
@@ -1531,8 +1531,8 @@ model AnamnesisCondition {
   clinicalHistoryId String
   name              String
   note              String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
 
   clinicalHistory AnamnesisClinicalHistory @relation(fields: [clinicalHistoryId], references: [id], onDelete: Cascade)
 
@@ -1548,8 +1548,8 @@ model AnamnesisSurgery {
   name              String
   year              Int?
   note              String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
 
   clinicalHistory AnamnesisClinicalHistory @relation(fields: [clinicalHistoryId], references: [id], onDelete: Cascade)
 
@@ -1566,8 +1566,8 @@ model AnamnesisMedication {
   clinicalHistoryId String
   name              String
   posology          String? // preenchido/refinado pelo profissional (D-102)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
 
   clinicalHistory AnamnesisClinicalHistory @relation(fields: [clinicalHistoryId], references: [id], onDelete: Cascade)
 
@@ -1582,8 +1582,8 @@ model AnamnesisAllergy {
   clinicalHistoryId String
   name              String
   reaction          String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
 
   clinicalHistory AnamnesisClinicalHistory @relation(fields: [clinicalHistoryId], references: [id], onDelete: Cascade)
 
@@ -1600,10 +1600,10 @@ model AnamnesisFamilyHistory {
 
   authoredBy          AnamnesisAuthor
   authoredByAccountId String
-  authoredAt          DateTime
+  authoredAt          DateTime        @db.Timestamptz(3)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
   authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
@@ -1620,8 +1620,8 @@ model AnamnesisFamilyCondition {
   familyHistoryId String
   name            String
   relationship    String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
   familyHistory AnamnesisFamilyHistory @relation(fields: [familyHistoryId], references: [id], onDelete: Cascade)
 
@@ -1646,10 +1646,10 @@ model AnamnesisLifestyle {
 
   authoredBy          AnamnesisAuthor
   authoredByAccountId String
-  authoredAt          DateTime
+  authoredAt          DateTime        @db.Timestamptz(3)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
   authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
@@ -1669,10 +1669,10 @@ model AnamnesisEmergencyContact {
 
   authoredBy          AnamnesisAuthor
   authoredByAccountId String
-  authoredAt          DateTime
+  authoredAt          DateTime        @db.Timestamptz(3)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
   authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
@@ -1705,10 +1705,10 @@ model AnamnesisTraining {
 
   authoredBy          AnamnesisAuthor
   authoredByAccountId String
-  authoredAt          DateTime
+  authoredAt          DateTime        @db.Timestamptz(3)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   anamnesis         Anamnesis @relation(fields: [anamnesisId], references: [id], onDelete: Cascade)
   authoredByAccount Account   @relation(fields: [authoredByAccountId], references: [id], onDelete: Restrict)
@@ -1731,8 +1731,8 @@ model AnamnesisInjury {
   sinceYear   Int?
   isCurrent   Boolean @default(false) // dor ativa x historico
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   training AnamnesisTraining @relation(fields: [trainingId], references: [id], onDelete: Cascade)
 
@@ -1751,8 +1751,8 @@ model Assessment {
   tenantId  String // escopo denormalizado (D-002)
   bondId    String // isolamento por vinculo (ADR-0001)
   detail    Json? // TODO(D-063): campos por especialidade — nao inventar
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -1770,9 +1770,9 @@ model ProgressPhoto {
   tenantId   String // escopo denormalizado (D-002)
   bondId     String // isolamento por vinculo (ADR-0001)
   storageKey String // referencia do objeto no storage S3-compatible (sem binario aqui)
-  takenAt    DateTime? // quando a foto foi tirada (estrutural; UTC)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  takenAt    DateTime? @db.Timestamptz(3) // quando a foto foi tirada (estrutural; UTC)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -1812,11 +1812,11 @@ model Attendance {
   openedByAccountId String // quem abriu (normalmente o aluno)
   subject           String // vem do formulario interativo de abertura (D-096)
   status            AttendanceStatus @default(PENDING)
-  lastMessageAt     DateTime         @default(now()) // relogio da escalada + ordenacao (D-096)
+  lastMessageAt     DateTime         @default(now()) @db.Timestamptz(3) // relogio da escalada + ordenacao (D-096)
   escalationLevel   Int              @default(0) // 0=nenhuma, 1=2h, 2=24h, 3=48h (worker — D-096)
-  resolvedAt        DateTime? // conclusao (UTC)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  resolvedAt        DateTime?        @db.Timestamptz(3) // conclusao (UTC)
+  createdAt         DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime         @updatedAt @db.Timestamptz(3)
 
   tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   bond     Bond                @relation(fields: [bondId], references: [id], onDelete: Cascade)
@@ -1838,9 +1838,9 @@ model AttendanceMessage {
   attendanceId    String
   senderAccountId String
   body            String
-  readAt          DateTime? // nulo = nao lida; base da escalada (D-096)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  readAt          DateTime? @db.Timestamptz(3) // nulo = nao lida; base da escalada (D-096)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
   attendance Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
   sender     Account    @relation(fields: [senderAccountId], references: [id], onDelete: Cascade)
@@ -1856,8 +1856,8 @@ model AttendanceRating {
   attendanceId String   @unique // uma avaliacao por ticket (D-096)
   score        Int
   comment      String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
   attendance Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
 
@@ -1891,10 +1891,10 @@ model Notification {
   body      String
   data      Json? // payload de deep-link/roteamento (Json legitimo — ver doc acima)
   sensitive Boolean          @default(false) // financeiro/consentimento: retido por lei (D-028)
-  readAt    DateTime?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-  deletedAt DateTime? // soft delete da central in-app (D-028)
+  readAt    DateTime?        @db.Timestamptz(3)
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime         @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime?        @db.Timestamptz(3) // soft delete da central in-app (D-028)
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 

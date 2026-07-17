@@ -16,7 +16,7 @@
       "env": ["REDIS_URL"]
     },
     "test:integration": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "build"],
       "env": ["DATABASE_URL"],
       "cache": false
     },

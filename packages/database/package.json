@@ -15,9 +15,9 @@
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "lint": "eslint .",
-    "typecheck": "prisma generate && tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "build": "prisma generate",
-    "test:integration": "prisma generate && vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.1.0"

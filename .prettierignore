@@ -6,6 +6,10 @@
 **/.turbo
 pnpm-lock.yaml
 
+# Client gerado pelo Prisma (output dentro do pacote — ver troubleshooting §13).
+# Artefato de terceiro: formatar o gerado so produziria format:check vermelho.
+packages/database/src/generated/
+
 # Documentacao de planejamento (preservar formatacao original)
 CLAUDE.md
 CONTRIBUTING.md

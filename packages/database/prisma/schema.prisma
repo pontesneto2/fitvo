@@ -10,8 +10,26 @@
 //   (D-008/D-046). Especialidades = catalogo fixo (D-047).
 // - RBAC 4 niveis; admin de clinica desacoplado de profissional (D-013/D-015).
 
+/// OUTPUT EXPLICITO, DENTRO DO PACOTE — nao e preferencia, e correcao de CI.
+///
+/// O default do Prisma escreve em `node_modules/.pnpm/@prisma+client@.../
+/// node_modules/.prisma/client`: o virtual store COMPARTILHADO do pnpm, FORA
+/// deste pacote. O turbo so captura o que esta DENTRO do pacote, entao o
+/// artefato ficava invisivel para ele: `build` reportava `cache HIT` e
+/// restaurava ZERO arquivos. Verde que mente em forma de cache.
+///
+/// A defesa contra esse cache mentiroso CRIOU uma corrida: como ninguem podia
+/// confiar que o `build` produzira algo, enxertou-se `prisma generate` tambem no
+/// `typecheck` e no `test:integration` — e `database#build` e `database#typecheck`
+/// nao dependem um do outro, entao o turbo os rodava EM PARALELO, dois `generate`
+/// escrevendo no mesmo diretorio. Um truncava enquanto o outro lia. Mesmo codigo,
+/// CI vermelho aleatoriamente.
+///
+/// Com o output aqui: o turbo cacheia de verdade (ver packages/database/turbo.json),
+/// so o `build` gera, e os demais dependem dele. Ver docs/troubleshooting.md §13.
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/client"
 }
 
 datasource db {

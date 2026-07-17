@@ -488,9 +488,16 @@ grep -E '"(format|lint|test)' package.json
 
 **Caso real**
 
-Nesta sessão, `prettier --check .` deu vermelho em `gallery/index.html` e eu quase
-reportei "a `main` tem problema de formatação". `pnpm format:check` — o comando do
-CI — dava **verde**. Eu estava errado, não a `main`.
+`prettier --check .` deu vermelho em `gallery/index.html` e o agente quase
+reportou "a `main` tem problema de formatação". `pnpm format:check` — o comando do
+CI — dava **verde**. O agente estava errado, não a `main`.
+
+> **Esta armadilha já pegou DUAS vezes** — a sessão que escreveu esta seção e a
+> seguinte, que caiu no mesmo `.html` da galeria depois de já tê-la documentado. O
+> hábito de rodar a ferramenta em vez do comando do projeto é **forte**: saber da
+> armadilha não basta, porque `prettier --check .` é o reflexo, e o reflexo dispara
+> antes da memória. A defesa é mecânica, não de vontade — **abrir o `package.json`
+> e rodar o script**, sempre, mesmo "só para conferir".
 
 > **Fecha o documento, e vale para todas as seções acima.** As seções 4, 5 e 6 são
 > **verde que não prova nada**; esta é o espelho: **vermelho que não reprova nada**.
@@ -517,3 +524,98 @@ humana. Não é bug.
 Em banco de desenvolvimento descartável, rode você mesmo o comando. Prefira
 `DELETE` cirúrgico dos dados de teste a um reset completo — e nunca contorne a
 trava em nada que não seja um banco local descartável.
+
+---
+
+## 13. `outputs: null` no turbo = cache que reporta HIT restaurando ZERO arquivos
+
+**Sintoma**
+
+O CI da `main` fica **verde por sorte**. O mesmo código passa num PR e falha na
+`main`, sem ninguém ter mudado nada. Não reproduz sob demanda — e por isso a
+tentação é reexecutar o job até passar.
+
+Localmente, o turbo afirma ter buildado sem ter produzido nada:
+
+```
+@fitvo/database:build: cache hit, replaying logs
+ Tasks:    1 successful, 1 total
+```
+
+**Causa — dois defeitos, um sintoma**
+
+**1. O turbo só captura o que está DENTRO do pacote.** O `prisma generate` sem
+`output` explícito escreve em:
+
+```
+node_modules/.pnpm/@prisma+client@X/node_modules/.prisma/client   # virtual store COMPARTILHADO
+```
+
+Fora de `packages/database`, portanto **invisível ao turbo**. O `build` ficava com
+`outputs: null` — o turbo cacheava um conjunto **vazio** de artefatos. **É verde
+que mente em forma de cache:** `cache HIT, timeSaved: 1041` produzindo zero
+arquivos.
+
+**2. A defesa contra o cache mentiroso CRIOU a corrida.** Como ninguém podia
+confiar que o `build` produzira algo, enxertou-se `prisma generate` também no
+`typecheck` e no `test:integration`. E o grafo do turbo mostrava que
+`database#build` e `database#typecheck` **não dependiam um do outro**:
+
+```
+@fitvo/database#build      command: prisma generate
+                           dependsOn: [eslint-config#build, typescript-config#build]
+@fitvo/database#typecheck  command: prisma generate && tsc --noEmit
+                           dependsOn: [eslint-config#build, typescript-config#build]
+```
+
+Livres para rodar **em paralelo**, dois `generate` escrevendo no mesmo diretório.
+`prisma generate` não escreve atomicamente: um **trunca enquanto o outro lê**.
+
+> **O sintoma nasceu da cura.** É o padrão a reconhecer: a corrida não era o
+> problema original — era o remendo do problema original. Procurar só a corrida
+> leva ao remendo, não à doença.
+
+**Solução — a ORDEM importa**
+
+1. **Mover o output para dentro do pacote** (`output = "../src/generated/client"`).
+2. **Declarar `outputs`** no `turbo.json` do pacote — agora o cache é honesto.
+3. **Só então remover os `generate` redundantes** e fazer o `typecheck` depender
+   do `build`.
+
+**Fazer só o passo 3 transformaria flaky em quebra dura**: o `typecheck` perderia
+seu `generate` e encontraria um cache HIT que não restaurou cliente nenhum.
+
+**Como verificar (o loop NÃO basta)**
+
+A corrida é **probabilística**: passadas verdes não provam nada — foi assim que a
+`main` ficou "verde". Medido nesta base: **10/10 verdes no código SEM a
+correção**, numa máquina que simplesmente não dispara o defeito. Um loop verde
+teria "provado" que não havia bug.
+
+> **O loop inconclusivo, reportado como inconclusivo, vale mais que "8/8 verde,
+> provado".** Trazer só a branch corrigida passando teria repetido exatamente o
+> erro da `main`: **chamar sorte de prova**. O baseline sem correção — 10/10 verde
+> — é o que desmascara o loop: se o código quebrado também passa, o verde do código
+> certo não vem da correção. Rode o baseline *antes* de comemorar o loop verde; sem
+> o controle, o experimento não tem grupo de comparação e a cor não significa nada.
+
+O que prova são duas coisas **determinísticas**:
+
+1. **O grafo** (`turbo typecheck --dry=json`): a corrida é **estruturalmente
+   impossível** quando só uma tarefa gera e as outras dependem dela. Prova por
+   construção, não por amostragem.
+2. **Cache HIT com o artefato APAGADO** — o inverso do defeito:
+
+```bash
+npx turbo build --filter=@fitvo/database   # gera
+rm -rf packages/database/src/generated     # apaga
+npx turbo build --filter=@fitvo/database   # cache hit
+ls packages/database/src/generated/client/index.js   # DEVE existir
+```
+
+Antes da correção esse teste devolvia **replay vazio**: `1 successful` e nenhum
+arquivo. Depois, o cliente é **restaurado**. Determinístico, nos dois sentidos.
+
+> **Princípio geral:** tarefa cujo artefato o turbo não enxerga é tarefa cujo
+> cache **mente**. Antes de aceitar `cache HIT`, pergunte **onde o artefato caiu**
+> — se for fora do pacote, o HIT não significa nada.

@@ -736,3 +736,38 @@ A decisão e as alternativas rejeitadas (cobrar a taxa fora do split para
 preservá-la no estorno — rejeitado) estão em `docs/adr/0004-financeiro.md`. Este
 registro é o que morde quem for **codar** o split: o ADR é a decisão; isto é a
 consequência prática.
+
+## 17. Escolher versão de dependência sem rodar o `osv-scanner` ANTES é decidir no escuro
+
+**Sintoma**
+
+O plano fixa uma versão (ex.: Next 14, "a estável compatível com React 18"), tudo
+compila, o E2E passa, o PR abre — e o `dependency-scan` (osv-scanner) do CI reprova
+por vulnerabilidade conhecida naquela versão. O retrabalho não é uma linha: é
+reabrir a decisão de versão com o código já construído em cima dela.
+
+**Causa**
+
+`typecheck`/`lint`/`build`/E2E provam que o código **funciona** — não que a versão
+é **segura**. Vulnerabilidade conhecida é ortogonal a "compila". O CI tem o gate
+certo (`osv-scanner scan --lockfile=pnpm-lock.yaml`, ADR-0006), mas ele roda
+**depois** do plano inteiro.
+
+**Caso real (PR #62):** a escolha de **Next 14.2.35** (por casar com React 18, trava
+do ui-web) foi reprovada — 14 advisories, 5 High (até CVSS 8.6, SSRF), **sem fix na
+linha 14.x**, só em Next 15+. Custo: reabrir a versão do framework (Next 15, que
+também aceita React 18), migrar `cookies()` para async, refazer gates e E2E. Tudo
+evitável com um scan antes.
+
+**O que fazer**
+
+Antes de fixar a versão de uma dependência nova (ou subir major), rode o mesmo
+scanner do CI **local**:
+
+```bash
+# osv-scanner na mesma versao do CI (ver .github/workflows/ci.yml)
+./osv-scanner scan --lockfile=pnpm-lock.yaml   # exit 0 = sem vulnerabilidade
+```
+
+> A pergunta não é "compila com esta versão?" — é "esta versão tem vulnerabilidade
+> conhecida?". O CI responde a segunda, mas tarde. Responda-a no plano, não no PR.

@@ -3,7 +3,7 @@
 > Fonte única do plano de execução. Substitui qualquer backlog interno de
 > sessão — o backlog do agente deve espelhar este documento, nunca o
 > contrário. Atualizar sempre que uma fase mudar de status. As decisões de
-> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-121); a
+> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-132); a
 > identidade visual em `docs/design-system.md`.
 
 Convenção de status: **FEITO** (mergeado em `main`, com PR), **EM ANDAMENTO**,
@@ -23,7 +23,7 @@ RESPONSÁVEL** (decisão que só você pode tomar), **BLOQUEADO — TERCEIROS**
 | 4 | Paciente & Vínculo (convite profissional→paciente, `Bond` = paciente↔profissional+especialidade — D-006/D-052/D-055) | #10 | |
 | 5 | Consentimento + motor de compartilhamento (`Consent` escopado no paciente, fila BullMQ, sugestão de overlap — D-016/D-017/D-054) | #11 | |
 | 6 | Financeiro — núcleo (Plan/Subscription, Charge/split, WebhookEvent, `/v1/billing`, adapter Asaas — ADR-0004) | #13 | Gated: Asaas ao vivo, preços comerciais, texto jurídico de estorno. |
-| 7 | Esqueletos de conteúdo (Exercise/Workout, Food/MealPlan, Encounter/MedicalRecord/Prescription, Assessment — ADR-0006) | #14 | SÓ schema. Campos finos deferidos (`detail Json?` + TODO(D-063)). Sem slice de API. |
+| 7 | Esqueletos de conteúdo (Exercise/Workout, Food/MealPlan, Encounter/MedicalRecord/Prescription, Assessment — ADR-0006) | #14 | SÓ schema. Campos finos deferidos (`detail Json?` + TODO(D-063)). Sem slice de API. **`MedicalRecord` foi um erro do esqueleto e morre no item 5b** (D-122 — o prontuário É o vínculo). |
 | 8 | Adapters das abstrações (observability/pino, cache/Redis, storage/S3, notifications, ai/Anthropic — ADR-0005) | #15 | Todos com fake/mock testável + gate para uso ao vivo. |
 | 9 | Upgrade de infra (Node 22, eslint 10, commitlint 21, vitest 4) | #16 | TypeScript e Prisma majors deliberadamente NÃO subiram (ver PENDENTE). |
 | 10 | Design tokens (`brand-tokens` populado: cor, tipografia, elevação, ícones Lucide, densidade) | #18 (aberto) | Ver EM ANDAMENTO — aguardando revisão/merge. |
@@ -92,6 +92,37 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
      nos horários.
    - Templates + base compartilhada (D-117), entregáveis (D-119), indicadores
      (D-120). Dado clínico → **revisão humana obrigatória**.
+5b. **Domínio de medicina — nutrologia esportiva** (D-122 a D-132, **ADR-0014**)
+   — **o D-063 fecha para a TERCEIRA e última especialidade**. Nenhum domínio de
+   conteúdo continua em `detail Json?` depois deste lote. Fases (a ordem é
+   dependência, não preferência — ver o ADR):
+   - **Fase 0 — fontes do congelamento — PR PRÓPRIO** (pré-requisito do D-130,
+     **não existem no schema**): **UF do conselho** e **RQE** no
+     `ProfessionalSpecialty` (o lugar já está certo — é o D-046: CREF e CRN são
+     conselhos distintos da mesma pessoa; **não** mover para o perfil), dados da
+     clínica no `Tenant` (endereço, cidade/UF, telefone, e-mail, logo), data de
+     nascimento e **sexo** do paciente (o sexo também destrava as faixas de
+     referência dos exames). **Toca auth/tenant → área crítica; não vai junto com
+     domínio clínico.**
+   - **Fase 1 — limpeza:** mata `MedicalRecord` (D-122 — o prontuário É o vínculo)
+     e os três `detail Json?` (`Encounter`, `Prescription`, `Assessment`).
+   - **Fase 2 — prontuário:** `Encounter` tipado (D-123, `appointmentId` já
+     correto) + **`Assessment` tipado** (D-132) com **protocolo de dobras +
+     dobras aferidas**, **data da aferição**, e **ângulo + ligação** na
+     `ProgressPhoto`. **Destrava o bloco de antropometria** (ADR-0011).
+   - **Fase 3 — exames laboratoriais** (D-124): catálogo (faixas por **sexo e
+     faixa etária**) + solicitação + resultado com **valores estruturados**
+     (**`Decimal`** — o primeiro do schema; nunca `Float`). Destrava o **módulo de
+     nutrologia da anamnese** (D-103) e, com ele, o **D-128**.
+   - **Fase 4 — documentos emitidos:** **`Guidance`** (D-125) e
+     **`MedicalPrescription`** (D-126 — só médico, sem biblioteca de
+     medicamentos, sem controlado) como **entidades separadas**; declaração de
+     comparecimento (D-127, derivada do `Appointment` `COMPLETED`); todos com
+     **congelamento** (D-130) e ciclo **`DRAFT`/`ISSUED`/`CANCELLED`** (emitido é
+     imutável; correção = cancelar com motivo + emitir novo). Depois
+     favoritos/modelos/repetir (D-131).
+   - Dado clínico + auth/tenant → **revisão humana obrigatória**. Plano de
+     modelagem **aprovado**; a ordem das fases é dependência, não preferência.
 6. **Videoconferência — treino e nutrição** (D-074/D-075, ADR-0007): package
    `video` novo (interface + adapter Daily/Prebuilt + fake, mesmo padrão dos
    demais adapters da ADR-0005). Habilitado nos ambientes de treino e
@@ -249,15 +280,37 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
     visível **só ao profissional**, como sugestão, nunca veredito.
   - *Saúde sexual/fertilidade no núcleo* — dado sensível (LGPD); só no módulo de
     nutrologia.
-- **Bloco de antropometria (ADR-0011)**: resolvido quanto ao desenho — bloco
-  visível no fluxo da anamnese, dado morando no `Assessment`, invisível em
-  `ONLINE`. Mas **construí-lo depende de tipar o `Assessment`** (D-063, abaixo).
-  Não bloqueia a tipagem da anamnese, que está completa sem ele.
-- **Campos finos de nutrição/medicina (D-063, ainda aberto)**: treino já foi
-  fechado (ADR-0009/0010, MFit) e a anamnese pelo ADR-0011. **Nutrição fechou**
-  pelo ADR-0013 (Dietbox) — resta **medicina** (prontuário/prescrição), que
-  depende de decisão humana e traz junto os **exames laboratoriais** (D-076) e o
-  **módulo de nutrologia** da anamnese (D-103).
+- **Bloco de antropometria (ADR-0011)**: **decisão destravada** — o D-132
+  (ADR-0014) tipa o `Assessment`, que era a dependência. Desenho já resolvido
+  (bloco no fluxo da anamnese, dado no `Assessment`, invisível em `ONLINE`).
+  Não é mais decisão pendente: é implementação, na fase 2 do item 5b.
+- **~~Campos finos de nutrição/medicina (D-063)~~ — FECHADO.** As três
+  especialidades têm ADR: treino (ADR-0009/0010, MFit), nutrição (ADR-0013,
+  Dietbox) e **medicina (ADR-0014, nutrologia esportiva)**; a anamnese pelo
+  ADR-0011. **Não há mais decisão de campo fino pendente** — o que resta é
+  implementação (itens 5 e 5b) e os gaps pontuais listados abaixo.
+- **Gaps do domínio de medicina (ADR-0014)** — citados nas decisões, sem
+  definição; não modelar sem ADR. **Três foram resolvidos na revisão do ADR** e
+  viraram adendos (faixa de referência por sexo/idade; ciclo de vida do documento
+  com cancelamento em vez de edição; protocolo de dobras + série por protocolo).
+  Restam:
+  - **Resultado qualitativo** (D-124): "negativo"/"reagente" não é número — o
+    adendo decidiu o tipo do valor **quantitativo**, não a existência do
+    qualitativo.
+  - **Unidades** (D-124): string livre quebra a série ("ng/ml" × "ng/mL"); enum
+    exige migração a cada exame novo.
+  - **Quem emite a declaração de comparecimento** (D-127): o admin da clínica
+    pode? Não é dado clínico em conteúdo, mas nasce de dado clínico — o D-015 não
+    responde este caso.
+  - **Numeração de documento** e **se o paciente vê a receita no app** (D-126/
+    D-127): não decididos.
+- **⚠️ Receita de medicamento CONTROLADO (D-126) — item de produto/jurídico, não
+  de engenharia**: o núcleo da nutrologia esportiva é protocolo hormonal (TRT,
+  GH), e **testosterona/anabolizantes são controlados no Brasil** — exigem
+  formulário oficial numerado, que o FITVO não imprime. A receita que mais importa
+  ao nutrólogo é justamente a que o app não emite. Não inviabiliza (ele usa o
+  talonário oficial), mas há uma **costura fora do app** no fluxo premium. Não há
+  contorno técnico: é decisão.
 - **Gaps do domínio de nutrição (ADR-0013)** — citados nas decisões, sem
   definição; não modelar sem ADR:
   - **Hidratação**: o D-120 pede o indicador, mas nenhuma decisão diz onde a meta

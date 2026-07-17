@@ -24,6 +24,7 @@ o formato: contexto, decisão, alternativas consideradas, consequências.
 | [0011](docs/adr/0011-modalidade-e-anamnese.md) | Modalidade de atendimento e anamnese (revisa D-094) |
 | [0012](docs/adr/0012-agenda.md) | Agenda e agendamento |
 | [0013](docs/adr/0013-dominio-nutricao.md) | Domínio de nutrição (revisa D-104) |
+| [0014](docs/adr/0014-dominio-medicina.md) | Domínio de medicina — nutrologia esportiva (revisa o esqueleto do ADR-0006) |
 
 ### Mapa D-número → ADR
 
@@ -47,8 +48,9 @@ sem repetir o número. **A tabela é a autoridade sobre a cobertura**, não o `g
 | D-101 – D-104 | [0011](docs/adr/0011-modalidade-e-anamnese.md) | Modalidade e anamnese |
 | D-106 – D-111 | [0012](docs/adr/0012-agenda.md) | Agenda |
 | D-112 – D-121 | [0013](docs/adr/0013-dominio-nutricao.md) | Domínio de nutrição |
+| D-122 – D-132 | [0014](docs/adr/0014-dominio-medicina.md) | Domínio de medicina (nutrologia esportiva) |
 
-**Cobertura:** D-001 a D-121, sem lacunas. Algumas aparecem em dois ADRs (D-025
+**Cobertura:** D-001 a D-132, sem lacunas. Algumas aparecem em dois ADRs (D-025
 em 0004/0005; D-050 em 0003/0004; D-054 em 0001/0003) — é intencional: a decisão
 tem consequência nos dois temas.
 
@@ -60,6 +62,7 @@ verdade:
 |---|---|---|
 | D-094 (anamnese: quem responde) | D-102 | [0011](docs/adr/0011-modalidade-e-anamnese.md) |
 | D-104 (`MealLog` binário) | D-118 | [0013](docs/adr/0013-dominio-nutricao.md) |
+| D-063/ADR-0006 (esqueleto previu `MedicalRecord`) | D-122 | [0014](docs/adr/0014-dominio-medicina.md) |
 
 ## Desenvolvimento local
 
@@ -84,9 +87,11 @@ sintoma e causa.
 
 ## Trabalho futuro (fora do escopo do planejamento estrutural)
 
-- Detalhe fino dos domínios de conteúdo: **treino já fechado** (ADR-0009);
-  **nutrição e medicina seguem abertos** (D-063), assim como a taxonomia de
-  campos da anamnese (D-094 decidiu o ciclo de vida, não os campos).
+- Detalhe fino dos domínios de conteúdo: **D-063 fechado para as três
+  especialidades** — treino (ADR-0009), nutrição (ADR-0013) e medicina
+  (ADR-0014); a taxonomia da anamnese está no ADR-0011 (D-103), que revisou o
+  D-094. **Decidido não é implementado:** nutrição e medicina seguem em
+  `detail Json?` no schema até o lote de implementação de cada uma.
 - Design system e logo — bloco de design próprio; cores atuais são provisórias.
 - Redação jurídica dos termos e política de cancelamento/estorno — advogado,
   pré-lançamento.

@@ -82,6 +82,13 @@ Cada item: web + mobile + testes + galeria (artifact HTML light/dark), um commit
 
 **Contagem de testes:** ui-web **130**, ui-mobile **81** (+ lógica de série testada em `brand-tokens`).
 
+> **⚠️ Dívida conhecida — controles sem `forwardRef`.** `Input`/`Textarea` (§2),
+> `Select` (§3) e `Checkbox`/`Radio`/`Switch` (§4/5/6) são `export function X(props)`
+> sem encaminhar o `ref` ao elemento nativo. Isso **quebra o `register()` uncontrolled
+> do React Hook Form** (ADR-0005) — o consumidor é forçado a `Controller` (mais
+> verboso). Descoberto no login do `web-personal`. Correção = `forwardRef` nos 6
+> controles, **PR próprio** (ver `docs/roadmap.md`).
+
 ## Framework glue (base, commits `a625c13`/`4c83379`/`5fa2104`)
 
 - `ui-web`: `buildThemeCss()` (CSS vars em `:root`/`.dark`) + `fitvoTailwindPreset`
@@ -96,4 +103,11 @@ Cada item: web + mobile + testes + galeria (artifact HTML light/dark), um commit
 - **§20 restante** — ilustrações, gráficos avançados, componentes de domínio,
   onboarding, impressão: DEFERIDO (dependem de decisões que ainda não existem).
   A **logo** já foi definida (símbolo isolado ainda provisório).
-- Cola do preset num app real (Next) + `content` do Tailwind apontando p/ ui-web.
+- ~~Cola do preset num app real (Next) + `content` do Tailwind apontando p/ ui-web.~~
+  **FEITO** — `apps/web-personal` (esqueleto): `presets: [fitvoTailwindPreset]` +
+  `buildThemeCss()` injetado no layout raiz + `content` incluindo
+  `packages/ui-web/src`. A cola deixou de ser teórica; build/tema light-dark verdes.
+  **Achado ao ser o primeiro consumidor:** `Input` (e os demais controles) não faz
+  `forwardRef` — o `register` (uncontrolled) do React Hook Form não recebe o `ref`;
+  o `web-personal` contornou com `Controller` (controlado). Avaliar adicionar
+  `forwardRef` aos controles para habilitar o uso uncontrolled do RHF.

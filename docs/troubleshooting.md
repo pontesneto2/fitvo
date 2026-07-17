@@ -488,9 +488,16 @@ grep -E '"(format|lint|test)' package.json
 
 **Caso real**
 
-Nesta sessão, `prettier --check .` deu vermelho em `gallery/index.html` e eu quase
-reportei "a `main` tem problema de formatação". `pnpm format:check` — o comando do
-CI — dava **verde**. Eu estava errado, não a `main`.
+`prettier --check .` deu vermelho em `gallery/index.html` e o agente quase
+reportou "a `main` tem problema de formatação". `pnpm format:check` — o comando do
+CI — dava **verde**. O agente estava errado, não a `main`.
+
+> **Esta armadilha já pegou DUAS vezes** — a sessão que escreveu esta seção e a
+> seguinte, que caiu no mesmo `.html` da galeria depois de já tê-la documentado. O
+> hábito de rodar a ferramenta em vez do comando do projeto é **forte**: saber da
+> armadilha não basta, porque `prettier --check .` é o reflexo, e o reflexo dispara
+> antes da memória. A defesa é mecânica, não de vontade — **abrir o `package.json`
+> e rodar o script**, sempre, mesmo "só para conferir".
 
 > **Fecha o documento, e vale para todas as seções acima.** As seções 4, 5 e 6 são
 > **verde que não prova nada**; esta é o espelho: **vermelho que não reprova nada**.
@@ -584,6 +591,13 @@ A corrida é **probabilística**: passadas verdes não provam nada — foi assim
 `main` ficou "verde". Medido nesta base: **10/10 verdes no código SEM a
 correção**, numa máquina que simplesmente não dispara o defeito. Um loop verde
 teria "provado" que não havia bug.
+
+> **O loop inconclusivo, reportado como inconclusivo, vale mais que "8/8 verde,
+> provado".** Trazer só a branch corrigida passando teria repetido exatamente o
+> erro da `main`: **chamar sorte de prova**. O baseline sem correção — 10/10 verde
+> — é o que desmascara o loop: se o código quebrado também passa, o verde do código
+> certo não vem da correção. Rode o baseline *antes* de comemorar o loop verde; sem
+> o controle, o experimento não tem grupo de comparação e a cor não significa nada.
 
 O que prova são duas coisas **determinísticas**:
 

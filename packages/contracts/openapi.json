@@ -1,0 +1,2326 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FITVO API",
+    "version": "0.0.0"
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {}
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/auth/register/professional": {
+      "post": {
+        "summary": "Cadastra um profissional (cria conta + tenant SOLO)",
+        "tags": [
+          "auth"
+        ],
+        "description": "Cria conta + tenant SOLO + perfil profissional (D-045) e dispara a verificacao de e-mail.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+                    "description": "E-mail de login (único) — D-042."
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Senha em claro (mín. 8)."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "document": {
+                    "type": "string",
+                    "minLength": 11,
+                    "maxLength": 18,
+                    "description": "CPF ou CNPJ (D-043)."
+                  },
+                  "documentType": {
+                    "type": "string",
+                    "enum": [
+                      "CPF",
+                      "CNPJ"
+                    ]
+                  },
+                  "tenantName": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "email",
+                  "password",
+                  "name",
+                  "document",
+                  "documentType",
+                  "tenantName"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "tokens": {
+                      "type": "object",
+                      "properties": {
+                        "accessToken": {
+                          "type": "string"
+                        },
+                        "refreshToken": {
+                          "type": "string"
+                        },
+                        "accessExpiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        "refreshExpiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        }
+                      },
+                      "required": [
+                        "accessToken",
+                        "refreshToken",
+                        "accessExpiresAt",
+                        "refreshExpiresAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "account",
+                    "tokens"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/register/patient": {
+      "post": {
+        "summary": "Cadastra um paciente (conta em estado minimo)",
+        "tags": [
+          "auth"
+        ],
+        "description": "Autocadastro de paciente (D-006); dispara a verificacao de e-mail.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+                    "description": "E-mail de login (único) — D-042."
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Senha em claro (mín. 8)."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "document": {
+                    "type": "string",
+                    "minLength": 11,
+                    "maxLength": 14,
+                    "description": "CPF (D-043)."
+                  }
+                },
+                "required": [
+                  "email",
+                  "password",
+                  "name",
+                  "document"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "tokens": {
+                      "type": "object",
+                      "properties": {
+                        "accessToken": {
+                          "type": "string"
+                        },
+                        "refreshToken": {
+                          "type": "string"
+                        },
+                        "accessExpiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        "refreshExpiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        }
+                      },
+                      "required": [
+                        "accessToken",
+                        "refreshToken",
+                        "accessExpiresAt",
+                        "refreshExpiresAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "account",
+                    "tokens"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/login": {
+      "post": {
+        "summary": "Autentica por e-mail e senha (rate limited)",
+        "tags": [
+          "auth"
+        ],
+        "description": "Emite access + refresh (D-029). Limitado a 5 tentativas por minuto.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+                    "description": "E-mail de login (único) — D-042."
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "tokens": {
+                      "type": "object",
+                      "properties": {
+                        "accessToken": {
+                          "type": "string"
+                        },
+                        "refreshToken": {
+                          "type": "string"
+                        },
+                        "accessExpiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        "refreshExpiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        }
+                      },
+                      "required": [
+                        "accessToken",
+                        "refreshToken",
+                        "accessExpiresAt",
+                        "refreshExpiresAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "account",
+                    "tokens"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "summary": "Rotaciona o refresh token",
+        "tags": [
+          "auth"
+        ],
+        "description": "Rotacao a cada uso com deteccao de reuso (D-029).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "refreshToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tokens": {
+                      "type": "object",
+                      "properties": {
+                        "accessToken": {
+                          "type": "string"
+                        },
+                        "refreshToken": {
+                          "type": "string"
+                        },
+                        "accessExpiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        "refreshExpiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        }
+                      },
+                      "required": [
+                        "accessToken",
+                        "refreshToken",
+                        "accessExpiresAt",
+                        "refreshExpiresAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "tokens"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "summary": "Encerra a sessao atual (revoga o refresh)",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/auth/me": {
+      "get": {
+        "summary": "Conta autenticada (a partir do access token)",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "emailVerified": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "email",
+                    "name",
+                    "emailVerified"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/verify-email/request": {
+      "post": {
+        "summary": "Solicita/reenvia a verificacao de e-mail",
+        "tags": [
+          "auth"
+        ],
+        "description": "Sempre 202 — nao revela se o e-mail existe ou ja esta verificado (D-029). Rate limited.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+                    "description": "E-mail de login (único) — D-042."
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "accepted"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/verify-email": {
+      "post": {
+        "summary": "Confirma a verificacao de e-mail (consome o token)",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Token de uso único recebido por e-mail."
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "verified"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/forgot-password": {
+      "post": {
+        "summary": "Inicia a recuperacao de senha",
+        "tags": [
+          "auth"
+        ],
+        "description": "Sempre 202 — nao vaza existencia de conta (D-029). Rate limited.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+                    "description": "E-mail de login (único) — D-042."
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "accepted"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/reset-password": {
+      "post": {
+        "summary": "Redefine a senha e revoga as sessoes",
+        "tags": [
+          "auth"
+        ],
+        "description": "Consome o token de uso unico e revoga todas as sessoes da conta (D-029).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Token de uso único recebido por e-mail."
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Senha em claro (mín. 8)."
+                  }
+                },
+                "required": [
+                  "token",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/clinic/{tenantId}/invites": {
+      "post": {
+        "summary": "Convida um profissional para a clinica (admin)",
+        "tags": [
+          "clinic"
+        ],
+        "description": "Cria um convite de uso unico (D-014/D-048). Requer CLINIC_ADMIN do tenant. Devolve o token em claro UMA vez (entrega por e-mail e fase futura); o banco guarda apenas o hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "E-mail do profissional convidado."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant da clinica."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "invite": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "PENDING",
+                            "ACCEPTED",
+                            "EXPIRED",
+                            "REVOKED"
+                          ]
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "status",
+                        "expiresAt",
+                        "createdAt"
+                      ]
+                    },
+                    "token": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "invite",
+                    "token"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/clinic/{tenantId}/professionals": {
+      "get": {
+        "summary": "Lista profissionais e convites pendentes da clinica (admin)",
+        "tags": [
+          "clinic"
+        ],
+        "description": "Visao OPERACIONAL do corpo profissional + convites pendentes (D-015). Nunca expoe dado clinico. Requer CLINIC_ADMIN do tenant.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant da clinica."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "professionals": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "accountId": {
+                            "type": "string"
+                          },
+                          "professionalProfileId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "joinedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "accountId",
+                          "professionalProfileId",
+                          "name",
+                          "email",
+                          "joinedAt"
+                        ]
+                      }
+                    },
+                    "pendingInvites": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "PENDING",
+                              "ACCEPTED",
+                              "EXPIRED",
+                              "REVOKED"
+                            ]
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "email",
+                          "status",
+                          "expiresAt",
+                          "createdAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "professionals",
+                    "pendingInvites"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/clinic/{tenantId}/invites/{inviteId}/revoke": {
+      "post": {
+        "summary": "Revoga um convite pendente (admin)",
+        "tags": [
+          "clinic"
+        ],
+        "description": "Marca o convite como REVOKED. Requer CLINIC_ADMIN do tenant.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant da clinica."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "inviteId",
+            "required": true,
+            "description": "ID do convite."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Convite revogado."
+          }
+        }
+      }
+    },
+    "/v1/clinic/invites/accept": {
+      "post": {
+        "summary": "Aceita um convite de profissional (publico, por token)",
+        "tags": [
+          "clinic"
+        ],
+        "description": "Cria a conta (se nova) OU vincula o perfil a conta existente, sempre no tenant da clinica do convite (D-048 — unica porta de entrada numa clinica). O token de uso unico e a autorizacao; nao requer Bearer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token",
+                  "password",
+                  "name",
+                  "document",
+                  "documentType"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "Token de uso unico recebido no convite."
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Senha em claro (min. 8)."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "document": {
+                    "type": "string",
+                    "minLength": 11,
+                    "maxLength": 18,
+                    "description": "CPF ou CNPJ do profissional (D-043)."
+                  },
+                  "documentType": {
+                    "type": "string",
+                    "enum": [
+                      "CPF",
+                      "CNPJ"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "professional": {
+                      "type": "object",
+                      "properties": {
+                        "accountId": {
+                          "type": "string"
+                        },
+                        "tenantId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "accountId",
+                        "tenantId"
+                      ]
+                    },
+                    "created": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "professional",
+                    "created"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/patients/{tenantId}/invites": {
+      "post": {
+        "summary": "Convida um paciente para uma especialidade (profissional)",
+        "tags": [
+          "patient"
+        ],
+        "description": "Cria um convite de uso unico direcionado a UMA especialidade (D-006/D-052), declarando a MODALIDADE do atendimento (D-101), que o vinculo herda no aceite. Requer perfil profissional no tenant que reivindica a especialidade-alvo. Devolve o token em claro UMA vez (entrega por push/e-mail e fase futura); o banco guarda apenas o hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "specialtyId",
+                  "modality"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "E-mail do paciente convidado."
+                  },
+                  "specialtyId": {
+                    "type": "string",
+                    "description": "Especialidade-alvo do vinculo (D-052)."
+                  },
+                  "modality": {
+                    "type": "string",
+                    "enum": [
+                      "ONLINE",
+                      "PRESENCIAL",
+                      "HIBRIDO"
+                    ],
+                    "description": "Modalidade do atendimento (D-101). Definida pelo PROFISSIONAL — o paciente nao escolhe a modalidade do servico que contrata. Define o fluxo da anamnese: ONLINE (paciente preenche sozinho), PRESENCIAL (profissional preenche na consulta) ou HIBRIDO (ambos)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant do profissional."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "invite": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "specialtyId": {
+                          "type": "string"
+                        },
+                        "modality": {
+                          "type": "string",
+                          "enum": [
+                            "ONLINE",
+                            "PRESENCIAL",
+                            "HIBRIDO"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "PENDING",
+                            "ACCEPTED",
+                            "EXPIRED",
+                            "REVOKED"
+                          ]
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "specialtyId",
+                        "modality",
+                        "status",
+                        "expiresAt",
+                        "createdAt"
+                      ]
+                    },
+                    "token": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "invite",
+                    "token"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/patients/{tenantId}/overview": {
+      "get": {
+        "summary": "Lista convites pendentes e vinculos ativos do profissional",
+        "tags": [
+          "patient"
+        ],
+        "description": "Visao OPERACIONAL do proprio profissional: convites pendentes + vinculos ativos (ADR-0001). Requer perfil profissional no tenant.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant do profissional."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pendingInvites": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "specialtyId": {
+                            "type": "string"
+                          },
+                          "modality": {
+                            "type": "string",
+                            "enum": [
+                              "ONLINE",
+                              "PRESENCIAL",
+                              "HIBRIDO"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "PENDING",
+                              "ACCEPTED",
+                              "EXPIRED",
+                              "REVOKED"
+                            ]
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "email",
+                          "specialtyId",
+                          "modality",
+                          "status",
+                          "expiresAt",
+                          "createdAt"
+                        ]
+                      }
+                    },
+                    "activeBonds": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "patientProfileId": {
+                            "type": "string"
+                          },
+                          "patientName": {
+                            "type": "string"
+                          },
+                          "patientEmail": {
+                            "type": "string"
+                          },
+                          "specialtyId": {
+                            "type": "string"
+                          },
+                          "modality": {
+                            "type": "string",
+                            "enum": [
+                              "ONLINE",
+                              "PRESENCIAL",
+                              "HIBRIDO"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "ACTIVE",
+                              "ARCHIVED"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "archivedAt": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "patientProfileId",
+                          "patientName",
+                          "patientEmail",
+                          "specialtyId",
+                          "modality",
+                          "status",
+                          "createdAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "pendingInvites",
+                    "activeBonds"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/patients/{tenantId}/invites/{inviteId}/resend": {
+      "post": {
+        "summary": "Reenvia um convite pendente (profissional)",
+        "tags": [
+          "patient"
+        ],
+        "description": "Rotaciona o token e estende a validade na mesma linha (D-055). Devolve o novo token em claro UMA vez. Requer perfil profissional no tenant.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant do profissional."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "inviteId",
+            "required": true,
+            "description": "ID do convite."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "invite": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "specialtyId": {
+                          "type": "string"
+                        },
+                        "modality": {
+                          "type": "string",
+                          "enum": [
+                            "ONLINE",
+                            "PRESENCIAL",
+                            "HIBRIDO"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "PENDING",
+                            "ACCEPTED",
+                            "EXPIRED",
+                            "REVOKED"
+                          ]
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "specialtyId",
+                        "modality",
+                        "status",
+                        "expiresAt",
+                        "createdAt"
+                      ]
+                    },
+                    "token": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "invite",
+                    "token"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/patients/{tenantId}/invites/{inviteId}/revoke": {
+      "post": {
+        "summary": "Revoga um convite pendente (profissional)",
+        "tags": [
+          "patient"
+        ],
+        "description": "Marca o convite como REVOKED. Requer perfil profissional no tenant.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant do profissional."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "inviteId",
+            "required": true,
+            "description": "ID do convite."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Convite revogado."
+          }
+        }
+      }
+    },
+    "/v1/patients/{tenantId}/bonds/{bondId}/archive": {
+      "post": {
+        "summary": "Arquiva um vinculo ativo (profissional)",
+        "tags": [
+          "patient"
+        ],
+        "description": "ACTIVE -> ARCHIVED + archivedAt. NUNCA apaga: dados preservados (D-053). Requer perfil profissional no tenant.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant do profissional."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "bondId",
+            "required": true,
+            "description": "ID do vinculo."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Vinculo arquivado."
+          }
+        }
+      }
+    },
+    "/v1/patients/invites/accept": {
+      "post": {
+        "summary": "Aceita um convite de paciente (publico, por token)",
+        "tags": [
+          "patient"
+        ],
+        "description": "Cria a conta+perfil de paciente (se novo) OU anexa/reusa o perfil na conta existente (multi-papel — D-041) e abre o vinculo na especialidade do convite. O token de uso unico e a autorizacao; nao requer Bearer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token",
+                  "password",
+                  "name",
+                  "document"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "Token de uso unico recebido no convite."
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Senha em claro (min. 8)."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "document": {
+                    "type": "string",
+                    "minLength": 11,
+                    "maxLength": 14,
+                    "description": "CPF do paciente (D-043)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "patient": {
+                      "type": "object",
+                      "properties": {
+                        "accountId": {
+                          "type": "string"
+                        },
+                        "tenantId": {
+                          "type": "string"
+                        },
+                        "patientProfileId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "accountId",
+                        "tenantId",
+                        "patientProfileId"
+                      ]
+                    },
+                    "bond": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "specialtyId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "specialtyId"
+                      ]
+                    },
+                    "created": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "patient",
+                    "bond",
+                    "created"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/consents/": {
+      "post": {
+        "summary": "Paciente concede consentimento a um profissional (por especialidade)",
+        "tags": [
+          "consent"
+        ],
+        "description": "O paciente (titular do dado) autoriza um profissional (grantee) a acessar os dados de UMA especialidade (D-016/ADR-0003). Exige vinculo ATIVO do paciente na especialidade. Bloqueia duplicata ativa (409); reabre um consentimento revogado. O consentimento e do paciente e pode cruzar tenants.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "granteeProfessionalProfileId",
+                  "specialtyId"
+                ],
+                "properties": {
+                  "granteeProfessionalProfileId": {
+                    "type": "string",
+                    "description": "Profissional que RECEBE o acesso."
+                  },
+                  "specialtyId": {
+                    "type": "string",
+                    "description": "Especialidade cujo dado pode ser compartilhado."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "granteeProfessionalProfileId": {
+                      "type": "string"
+                    },
+                    "specialtyId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ACTIVE",
+                        "REVOKED"
+                      ]
+                    },
+                    "grantedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "revokedAt": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "granteeProfessionalProfileId",
+                    "specialtyId",
+                    "status",
+                    "grantedAt"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Lista os consentimentos do proprio paciente",
+        "tags": [
+          "consent"
+        ],
+        "description": "Consentimentos ATIVOS + historico revogado do paciente autenticado (D-016). Requer perfil de paciente.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "granteeProfessionalProfileId": {
+                            "type": "string"
+                          },
+                          "specialtyId": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "ACTIVE",
+                              "REVOKED"
+                            ]
+                          },
+                          "grantedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "revokedAt": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "granteeProfessionalProfileId",
+                          "specialtyId",
+                          "status",
+                          "grantedAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "consents"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/consents/{consentId}/revoke": {
+      "post": {
+        "summary": "Paciente revoga um consentimento ativo",
+        "tags": [
+          "consent"
+        ],
+        "description": "ACTIVE -> REVOKED + revokedAt. Requer perfil de paciente (titular).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "consentId",
+            "required": true,
+            "description": "ID do consentimento."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Consentimento revogado."
+          }
+        }
+      }
+    },
+    "/v1/billing/plans": {
+      "get": {
+        "summary": "Catalogo publico de planos (Fluxo A)",
+        "tags": [
+          "billing"
+        ],
+        "description": "Planos Nivel 1 da plataforma (D-060). Publico. Os precos comerciais reais sao um input GATED (decisao humana) — o catalogo pode estar vazio ate a definicao.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plans": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "tier": {
+                            "type": "string"
+                          },
+                          "prices": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "periodicity": {
+                                  "type": "string",
+                                  "enum": [
+                                    "monthly",
+                                    "quarterly",
+                                    "biannual",
+                                    "annual"
+                                  ]
+                                },
+                                "amountCents": {
+                                  "type": "integer",
+                                  "description": "Preco em centavos (D-069)."
+                                }
+                              },
+                              "required": [
+                                "periodicity",
+                                "amountCents"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name",
+                          "tier",
+                          "prices"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "plans"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/billing/{tenantId}/subscription": {
+      "post": {
+        "summary": "Assina um plano (dono/admin do tenant)",
+        "tags": [
+          "billing"
+        ],
+        "description": "Fluxo A (D-062): trial de 7 dias antes de cobrar. Requer dono/admin do tenant. idempotencyKey obrigatoria (D-035): um replay devolve a assinatura existente. O gateway Asaas e GATED — usa o FakePaymentGateway sem credenciais.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "planId",
+                  "periodicity",
+                  "idempotencyKey"
+                ],
+                "properties": {
+                  "planId": {
+                    "type": "string"
+                  },
+                  "periodicity": {
+                    "type": "string",
+                    "enum": [
+                      "monthly",
+                      "quarterly",
+                      "biannual",
+                      "annual"
+                    ]
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 200
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "planId": {
+                      "type": "string"
+                    },
+                    "periodicity": {
+                      "type": "string",
+                      "enum": [
+                        "monthly",
+                        "quarterly",
+                        "biannual",
+                        "annual"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "TRIALING",
+                        "ACTIVE",
+                        "PAST_DUE",
+                        "SUSPENDED",
+                        "CANCELED"
+                      ]
+                    },
+                    "currentPeriodEnd": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "format": "date-time"
+                    },
+                    "trialEndsAt": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "planId",
+                    "periodicity",
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Assinatura vigente do tenant (dono/admin)",
+        "tags": [
+          "billing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "planId": {
+                      "type": "string"
+                    },
+                    "periodicity": {
+                      "type": "string",
+                      "enum": [
+                        "monthly",
+                        "quarterly",
+                        "biannual",
+                        "annual"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "TRIALING",
+                        "ACTIVE",
+                        "PAST_DUE",
+                        "SUSPENDED",
+                        "CANCELED"
+                      ]
+                    },
+                    "currentPeriodEnd": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "format": "date-time"
+                    },
+                    "trialEndsAt": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "planId",
+                    "periodicity",
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/billing/{tenantId}/charges": {
+      "post": {
+        "summary": "Emite uma cobranca contra um vinculo (profissional)",
+        "tags": [
+          "billing"
+        ],
+        "description": "Fluxo B (D-019): o profissional dono do vinculo cobra o paciente via split (subconta do profissional + taxa FITVO). Valor em centavos (D-069). idempotencyKey obrigatoria (D-035). Asaas GATED — usa o FakePaymentGateway.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "bondId",
+                  "amountCents",
+                  "method",
+                  "idempotencyKey"
+                ],
+                "properties": {
+                  "bondId": {
+                    "type": "string"
+                  },
+                  "amountCents": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Valor em centavos (D-069)."
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "boleto",
+                      "pix",
+                      "credit_card"
+                    ]
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 200
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "recurring": {
+                    "type": "boolean"
+                  },
+                  "periodicity": {
+                    "type": "string",
+                    "enum": [
+                      "monthly",
+                      "quarterly",
+                      "biannual",
+                      "annual"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "bondId": {
+                      "type": "string"
+                    },
+                    "amountCents": {
+                      "type": "integer"
+                    },
+                    "method": {
+                      "type": "string",
+                      "enum": [
+                        "boleto",
+                        "pix",
+                        "credit_card"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "PENDING",
+                        "CONFIRMED",
+                        "RECEIVED",
+                        "OVERDUE",
+                        "REFUNDED",
+                        "FAILED"
+                      ]
+                    },
+                    "recurring": {
+                      "type": "boolean"
+                    },
+                    "periodicity": {
+                      "type": "string",
+                      "enum": [
+                        "monthly",
+                        "quarterly",
+                        "biannual",
+                        "annual"
+                      ],
+                      "nullable": true
+                    },
+                    "platformFeeCents": {
+                      "type": "integer",
+                      "description": "Taxa FITVO retida, em centavos (D-061)."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "bondId",
+                    "amountCents",
+                    "method",
+                    "status",
+                    "recurring",
+                    "platformFeeCents",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/billing/{tenantId}/wallet": {
+      "get": {
+        "summary": "Extrato da carteira do tenant (dono/admin)",
+        "tags": [
+          "billing"
+        ],
+        "description": "Recebido / a receber / taxas, agregados das cobrancas (D-061). Centavos (D-069).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "receivedCents": {
+                      "type": "integer"
+                    },
+                    "pendingCents": {
+                      "type": "integer"
+                    },
+                    "feesCents": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "receivedCents",
+                    "pendingCents",
+                    "feesCents"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/billing/webhooks/asaas": {
+      "post": {
+        "summary": "Webhook Asaas (publico, assinado, idempotente)",
+        "tags": [
+          "billing"
+        ],
+        "description": "Recebe eventos do Asaas (D-035): assinatura validada pelo gateway, dedupe idempotente pelo ledger (evento reentregue = no-op) e atualizacao de status. Rate limit dedicado. Sem credenciais Asaas, a validacao usa o FakePaymentGateway.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "received": {
+                      "type": "boolean"
+                    },
+                    "duplicate": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "received",
+                    "duplicate"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

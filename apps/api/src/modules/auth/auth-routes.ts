@@ -1,121 +1,239 @@
-import type { FastifyPluginAsync } from 'fastify';
-
-import { extractBearerToken } from '../../shared/auth-context';
-import type { AuthApplicationService } from './auth-application-service';
+import type { AuthTokens } from '@fitvo/auth';
 import {
-  forgotPasswordRouteSchema,
-  loginRouteSchema,
-  logoutRouteSchema,
-  meRouteSchema,
-  refreshRouteSchema,
-  registerPatientRouteSchema,
-  registerProfessionalRouteSchema,
-  requestEmailVerificationRouteSchema,
-  resetPasswordRouteSchema,
-  verifyEmailRouteSchema,
-} from './auth-openapi';
-import {
+  acceptedResultSchema,
+  type AuthResult as AuthResultDto,
+  authResultSchema,
+  emailVerifiedResultSchema,
   forgotPasswordSchema,
   loginSchema,
+  meResultSchema,
+  refreshResultSchema,
   refreshSchema,
   registerPatientSchema,
   registerProfessionalSchema,
   requestEmailVerificationSchema,
   resetPasswordSchema,
+  type Tokens as TokensDto,
   verifyEmailSchema,
-} from './auth-schemas';
+} from '@fitvo/validation';
+import type { FastifyPluginAsync } from 'fastify';
+import {
+  serializerCompiler,
+  validatorCompiler,
+  type ZodTypeProvider,
+} from 'fastify-type-provider-zod';
 
-const ACCEPTED = { status: 'accepted' as const };
+import { extractBearerToken } from '../../shared/auth-context';
+import type { AuthApplicationService, AuthResult } from './auth-application-service';
+
+const ACCEPTED = { status: 'accepted' } as const;
+const TAGS = ['auth'];
+
+/**
+ * Timestamps do domínio (`Date`) → ISO string no fio. O `fast-json-stringify`
+ * fazia isto escondido via `format: date-time`; o serializer do Zod não converte
+ * `Date` sozinho, então a ponte é explícita aqui, no boundary (D-032).
+ */
+function toTokensDto(tokens: AuthTokens): TokensDto {
+  return {
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    accessExpiresAt: tokens.accessExpiresAt.toISOString(),
+    refreshExpiresAt: tokens.refreshExpiresAt.toISOString(),
+  };
+}
+
+function toAuthResultDto(result: AuthResult): AuthResultDto {
+  return { account: result.account, tokens: toTokensDto(result.tokens) };
+}
 
 /**
  * Vertical slice de autenticacao (D-034: versao na URL /v1). Registro por papel
  * (D-045/D-006), login (rate limited — D-029), refresh (rotacao), logout,
- * verificacao de e-mail, recuperacao de senha e conta atual (/me). Rotas
- * documentadas no OpenAPI/Swagger (D-032); Zod valida o corpo nos handlers.
+ * verificacao de e-mail, recuperacao de senha e conta atual (/me).
+ *
+ * D-032: os schemas Zod de `@fitvo/validation` são a FONTE ÚNICA — validam o
+ * request E geram o OpenAPI (via `fastify-type-provider-zod`). O validador e o
+ * serializer Zod são setados AQUI, no contexto encapsulado deste slice: os
+ * demais slices seguem em AJV/JSON Schema até a D-032.2.
  */
 export function authRoutes(service: AuthApplicationService): FastifyPluginAsync {
-  return (app) => {
+  return async (fastify) => {
+    fastify.setValidatorCompiler(validatorCompiler);
+    fastify.setSerializerCompiler(serializerCompiler);
+    const app = fastify.withTypeProvider<ZodTypeProvider>();
+
     app.post(
       '/register/professional',
-      { schema: registerProfessionalRouteSchema },
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'Cadastra um profissional (cria conta + tenant SOLO)',
+          description:
+            'Cria conta + tenant SOLO + perfil profissional (D-045) e dispara a verificacao de e-mail.',
+          body: registerProfessionalSchema,
+          response: { 201: authResultSchema },
+        },
+      },
       async (request, reply) => {
-        const body = registerProfessionalSchema.parse(request.body);
-        return reply.code(201).send(await service.registerProfessional(body));
+        return reply
+          .code(201)
+          .send(toAuthResultDto(await service.registerProfessional(request.body)));
       },
     );
 
     app.post(
       '/register/patient',
-      { schema: registerPatientRouteSchema },
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'Cadastra um paciente (conta em estado minimo)',
+          description: 'Autocadastro de paciente (D-006); dispara a verificacao de e-mail.',
+          body: registerPatientSchema,
+          response: { 201: authResultSchema },
+        },
+      },
       async (request, reply) => {
-        const body = registerPatientSchema.parse(request.body);
-        return reply.code(201).send(await service.registerPatient(body));
+        return reply.code(201).send(toAuthResultDto(await service.registerPatient(request.body)));
       },
     );
 
     app.post(
       '/login',
-      { schema: loginRouteSchema, config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'Autentica por e-mail e senha (rate limited)',
+          description: 'Emite access + refresh (D-029). Limitado a 5 tentativas por minuto.',
+          body: loginSchema,
+          response: { 200: authResultSchema },
+        },
+        config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+      },
       async (request, reply) => {
-        const body = loginSchema.parse(request.body);
-        return reply.send(await service.login(body.email, body.password));
+        return reply.send(
+          toAuthResultDto(await service.login(request.body.email, request.body.password)),
+        );
       },
     );
 
-    app.post('/refresh', { schema: refreshRouteSchema }, async (request, reply) => {
-      const body = refreshSchema.parse(request.body);
-      return reply.send({ tokens: await service.refresh(body.refreshToken) });
-    });
+    app.post(
+      '/refresh',
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'Rotaciona o refresh token',
+          description: 'Rotacao a cada uso com deteccao de reuso (D-029).',
+          body: refreshSchema,
+          response: { 200: refreshResultSchema },
+        },
+      },
+      async (request, reply) => {
+        return reply.send({
+          tokens: toTokensDto(await service.refresh(request.body.refreshToken)),
+        });
+      },
+    );
 
-    app.post('/logout', { schema: logoutRouteSchema }, async (request, reply) => {
-      await service.logout(extractBearerToken(request.headers.authorization));
-      return reply.code(204).send();
-    });
+    app.post(
+      '/logout',
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'Encerra a sessao atual (revoga o refresh)',
+          security: [{ bearerAuth: [] }],
+        },
+      },
+      async (request, reply) => {
+        await service.logout(extractBearerToken(request.headers.authorization));
+        return reply.code(204).send();
+      },
+    );
 
-    app.get('/me', { schema: meRouteSchema }, async (request, reply) => {
-      return reply.send(await service.getMe(extractBearerToken(request.headers.authorization)));
-    });
+    app.get(
+      '/me',
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'Conta autenticada (a partir do access token)',
+          security: [{ bearerAuth: [] }],
+          response: { 200: meResultSchema },
+        },
+      },
+      async (request, reply) => {
+        return reply.send(await service.getMe(extractBearerToken(request.headers.authorization)));
+      },
+    );
 
     // (Re)envio da verificacao de e-mail — sempre 202 (nao vaza existencia).
     app.post(
       '/verify-email/request',
       {
-        schema: requestEmailVerificationRouteSchema,
+        schema: {
+          tags: TAGS,
+          summary: 'Solicita/reenvia a verificacao de e-mail',
+          description:
+            'Sempre 202 — nao revela se o e-mail existe ou ja esta verificado (D-029). Rate limited.',
+          body: requestEmailVerificationSchema,
+          response: { 202: acceptedResultSchema },
+        },
         config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
       },
       async (request, reply) => {
-        const body = requestEmailVerificationSchema.parse(request.body);
-        await service.requestEmailVerification(body.email);
+        await service.requestEmailVerification(request.body.email);
         return reply.code(202).send(ACCEPTED);
       },
     );
 
-    app.post('/verify-email', { schema: verifyEmailRouteSchema }, async (request, reply) => {
-      const body = verifyEmailSchema.parse(request.body);
-      await service.verifyEmail(body.token);
-      return reply.send({ verified: true });
-    });
+    app.post(
+      '/verify-email',
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'Confirma a verificacao de e-mail (consome o token)',
+          body: verifyEmailSchema,
+          response: { 200: emailVerifiedResultSchema },
+        },
+      },
+      async (request, reply) => {
+        await service.verifyEmail(request.body.token);
+        return reply.send({ verified: true });
+      },
+    );
 
     // Recuperacao de senha — sempre 202 (nao vaza existencia de conta).
     app.post(
       '/forgot-password',
       {
-        schema: forgotPasswordRouteSchema,
+        schema: {
+          tags: TAGS,
+          summary: 'Inicia a recuperacao de senha',
+          description: 'Sempre 202 — nao vaza existencia de conta (D-029). Rate limited.',
+          body: forgotPasswordSchema,
+          response: { 202: acceptedResultSchema },
+        },
         config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
       },
       async (request, reply) => {
-        const body = forgotPasswordSchema.parse(request.body);
-        await service.forgotPassword(body.email);
+        await service.forgotPassword(request.body.email);
         return reply.code(202).send(ACCEPTED);
       },
     );
 
-    app.post('/reset-password', { schema: resetPasswordRouteSchema }, async (request, reply) => {
-      const body = resetPasswordSchema.parse(request.body);
-      await service.resetPassword(body.token, body.password);
-      return reply.code(204).send();
-    });
-
-    return Promise.resolve();
+    app.post(
+      '/reset-password',
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'Redefine a senha e revoga as sessoes',
+          description: 'Consome o token de uso unico e revoga todas as sessoes da conta (D-029).',
+          body: resetPasswordSchema,
+        },
+      },
+      async (request, reply) => {
+        await service.resetPassword(request.body.token, request.body.password);
+        return reply.code(204).send();
+      },
+    );
   };
 }

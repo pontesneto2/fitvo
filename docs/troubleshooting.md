@@ -653,3 +653,51 @@ por ano. Nenhum erro aparece — o dado só fica **errado em silêncio**.
 Antes de escrever `DateTime`, pergunte: **isto é um instante, um dia, ou uma regra
 que se repete?** Três respostas, três tipos. `birthDate` é o primeiro `@db.Date` do
 schema — não por acaso, e não deve ser o último tratado por reflexo como instante.
+
+---
+
+# Integrações externas
+
+Armadilhas que não são do ambiente local, mas do **gateway/serviço de terceiros**.
+Mordem na implementação, não no setup: o comportamento do provider não é o que a
+intuição supõe, e o código escrito sobre a suposição fica errado em silêncio.
+
+## 15. Asaas / split: a taxa incide sobre o `netValue`, e o estorno reverte tudo
+
+**Sintoma**
+
+Dois erros distintos, nenhum quebra nada — só dá número errado:
+
+1. A receita projetada do FITVO vem **inflada**: o dashboard soma mais do que o
+   Asaas de fato transfere.
+2. A implementação de estorno assume que a taxa do FITVO **fica retida** e concilia
+   um saldo que nunca existiu.
+
+**Causa**
+
+Duas premissas do split do Asaas que contrariam a intuição (fatos verificados,
+ver ADR-0004 / D-018 e D-021):
+
+1. **A taxa do Asaas é descontada ANTES do split.** O percentual do split incide
+   sobre o `netValue`, **nunca sobre o valor bruto**. Numa cobrança de **R$ 200 no
+   cartão** → o Asaas desconta **R$ 6,47** → `netValue` **R$ 193,53** → o split de
+   2% do FITVO rende **R$ 3,87**, não R$ 4,00. Calcular sobre o bruto infla a
+   receita esperada. A taxa do FITVO é margem limpa; o profissional absorve o custo
+   do gateway.
+
+2. **Estorno total reverte o split inteiro — taxa do FITVO incluída.** Em estorno
+   total da cobrança, todas as contas que receberam saldo têm a transferência
+   revertida, o FITVO entre elas. **Não é configurável** — é comportamento do
+   gateway. A implementação de estorno **deve assumir isso**: a taxa volta, não há
+   como retê-la dentro do split.
+
+**Regra**
+
+> O split do FITVO é **percentual sobre o `netValue`**, e o estorno **devolve a
+> taxa**. Não calcule receita sobre o bruto, e não modele estorno supondo que a
+> taxa fica. Os dois vêm do gateway, não da nossa configuração.
+
+A decisão e as alternativas rejeitadas (cobrar a taxa fora do split para
+preservá-la no estorno — rejeitado) estão em `docs/adr/0004-financeiro.md`. Este
+registro é o que morde quem for **codar** o split: o ADR é a decisão; isto é a
+consequência prática.

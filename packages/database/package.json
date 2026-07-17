@@ -16,7 +16,8 @@
     "db:studio": "prisma studio",
     "lint": "eslint .",
     "typecheck": "prisma generate && tsc --noEmit",
-    "build": "prisma generate"
+    "build": "prisma generate",
+    "test:integration": "prisma generate && vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.1.0"
@@ -27,6 +28,7 @@
     "@types/node": "^26.1.1",
     "eslint": "^10.7.0",
     "prisma": "^6.1.0",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "vitest": "^4.1.10"
   }
 }

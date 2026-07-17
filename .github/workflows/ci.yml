@@ -90,6 +90,20 @@ jobs:
             --shadow-database-url "$SHADOW_DATABASE_URL" \
             --exit-code
 
+      # 3) TESTES DE INTEGRACAO — rodam AQUI, e nao no job `test`, porque exigem
+      #    banco: este job ja subiu o Postgres e ja aplicou a cadeia acima. O
+      #    banco esta no estado exato de que eles precisam; subir outro container
+      #    seria duplicar infra.
+      #
+      #    Eles cobrem o que o resto do CI NAO consegue ver:
+      #    - MAPEAMENTO: os testes do slice usam repositorio in-memory. Campo
+      #      errado, relacao trocada ou onDelete frouxo passam verdes lá.
+      #    - A constraint EXCLUDE da agenda: e SQL cru, invisivel ao drift check
+      #      dos dois lados. Se alguem a derrubar, o passo (2) acima NAO percebe —
+      #      quem percebe e este.
+      - name: Testes de integracao (mapeamento + constraints)
+        run: pnpm test:integration
+
   dependency-scan:
     name: dependency-scan
     runs-on: ubuntu-latest

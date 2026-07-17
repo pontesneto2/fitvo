@@ -389,7 +389,60 @@ sobrevivente. O acaso foi o backup.
 > avisaria; a 9 age sobre um alvo que não é o que você pensou. Nos três, a
 > ferramenta obedeceu com precisão — a uma pergunta que não era a sua.
 
-## 10. `prisma migrate reset` pede consentimento explícito
+## 10. Rodar o comando DA FERRAMENTA em vez do comando DO PROJETO
+
+**Sintoma**
+
+Você roda a ferramenta direto para conferir o estado do repo, e ela **reprova**
+algo que está no `main` verde:
+
+```bash
+pnpm exec prettier --check .
+# [warn] packages/ui-web/gallery/index.html
+# → vermelho
+```
+
+**Causa**
+
+O comando do projeto **não é** o comando da ferramenta:
+
+```jsonc
+"format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,yml,yaml}\""
+```
+
+O escopo é **deliberado** — `.html` fica de fora (a galeria é markup manual, e o
+prettier a reformataria). `prettier --check .` cobre **tudo** e reprova o que está
+fora de escopo **de propósito**. O vermelho é real; o defeito, não.
+
+**Regra**
+
+> Rode **`pnpm format:check`**, `pnpm lint`, `pnpm test` — os scripts do
+> `package.json`, que são o que o CI roda. Ao conferir um estado, use o comando do
+> **projeto**, não o da ferramenta: eles têm escopos diferentes, e o da ferramenta
+> não sabe o que foi excluído por decisão.
+
+Se precisar rodar a ferramenta direto (para depurar), confira antes o escopo real:
+
+```bash
+grep -E '"(format|lint|test)' package.json
+```
+
+**Caso real**
+
+Nesta sessão, `prettier --check .` deu vermelho em `gallery/index.html` e eu quase
+reportei "a `main` tem problema de formatação". `pnpm format:check` — o comando do
+CI — dava **verde**. Eu estava errado, não a `main`.
+
+> **Fecha o documento, e vale para todas as seções acima.** As seções 4, 5 e 6 são
+> **verde que não prova nada**; esta é o espelho: **vermelho que não reprova nada**.
+> A pergunta certa nunca foi *"passou?"* — e também não é *"falhou?"*. É:
+>
+> ### **"Qual pergunta este comando está respondendo?"**
+>
+> Um check só vale quando você sabe **o que ele reprova**. Se não sabe, a cor dele
+> é decoração.
+
+## 11. `prisma migrate reset` pede consentimento explícito
 
 **Sintoma**
 

@@ -619,3 +619,37 @@ arquivo. Depois, o cliente é **restaurado**. Determinístico, nos dois sentidos
 > **Princípio geral:** tarefa cujo artefato o turbo não enxerga é tarefa cujo
 > cache **mente**. Antes de aceitar `cache HIT`, pergunte **onde o artefato caiu**
 > — se for fora do pacote, o HIT não significa nada.
+
+---
+
+## 14. Nem todo `DateTime` é instante — são TRÊS tipos de dado temporal
+
+**Sintoma (o que dá errado se ignorar)**
+
+Você modela toda data como `DateTime` e deixa o Prisma mapear para o default. Meses
+depois: a data de nascimento de alguém "muda de dia" perto da meia-noite conforme o
+fuso de quem consulta; ou um horário de atendimento "desliza uma hora" duas vezes
+por ano. Nenhum erro aparece — o dado só fica **errado em silêncio**.
+
+**Causa — três perguntas diferentes tratadas como uma**
+
+"Data" não é um tipo só. O FITVO já bateu de frente com isso três vezes, e a regra
+é: **o tipo da coluna tem que combinar com a natureza do dado.**
+
+| Natureza | Exemplo | Tipo | Por quê |
+|---|---|---|---|
+| **Instante** | `Appointment.startsAt`, `createdAt` | `@db.Timestamptz(3)` | Um ponto único na linha do tempo. UTC no banco, convertido na exibição (ADR-0012, D-111). |
+| **Data de calendário** | `Account.birthDate` | `@db.Date` | Ninguém nasce "às 00h UTC". Não tem hora nem fuso — é um dia no calendário. |
+| **Janela recorrente** | `AvailabilityRule` | hora local (min) + `timezone` IANA | "Atendo 9h–18h" é hora de parede que se repete; guardar em UTC congela um offset e desliza no DST (ADR-0012, adendo do D-111). |
+
+**Regra**
+
+> **Converter cedo destrói informação.** O ADR-0012 provou isso do jeito difícil
+> com a janela recorrente: guardar "9h no relógio dele" como UTC apaga o fato de
+> que era 9h **local**. O mesmo vale para baixo: guardar uma data de nascimento
+> como `timestamptz` inventa uma hora e um fuso que não existem, e reintroduz o
+> deslize que o D-111 combate.
+
+Antes de escrever `DateTime`, pergunte: **isto é um instante, um dia, ou uma regra
+que se repete?** Três respostas, três tipos. `birthDate` é o primeiro `@db.Date` do
+schema — não por acaso, e não deve ser o último tratado por reflexo como instante.

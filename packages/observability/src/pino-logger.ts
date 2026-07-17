@@ -12,6 +12,26 @@ export interface PinoLoggerOptions {
 }
 
 /**
+ * Campos sensiveis censurados em todo log (rede de seguranca — D-073). Cobre o
+ * campo no topo e um nivel de aninhamento (ex.: `body.password`). O primeiro
+ * dever e nunca logar o segredo na origem; isto e a rede, nao o piso: um handler
+ * que logue um payload por engano nao vaza credencial nem CPF (`document`).
+ */
+const SENSITIVE_KEYS = [
+  'token',
+  'password',
+  'newPassword',
+  'currentPassword',
+  'accessToken',
+  'refreshToken',
+  'authorization',
+  'apiKey',
+  'secret',
+  'document',
+] as const;
+const REDACT_PATHS = SENSITIVE_KEYS.flatMap((key) => [key, `*.${key}`]);
+
+/**
  * Adaptador concreto do contrato `Logger` sobre pino (D-073). Log estruturado
  * JSON, com `child(bindings)` propagando contexto (request/correlation ID). O
  * dominio depende apenas da interface `Logger`; pino fica confinado aqui.
@@ -27,6 +47,7 @@ export class PinoLogger implements Logger {
   static create(options: PinoLoggerOptions = {}, destination?: pino.DestinationStream): PinoLogger {
     const pinoOptions: pino.LoggerOptions = {
       level: options.level ?? 'info',
+      redact: { paths: REDACT_PATHS, censor: '[REDACTED]' },
       ...(options.name ? { name: options.name } : {}),
     };
     const instance = destination ? pino(pinoOptions, destination) : pino(pinoOptions);

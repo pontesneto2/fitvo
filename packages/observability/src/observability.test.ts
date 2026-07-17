@@ -53,6 +53,27 @@ describe('PinoLogger', () => {
 
     expect(dest.lines()[0]).toMatchObject({ msg: 'com contexto', requestId: 'r1' });
   });
+
+  it('censura campos sensiveis (rede de seguranca) sem tocar nos demais', () => {
+    const dest = captureDestination();
+    const logger = PinoLogger.create({ level: 'info', name: 'test' }, dest);
+
+    logger.info('evento', {
+      to: 'ana@fitvo.dev', // nao-sensivel: permanece
+      token: 'segredo-123', // topo: censurado
+      nested: { password: 'p4ss', document: '12345678900' }, // 1 nivel: censurado
+    });
+
+    const [entry] = dest.lines();
+    expect(entry).toMatchObject({
+      to: 'ana@fitvo.dev',
+      token: '[REDACTED]',
+      nested: { password: '[REDACTED]', document: '[REDACTED]' },
+    });
+    // O check so vale se reprovar o vazamento: o segredo nao pode sobrar na linha.
+    expect(JSON.stringify(entry)).not.toContain('segredo-123');
+    expect(JSON.stringify(entry)).not.toContain('12345678900');
+  });
 });
 
 describe('NoopLogger', () => {

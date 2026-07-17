@@ -31,26 +31,23 @@ export interface AuthEmailLogSink {
 /**
  * Stub de envio: NAO integra provedor real ainda (correto para esta fase —
  * D-029 exige recuperacao/verificacao seguras, nao um provedor especifico).
- * Registra destinatario e token no log para uso em desenvolvimento. Deve ser
- * substituido por um adaptador real (e idealmente enfileirado no worker) antes
- * de producao.
+ * Registra APENAS o destinatario no log — NUNCA o token nem o `link` (o link
+ * carrega o token). Token em log e credencial em claro no stdout: comprometimento
+ * em qualquer ambiente. Deve ser substituido por um adaptador real (e idealmente
+ * enfileirado no worker) antes de producao.
  */
 export class LoggingAuthEmailSender implements AuthEmailSender {
   constructor(private readonly log: AuthEmailLogSink) {}
 
   sendEmailVerification(message: AuthEmailMessage): Promise<void> {
-    this.log.info(
-      { to: message.to, token: message.token, link: message.link },
-      'auth: envio (stub) de verificacao de e-mail',
-    );
+    // Apenas o destinatario — nunca o token/link (credencial em claro no log).
+    this.log.info({ to: message.to }, 'auth: envio (stub) de verificacao de e-mail');
     return Promise.resolve();
   }
 
   sendPasswordReset(message: AuthEmailMessage): Promise<void> {
-    this.log.info(
-      { to: message.to, token: message.token, link: message.link },
-      'auth: envio (stub) de recuperacao de senha',
-    );
+    // Apenas o destinatario — nunca o token/link (credencial em claro no log).
+    this.log.info({ to: message.to }, 'auth: envio (stub) de recuperacao de senha');
     return Promise.resolve();
   }
 }

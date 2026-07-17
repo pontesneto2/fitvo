@@ -106,6 +106,25 @@ sexo e pela idade do paciente **na data da coleta** (não na data de hoje: uma
 faixa pediátrica não pode virar adulta retroativamente porque o paciente
 cresceu).
 
+**O sexo é `BiologicalSex` (`MALE`/`FEMALE`/`INTERSEX`/`NOT_INFORMED`), definido
+na Fase 0** como atributo da `Account` (a pessoa, não o papel — D-044). A faixa de
+referência **só é derivável para `MALE` e `FEMALE`** — é neles que a fisiologia
+hormonal e hematológica tem faixa estabelecida. **Para `INTERSEX` e `NOT_INFORMED`
+o sistema NÃO adivinha faixa:** exibe o valor medido **sem** faixa e o
+profissional interpreta.
+
+> Registrado como decisão, não como comentário de código: adivinhar uma faixa
+> para quem não é `MALE`/`FEMALE` (cair no "mais próximo", ou usar a masculina por
+> default) produziria exatamente o "normal/alterado" falso que este adendo
+> existe para evitar — agora escondido atrás de uma premissa que ninguém
+> escolheu. Ausência de faixa é a resposta **honesta**; o profissional avalia. É a
+> mesma disciplina do D-102 (o profissional refina o que o sistema não sabe).
+>
+> **`BiologicalSex` é sexo biológico — dado clínico para a faixa — e NÃO
+> identidade de gênero.** Não é usado para tratamento nem nome social; se o
+> produto precisar de nome social, é campo separado (a Fase 0 fixa isso no
+> comentário do enum).
+
 #### Adendo — valor de exame é `Decimal`, e é o primeiro do schema
 
 O valor **não pode ser `Float`**, pelo mesmo motivo que dinheiro não pode

@@ -217,6 +217,18 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   com a convenção do harness (`test:integration` + serviço no CI): **falhar, não
   pular** — se a infra não subir, o job quebra. Ver `.github/workflows/ci.yml`, job
   `migrate`, e `packages/database/src/*.integration.test.ts`.
+- **⚠️ LACUNA DE CONFORMIDADE — profissional não-verificado PODE atender.** O
+  guard de vínculo exige a especialidade **reivindicada** (`ProfessionalSpecialty`
+  — D-046), mas **NÃO** exige `verificationStatus === VERIFIED`. É `TODO(D-010)`
+  explícito em [`patient-application-service.ts:286`](../apps/api/src/modules/patient/patient-application-service.ts#L286).
+  O **D-051** ("o profissional não atende até ser verificado") está **decidido, não
+  implementado** — depende do fluxo de verificação, deferido desde a Fase 2. Fica
+  **visível aqui**, não escondido num TODO: num produto de saúde com repositório
+  público, alguém reivindica CRM/CRN que não tem e o sistema hoje deixa. Não é bug
+  de código — é regra de negócio pendente, e o dono é o fluxo de verificação
+  (item deferido). A Fase 0 de medicina (D-130) **modela** `councilState`/`rqe`
+  nuláveis de propósito por causa disto: a coluna não impõe verificação; o guard é
+  que imporá, quando existir.
 - **`timestamptz` nas 54 tabelas existentes** — **APROVADO; PR #44 aberto,
   aguardando revisão. Mover para FEITO quando mergear.** O contexto a seguir fica
   registrado porque é o que fundamenta a decisão: o D-067/D-111 decidem "tudo em

@@ -206,6 +206,10 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   vermelhos. O React 19 muda tipos (`ref` como prop, `children` implícito removido)
   e atravessa `ui-web` + `ui-mobile`; o RN 0.86 é salto grande. **PR próprio,
   planejado, com verificação** — e provavelmente um para cada, não os dois juntos.
+  - **Nota (pós-#62):** o `web-personal` roda **Next 15 sobre React 18** — o peer do
+    Next 15 aceita `^18.2.0 || ^19`, então **subir o Next NÃO exige React 19**. Next
+    e React 19 são dívidas **separadas**; esta migração vale só quando se decidir
+    mover `ui-web`/`ui-mobile` para React 19, não por causa da versão do Next.
 - **`lucide-react` / `lucide-react-native` 0.469 → 1.24 (major)** — o Lucide entrou
   no #20 e o Dependabot já ofereceu o major na sequência (PR #39, fechado). Subir
   major de dependência recém-adotada, junto de patches, é pedir problema. Tarefa

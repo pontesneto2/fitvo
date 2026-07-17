@@ -51,6 +51,56 @@ enum DocumentType {
   CNPJ
 }
 
+/// Unidade federativa brasileira (27: 26 estados + DF). Enum, nao String: o
+/// conselho profissional e ESTADUAL e a UF vai impressa em documento (receita —
+/// D-126) — estado invalido deve ser irrepresentavel, mesma disciplina de
+/// Weekday/SetTechnique. Reusado por ProfessionalSpecialty.councilState (UF do
+/// conselho) e Tenant.addressState (UF da clinica).
+enum BrazilianState {
+  AC
+  AL
+  AM
+  AP
+  BA
+  CE
+  DF
+  ES
+  GO
+  MA
+  MG
+  MS
+  MT
+  PA
+  PB
+  PE
+  PI
+  PR
+  RJ
+  RN
+  RO
+  RR
+  RS
+  SC
+  SE
+  SP
+  TO
+}
+
+/// Sexo biologico — dado clinico que e a base das faixas de referencia
+/// laboratoriais (D-124 — ADR-0014: fisiologia hormonal/hematologica difere por
+/// sexo). Vive no Account (com nome e CPF) porque e atributo da PESSOA, nao do
+/// papel (D-044) — a mesma conta acumula profissional e paciente. NAO e
+/// identidade de genero: nao usar para tratamento nem nome social (se um dia for
+/// preciso, e campo separado). Faixa so e derivavel para MALE/FEMALE; para
+/// INTERSEX e NOT_INFORMED o sistema NAO adivinha — exibe o valor SEM faixa e o
+/// profissional interpreta (regra fixada no D-124, ADR-0014).
+enum BiologicalSex {
+  MALE
+  FEMALE
+  INTERSEX
+  NOT_INFORMED
+}
+
 enum SpecialtyCode {
   TRAINING // treino / educacao fisica (CREF)
   NUTRITION // nutricao (CRN)
@@ -108,17 +158,28 @@ enum SuggestionStatus {
 /// Conta = identidade unica de login. Acumula N papeis (profissional, paciente,
 /// admin de clinica, super admin) sob a mesma conta (D-041/D-044).
 model Account {
-  id                String       @id @default(cuid())
-  email             String       @unique
+  id                String        @id @default(cuid())
+  email             String        @unique
   passwordHash      String
   name              String
   document          String // CPF ou CNPJ da PESSOA (D-043)
   documentType      DocumentType
-  emailVerifiedAt   DateTime?    @db.Timestamptz(3)
-  preferredLocale   String       @default("pt-BR") // i18n (D-066)
-  preferredTimezone String       @default("America/Sao_Paulo") // exibicao (D-067)
-  createdAt         DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime     @updatedAt @db.Timestamptz(3)
+  /// Data de nascimento (D-044: atributo da PESSOA, nao do papel — a mesma conta
+  /// acumula profissional + paciente, entao mora aqui com nome e CPF, nao no
+  /// perfil). Idade e DERIVADA, nunca armazenada (mesma disciplina do IMC — D-132).
+  /// @db.Date: e data de CALENDARIO, nao instante — timestamptz reintroduziria o
+  /// deslize de fuso do ADR-0012 (ninguem nasce "as 00h UTC"). Nulavel: conta
+  /// antiga nao tem, e null e a unica representacao de "desconhecido".
+  birthDate         DateTime?     @db.Date
+  /// Sexo biologico (ver enum BiologicalSex). NOT NULL com default: NOT_INFORMED
+  /// JA E o estado "desconhecido", entao nulavel criaria DUAS representacoes do
+  /// mesmo estado (null e NOT_INFORMED) — o anti-padrao que o projeto evita (D-103).
+  biologicalSex     BiologicalSex @default(NOT_INFORMED)
+  emailVerifiedAt   DateTime?     @db.Timestamptz(3)
+  preferredLocale   String        @default("pt-BR") // i18n (D-066)
+  preferredTimezone String        @default("America/Sao_Paulo") // exibicao (D-067)
+  createdAt         DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime      @updatedAt @db.Timestamptz(3)
 
   professionalProfile ProfessionalProfile?
   patientProfile      PatientProfile?
@@ -164,8 +225,27 @@ model Tenant {
   name         String
   document     String? // CNPJ da CLINICA mora aqui (D-043); solo herda o da conta
   documentType DocumentType?
-  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+
+  /// Endereco e contato da clinica — cabecalho IMPRESSO da receita/declaracao
+  /// (D-126/D-130). Estrutura moderada, de proposito: TISS-level fica fora (D-121).
+  /// addressNumber e addressZipCode sao String, nao Int: "123-A"/"s/n" e o CEP com
+  /// zero a esquerda nao sao numeros. Todos nulaveis — solo pode nao ter endereco.
+  addressStreet     String?
+  addressNumber     String?
+  addressComplement String?
+  addressDistrict   String?
+  addressCity       String?
+  addressState      BrazilianState?
+  addressZipCode    String?
+  phone             String?
+  email             String?
+  /// Logo da clinica. UMA coluna, DOIS consumidores: cabecalho da receita (D-126)
+  /// e white-label estrutural (D-078 — ADR-0008) — o MESMO ativo, nao dois campos
+  /// competindo. Referencia S3 (sem binario aqui), padrao de ProgressPhoto.storageKey.
+  logoStorageKey    String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   professionals   ProfessionalProfile[]
   memberships     ClinicMembership[]
@@ -266,6 +346,15 @@ model ProfessionalSpecialty {
   specialtyId           String
   verificationStatus    VerificationStatus @default(PENDING)
   councilDocument       String? // registro no conselho (CREF/CRN/CRM)
+  /// UF do conselho (estadual): "CRM 12345" SEM UF nao identifica ninguem, e e o
+  /// que vai impresso na receita (D-126). Viaja junto de councilDocument; nulavel,
+  /// acompanha ele. A EXIGENCIA de preenchimento (junto com o verificationStatus
+  /// VERIFIED) e da aplicacao — D-051/TODO(D-010) —, nao da coluna.
+  councilState          BrazilianState?
+  /// RQE — Registro de Qualificacao de Especialista (D-126). So faz sentido na
+  /// especialidade MEDICINE (ao lado do CRM); "so quando MEDICINE" e regra entre a
+  /// linha e o enum, imposta na aplicacao/Zod, nao no banco. Nulo nas demais.
+  rqe                   String?
   createdAt             DateTime           @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime           @updatedAt @db.Timestamptz(3)
 

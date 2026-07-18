@@ -771,3 +771,90 @@ scanner do CI **local**:
 
 > A pergunta não é "compila com esta versão?" — é "esta versão tem vulnerabilidade
 > conhecida?". O CI responde a segunda, mas tarde. Responda-a no plano, não no PR.
+
+---
+
+# Documentação e decisões (ADR)
+
+## 18. Destilar o histórico num ADR pode APAGAR a força da decisão
+
+**Sintoma**
+
+Alguém lê só o ADR (a fonte viva), implementa conforme ele, e o resultado fica
+"certo" contra o ADR e **verde** no CI — mas **viola a decisão original**. O ADR,
+ao resumir o histórico, perdeu uma **palavra de força** (obrigatório, sempre,
+nunca) e ninguém percebeu. Quem lê só o ADR nunca saberá que faltou algo.
+
+**Causa**
+
+O fluxo do projeto **destila** o histórico bruto (`docs/history/`) em ADRs.
+Destilar é resumir — e resumo tende a **suavizar**. Só que palavra de força não é
+ênfase retórica: é o **contrato**. "Verificação de e-mail **obrigatória**" e
+"verificação de e-mail" são requisitos **diferentes** — a segunda permite não
+enforçar; a primeira, não. Quando a força cai na síntese, a decisão enfraquece
+**silenciosamente**, sem ninguém ter decidido enfraquecê-la.
+
+**Caso real (D-029 / ADR-0002)**
+
+O histórico (D-029, sob *"Medidas de segurança **obrigatórias**"*) diz literal:
+*"Verificação de e-mail **obrigatória**."* O ADR-0002 destilou para
+*"verificação de e-mail"* — **apagou "obrigatória"**. No código: o mecanismo de
+verificação existe inteiro (`/verify-email`, `emailVerifiedAt`, `markEmailVerified`),
+mas **nada enforça** — o login não checa `emailVerifiedAt`. A obrigação evaporou
+na tradução.
+
+**Regra**
+
+> Ao destilar o histórico em ADR, palavras de força — **obrigatório, sempre,
+> nunca, proibido, inegociável, apenas** — NÃO são ruído: são o contrato. Perdê-las
+> na síntese enfraquece a decisão silenciosamente. Ao revisar um ADR contra o
+> histórico, compare a **FORÇA**, não só o conteúdo.
+
+**Classe de defeito (nova)**
+
+Isto **não** é "decidido e não implementado" — o mecanismo existe. É "decidido e
+**destilado errado**": o defeito nasce na **síntese**, não na implementação. Um
+`grep` de conteúdo não pega (o assunto está lá); só a comparação de **força**
+pega. Ao gerar ou revisar um ADR, o diff que importa contra o histórico é o das
+palavras de força, não o dos tópicos.
+
+## 19. ADR aceito não carrega estado de implementação
+
+**Sintoma**
+
+Um ADR **aceito** afirma que algo está "pronto", "estruturado" ou traz um
+checkbox de tarefa — e o leitor não consegue dizer se aquilo foi **construído**
+ou não. O estado real vive noutro lugar (ou em lugar nenhum). A decisão está
+tomada, mas o ADR passou a responder também a pergunta errada ("foi feito?"), e
+responde mal.
+
+**Causa**
+
+ADR e roadmap respondem perguntas diferentes. O **ADR** responde *"o que foi
+decidido e por quê"* (é atemporal: uma vez aceito, a decisão vale até ser
+revisada por outro ADR). O **roadmap** responde *"o que foi construído e o que
+falta"* (muda a cada PR). Quando o ADR absorve linguagem de estado de
+implementação — um `- [ ]`, um "estrutura pronta", um "a ativar" — ele passa a
+carregar informação **volátil** num documento **atemporal**. Ninguém atualiza o
+ADR quando o código muda (o roadmap é que se atualiza), então a frase congela num
+estado que pode já não ser verdade. Um checkbox vazio é o pior caso: em decisão
+aceita, `- [ ]` não diz "não feito" nem "feito" — diz **"ninguém sabe"**.
+
+**Caso real (D-030 / ADR-0002 — MFA)**
+
+O ADR-0002 (aceito) lista *"estrutura pronta para MFA (ativação pós-MVP,
+começando por admin de clínica e médico)"*. "Estrutura pronta" sugere que algo
+foi construído — mas o leitor do ADR não tem como saber o quê. Só cruzando com o
+roadmap (item 2, PR #7: *"MFA (D-030) ... deferido"*) se descobre que **não foi
+construído**. O ADR afirmou implementação sem provar; a verdade estava só no
+roadmap. (Não havia checkbox literal aqui — a ambiguidade veio da **prosa de
+estado**; a regra cobre as duas formas.)
+
+**Regra**
+
+> ADR aceito **não** usa checkbox de implementação nem prosa de estado
+> ("pronto", "estruturado", "a ativar"). Ou a decisão está tomada — e o **estado
+> de implementação vive no roadmap** —, ou o ADR não deveria estar aceito.
+> Checkbox vazio (ou "estrutura pronta") em ADR aceito é **ambiguidade
+> permanente**: descreva a decisão no ADR, o progresso no roadmap, e nunca
+> misture os dois.

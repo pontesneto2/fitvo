@@ -6,10 +6,11 @@
 > documento vence.
 
 > **Fonte das decisões — leia antes de citar um `D-xxx`:**
-> `docs/adr/` é a **única fonte viva**. O `README.md` traz o **mapa
+> `docs/adr/` é a **única fonte viva**. O `docs/adr/README.md` traz o **mapa
 > D-número → ADR**: use-o para achar onde uma decisão está decidida, porque o ADR
 > **destila** e nem sempre repete o rótulo `D-xxx` no texto — `grep D-012 docs/adr/`
-> não acha nada e **isso não significa que falta**.
+> não acha nada e **isso não significa que falta**. (O `README.md` da raiz é a
+> vitrine do projeto; o índice das decisões vive em `docs/adr/README.md`.)
 > `docs/history/decisions-planejamento-original.md` é o registro **bruto** da
 > sessão de planejamento (D-001 a D-073), do qual os ADRs foram gerados: é
 > **histórico, não fonte**. Ele contém nuance que os ADRs **descartaram de

@@ -1,2 +1,33 @@
-# Donos padrao de todo o repositorio.
-* @pontesneto2
+# CODEOWNERS — FITVO
+#
+# Projeto solo: todo dono aponta para @pontesneto2. O valor aqui NAO e distribuir
+# donos diferentes — e tornar as AREAS CRITICAS da Politica de Merge (CLAUDE.md)
+# explicitas e versionadas no tooling: o GitHub passa a exigir review dessas
+# rotas automaticamente, e o mapa documenta onde "CI verde nao basta".
+#
+# Ordem importa: a ULTIMA regra que casa vence.
+
+# Dono padrao de todo o repositorio.
+*                                   @pontesneto2
+
+# --- Areas criticas: revisao humana obrigatoria antes do merge ---
+
+# Financeiro — erro custa dinheiro real de terceiros.
+/packages/payments/                 @pontesneto2
+**/billing/                         @pontesneto2
+
+# Autenticacao/autorizacao — erro e vazamento entre tenants.
+/packages/auth/                     @pontesneto2
+**/auth/                            @pontesneto2
+
+# Consentimento e compartilhamento — erro e violacao de LGPD.
+**/consent/                         @pontesneto2
+
+# Banco / migrations — migration destrutiva e perda de dado.
+/packages/database/                 @pontesneto2
+
+# --- Governanca do repo ---
+/docs/adr/                          @pontesneto2
+/.github/                           @pontesneto2
+/CLAUDE.md                          @pontesneto2
+/LICENSE                            @pontesneto2

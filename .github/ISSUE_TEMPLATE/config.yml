@@ -1,0 +1,9 @@
+# Só os dois formulários; sem issues em branco (força o template).
+blank_issues_enabled: false
+contact_links:
+  - name: Segurança — vulnerabilidade
+    url: https://github.com/pontesneto2/fitvo/security/advisories/new
+    about: Não abra issue pública para falha de segurança. Use um advisory privado.
+  - name: Dúvida sobre uma decisão de arquitetura
+    url: https://github.com/pontesneto2/fitvo/tree/main/docs/adr
+    about: Antes de propor, veja os ADRs — a fonte viva das decisões.

@@ -771,3 +771,49 @@ scanner do CI **local**:
 
 > A pergunta não é "compila com esta versão?" — é "esta versão tem vulnerabilidade
 > conhecida?". O CI responde a segunda, mas tarde. Responda-a no plano, não no PR.
+
+---
+
+# Documentação e decisões (ADR)
+
+## 18. Destilar o histórico num ADR pode APAGAR a força da decisão
+
+**Sintoma**
+
+Alguém lê só o ADR (a fonte viva), implementa conforme ele, e o resultado fica
+"certo" contra o ADR e **verde** no CI — mas **viola a decisão original**. O ADR,
+ao resumir o histórico, perdeu uma **palavra de força** (obrigatório, sempre,
+nunca) e ninguém percebeu. Quem lê só o ADR nunca saberá que faltou algo.
+
+**Causa**
+
+O fluxo do projeto **destila** o histórico bruto (`docs/history/`) em ADRs.
+Destilar é resumir — e resumo tende a **suavizar**. Só que palavra de força não é
+ênfase retórica: é o **contrato**. "Verificação de e-mail **obrigatória**" e
+"verificação de e-mail" são requisitos **diferentes** — a segunda permite não
+enforçar; a primeira, não. Quando a força cai na síntese, a decisão enfraquece
+**silenciosamente**, sem ninguém ter decidido enfraquecê-la.
+
+**Caso real (D-029 / ADR-0002)**
+
+O histórico (D-029, sob *"Medidas de segurança **obrigatórias**"*) diz literal:
+*"Verificação de e-mail **obrigatória**."* O ADR-0002 destilou para
+*"verificação de e-mail"* — **apagou "obrigatória"**. No código: o mecanismo de
+verificação existe inteiro (`/verify-email`, `emailVerifiedAt`, `markEmailVerified`),
+mas **nada enforça** — o login não checa `emailVerifiedAt`. A obrigação evaporou
+na tradução.
+
+**Regra**
+
+> Ao destilar o histórico em ADR, palavras de força — **obrigatório, sempre,
+> nunca, proibido, inegociável, apenas** — NÃO são ruído: são o contrato. Perdê-las
+> na síntese enfraquece a decisão silenciosamente. Ao revisar um ADR contra o
+> histórico, compare a **FORÇA**, não só o conteúdo.
+
+**Classe de defeito (nova)**
+
+Isto **não** é "decidido e não implementado" — o mecanismo existe. É "decidido e
+**destilado errado**": o defeito nasce na **síntese**, não na implementação. Um
+`grep` de conteúdo não pega (o assunto está lá); só a comparação de **força**
+pega. Ao gerar ou revisar um ADR, o diff que importa contra o histórico é o das
+palavras de força, não o dos tópicos.

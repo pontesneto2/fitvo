@@ -229,11 +229,20 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   com a convenção do harness (`test:integration` + serviço no CI): **falhar, não
   pular** — se a infra não subir, o job quebra. Ver `.github/workflows/ci.yml`, job
   `migrate`, e `packages/database/src/*.integration.test.ts`.
-- **DTOs de auth do `web-personal` deveriam morar em `@fitvo/contracts`** — o pacote
-  ainda está vazio (`export {}`), então o esqueleto do `web-personal` definiu os
-  tipos/Zod de login **localmente** (`apps/web-personal/src/lib/auth.ts`), espelhando
-  o contrato real da API. Mover para `@fitvo/contracts` é mudança cross-package
-  (fonte única de contrato entre API e clientes), **fora do escopo do esqueleto**.
+- **`web-personal`: importar os DTOs de auth de `@fitvo/contracts` (a terceira fonte
+  existe AGORA).** O #65 (D-032) populou o pacote: `@fitvo/contracts` exporta
+  `AuthResult`/`AccountSummary`/`LoginInput`/`MeResult`/`Tokens` — tipos de wire
+  inferidos dos schemas Zod de `@fitvo/validation` (fonte única), com job de CI
+  (`contract`) que reprova se dessincronizar da API. O esqueleto do `web-personal`
+  (#62) definiu esses tipos **localmente** (`apps/web-personal/src/lib/auth.ts`)
+  porque o contracts estava vazio na época — agora **duplicam** o que o contracts
+  exporta (a terceira fonte que o D-032 existe para evitar). **Próximo item do
+  `web-personal` (quando a sessão voltar):** importar os tipos de `@fitvo/contracts`
+  + o schema de validação de `@fitvo/validation`, remover os locais. **Com um teste
+  de INTEGRAÇÃO** que confirme que o contrato importado bate com o que a API responde
+  de verdade — a lição do forwardRef aplicada: teste isolado não pega desvio de
+  contrato, só o caso real pega. Dívida que **endurece** conforme o `web-personal`
+  cresce sobre os tipos locais.
 - **~~Os controles do `ui-web` não fazem `forwardRef`~~ — RESOLVIDO.** `Input`,
   `Textarea`, `Select`, `Checkbox`, `Radio` e `Switch` **agora encaminham o `ref`**
   ao elemento nativo (`mergeRefs` funde com o ref interno onde há). Habilita o

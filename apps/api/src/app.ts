@@ -6,7 +6,7 @@ import fastifyRateLimit from '@fastify/rate-limit';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import { CORRELATION_ID_HEADER, REQUEST_ID_HEADER } from '@fitvo/observability';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type onRouteHookHandler } from 'fastify';
 
 import type { AppDependencies } from './dependencies';
 import { authRoutes } from './modules/auth/auth-routes';
@@ -15,6 +15,7 @@ import { clinicRoutes } from './modules/clinic/clinic-routes';
 import { consentRoutes } from './modules/consent/consent-routes';
 import { patientRoutes } from './modules/patient/patient-routes';
 import { registerErrorHandler } from './shared/error-handler';
+import { zodAwareTransform } from './shared/openapi-transform';
 
 function firstHeader(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -28,11 +29,20 @@ function firstHeader(value: string | string[] | undefined): string | undefined {
  *   (/v1/patients), consentimento (/v1/consents) e financeiro (/v1/billing —
  *   inclui o webhook publico do Asaas); /health e /docs (Swagger, D-032/D-034).
  */
-export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> {
+export async function buildApp(
+  deps: AppDependencies,
+  options: { onRoute?: onRouteHookHandler } = {},
+): Promise<FastifyInstance> {
   const app = Fastify({
     logger: { level: deps.logLevel },
     genReqId: (req) => firstHeader(req.headers[CORRELATION_ID_HEADER]) ?? randomUUID(),
   });
+
+  // Seam de introspecção (registrado ANTES das rotas para capturá-las ao
+  // carregar): usado pela trava "nenhuma rota sem schema" (D-032). No-op em prod.
+  if (options.onRoute) {
+    app.addHook('onRoute', options.onRoute);
+  }
 
   // CSP desligada por ora para nao quebrar o Swagger UI; reavaliar na fase de UI.
   await app.register(fastifyHelmet, { contentSecurityPolicy: false });
@@ -56,6 +66,9 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
         },
       },
     },
+    // D-032.1 (transitório): converte os schemas Zod (hoje, auth) para OpenAPI;
+    // os slices ainda em JSON Schema passam intactos. Ver openapi-transform.ts.
+    transform: zodAwareTransform,
   });
   await app.register(fastifySwaggerUi, { routePrefix: '/docs' });
 

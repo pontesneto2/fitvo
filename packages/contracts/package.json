@@ -13,6 +13,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@fitvo/validation": "workspace:*"
+  },
   "devDependencies": {
     "@fitvo/eslint-config": "workspace:*",
     "@fitvo/typescript-config": "workspace:*",

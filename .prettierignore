@@ -10,6 +10,10 @@ pnpm-lock.yaml
 # Artefato de terceiro: formatar o gerado so produziria format:check vermelho.
 packages/database/src/generated/
 
+# OpenAPI gerado dos schemas Zod (D-032). Artefato versionado (base do check de
+# drift no CI), NAO editado a mao: formata-lo tiraria o determinismo do diff.
+packages/contracts/openapi.json
+
 # Documentacao de planejamento (preservar formatacao original)
 CLAUDE.md
 CONTRIBUTING.md

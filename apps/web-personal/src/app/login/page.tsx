@@ -3,7 +3,7 @@
 import { Button, Card, Field, Input, Logo } from '@fitvo/ui-web';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { type LoginInput, loginInputSchema } from '@/lib/auth';
@@ -13,7 +13,7 @@ export default function LoginPage(): ReactNode {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
   const {
-    control,
+    register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginInput>({
@@ -48,43 +48,22 @@ export default function LoginPage(): ReactNode {
           <p className="text-small text-fg-muted">Entre no painel do profissional</p>
         </div>
         <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-          {/* Controller (controlado), nao register (uncontrolled): os controles do
-              ui-web ainda nao fazem forwardRef, entao register nao recebe o ref.
-              Contorno ate o fix nos primitivos — divida em docs/roadmap.md. */}
-          <Controller
-            control={control}
-            name="email"
-            render={({ field }) => (
-              <Field label="E-mail" error={errors.email?.message}>
-                <Input
-                  type="email"
-                  autoComplete="email"
-                  placeholder="voce@exemplo.com"
-                  name={field.name}
-                  value={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                />
-              </Field>
-            )}
-          />
-          <Controller
-            control={control}
-            name="password"
-            render={({ field }) => (
-              <Field label="Senha" error={errors.password?.message}>
-                <Input
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="Sua senha"
-                  name={field.name}
-                  value={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                />
-              </Field>
-            )}
-          />
+          <Field label="E-mail" error={errors.email?.message}>
+            <Input
+              type="email"
+              autoComplete="email"
+              placeholder="voce@exemplo.com"
+              {...register('email')}
+            />
+          </Field>
+          <Field label="Senha" error={errors.password?.message}>
+            <Input
+              type="password"
+              autoComplete="current-password"
+              placeholder="Sua senha"
+              {...register('password')}
+            />
+          </Field>
           {formError ? (
             <p role="alert" className="text-caption text-danger-700 dark:text-danger-400">
               {formError}

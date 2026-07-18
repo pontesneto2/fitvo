@@ -226,14 +226,14 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   tipos/Zod de login **localmente** (`apps/web-personal/src/lib/auth.ts`), espelhando
   o contrato real da API. Mover para `@fitvo/contracts` é mudança cross-package
   (fonte única de contrato entre API e clientes), **fora do escopo do esqueleto**.
-- **Os controles do `ui-web` não fazem `forwardRef`** — `Input`, `Textarea`,
-  `Select`, `Checkbox`, `Radio` e `Switch` são `export function X(props)` sem
-  encaminhar o `ref` ao elemento nativo. Isso **quebra o `register()` uncontrolled do
-  React Hook Form** (stack oficial — ADR-0005): o ref não chega e o consumidor é
-  forçado a usar `Controller` (controlado, mais verboso). Descoberto ao montar o
-  login do `web-personal` (primeiro consumidor real do design system). **Correção nos
-  primitivos — uma passada nos 6 controles, PR próprio** — habilita o padrão
-  uncontrolled do RHF em todo consumidor futuro.
+- **~~Os controles do `ui-web` não fazem `forwardRef`~~ — RESOLVIDO.** `Input`,
+  `Textarea`, `Select`, `Checkbox`, `Radio` e `Switch` **agora encaminham o `ref`**
+  ao elemento nativo (`mergeRefs` funde com o ref interno onde há). Habilita o
+  `register()` uncontrolled do React Hook Form (ADR-0005); o `web-personal` voltou de
+  `Controller` para `register()`. Teste por controle que **reprova** se o ref não
+  chegar. Descoberto ao montar o login (primeiro consumidor real do design system) —
+  a suíte de 227 testes verdes não pegava, porque testava render/variantes, não
+  integração com formulário.
 - **⚠️ LACUNA DE CONFORMIDADE — profissional não-verificado PODE atender.** O
   guard de vínculo exige a especialidade **reivindicada** (`ProfessionalSpecialty`
   — D-046), mas **NÃO** exige `verificationStatus === VERIFIED`. É `TODO(D-010)`

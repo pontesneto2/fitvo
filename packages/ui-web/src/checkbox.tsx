@@ -1,9 +1,10 @@
 import { Check, Minus } from 'lucide-react';
-import type { ChangeEvent, InputHTMLAttributes, ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent, InputHTMLAttributes } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 
 import { cn } from './cn';
 import { Icon } from './icon';
+import { mergeRefs } from './merge-refs';
 
 /**
  * Checkbox WEB (design-system-components.md §4). 20px, raio `sm`. Input nativo
@@ -15,6 +16,10 @@ import { Icon } from './icon';
  * Dark: §4 nao especifica; aplico os tokens semanticos de borda (`line`/`line-
  * hover`/`line-focus`, corretos nos dois temas) e a regra "sobe na rampa" do §21
  * para os neutros de disabled. As cores de marca sao agnosticas de tema.
+ *
+ * `forwardRef`: encaminha o ref ao `<input>` (register do RHF — ADR-0005). O ref
+ * interno (que seta `indeterminate`, que nao e atributo HTML) e FUNDIDO com o
+ * encaminhado via `mergeRefs` — os dois apontam para o mesmo input.
  */
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
   readonly error?: boolean;
@@ -39,24 +44,27 @@ function boxState(active: boolean, disabled: boolean, error: boolean): string {
   return 'border-line-hover bg-transparent group-hover:border-brand-400 group-hover:bg-brand-50 peer-focus-visible:border-line-focus';
 }
 
-export function Checkbox({
-  checked,
-  defaultChecked,
-  indeterminate = false,
-  error = false,
-  disabled = false,
-  onChange,
-  className,
-  children,
-  ...props
-}: CheckboxProps): ReactNode {
+export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Checkbox(
+  {
+    checked,
+    defaultChecked,
+    indeterminate = false,
+    error = false,
+    disabled = false,
+    onChange,
+    className,
+    children,
+    ...props
+  },
+  forwardedRef,
+) {
   const isControlled = checked !== undefined;
   const [internal, setInternal] = useState<boolean>(defaultChecked ?? false);
   const isChecked = isControlled ? checked : internal;
-  const ref = useRef<HTMLInputElement>(null);
+  const innerRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (ref.current) ref.current.indeterminate = indeterminate;
+    if (innerRef.current) innerRef.current.indeterminate = indeterminate;
   }, [indeterminate]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>): void => {
@@ -75,7 +83,7 @@ export function Checkbox({
       )}
     >
       <input
-        ref={ref}
+        ref={mergeRefs(innerRef, forwardedRef)}
         type="checkbox"
         className="peer sr-only"
         checked={isChecked}
@@ -102,4 +110,4 @@ export function Checkbox({
       ) : null}
     </label>
   );
-}
+});

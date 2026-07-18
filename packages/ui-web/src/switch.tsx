@@ -1,5 +1,5 @@
-import type { ChangeEvent, InputHTMLAttributes, ReactNode } from 'react';
-import { useState } from 'react';
+import type { ChangeEvent, InputHTMLAttributes } from 'react';
+import { forwardRef, useState } from 'react';
 
 import { cn } from './cn';
 
@@ -10,6 +10,8 @@ import { cn } from './cn';
  * interno). Hover pela label (`group-hover`), foco pelo input (`peer-focus-
  * visible`). Dark de §6 nao especificado: neutros "sobem na rampa" (§21); a marca
  * e agnostica de tema.
+ *
+ * `forwardRef` encaminha o ref ao `<input>` nativo (register do RHF — ADR-0005).
  */
 export type SwitchProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'role'>;
 
@@ -25,15 +27,10 @@ function thumbColor(on: boolean, disabled: boolean): string {
   return 'bg-white';
 }
 
-export function Switch({
-  checked,
-  defaultChecked,
-  disabled = false,
-  onChange,
-  className,
-  children,
-  ...props
-}: SwitchProps): ReactNode {
+export const Switch = forwardRef<HTMLInputElement, SwitchProps>(function Switch(
+  { checked, defaultChecked, disabled = false, onChange, className, children, ...props },
+  ref,
+) {
   const isControlled = checked !== undefined;
   const [internal, setInternal] = useState<boolean>(defaultChecked ?? false);
   const isOn = isControlled ? checked : internal;
@@ -52,6 +49,7 @@ export function Switch({
       )}
     >
       <input
+        ref={ref}
         type="checkbox"
         role="switch"
         className="peer sr-only"
@@ -81,4 +79,4 @@ export function Switch({
       ) : null}
     </label>
   );
-}
+});

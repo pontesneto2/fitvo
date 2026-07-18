@@ -717,15 +717,17 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "email"
-                ],
                 "properties": {
                   "email": {
                     "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
                     "description": "E-mail do profissional convidado."
                   }
-                }
+                },
+                "required": [
+                  "email"
+                ]
               }
             }
           }
@@ -733,7 +735,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "tenantId",
@@ -774,11 +777,13 @@
                         },
                         "expiresAt": {
                           "type": "string",
-                          "format": "date-time"
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                         },
                         "createdAt": {
                           "type": "string",
-                          "format": "date-time"
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                         }
                       },
                       "required": [
@@ -787,7 +792,8 @@
                         "status",
                         "expiresAt",
                         "createdAt"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "token": {
                       "type": "string"
@@ -796,7 +802,8 @@
                   "required": [
                     "invite",
                     "token"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -814,7 +821,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "tenantId",
@@ -853,14 +861,13 @@
                             "type": "string"
                           },
                           "displayName": {
-                            "type": [
-                              "null",
-                              "string"
-                            ]
+                            "nullable": true,
+                            "type": "string"
                           },
                           "joinedAt": {
                             "type": "string",
-                            "format": "date-time"
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                           }
                         },
                         "required": [
@@ -868,8 +875,10 @@
                           "professionalProfileId",
                           "name",
                           "email",
+                          "displayName",
                           "joinedAt"
-                        ]
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "pendingInvites": {
@@ -894,11 +903,13 @@
                           },
                           "expiresAt": {
                             "type": "string",
-                            "format": "date-time"
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                           },
                           "createdAt": {
                             "type": "string",
-                            "format": "date-time"
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                           }
                         },
                         "required": [
@@ -907,14 +918,16 @@
                           "status",
                           "expiresAt",
                           "createdAt"
-                        ]
+                        ],
+                        "additionalProperties": false
                       }
                     }
                   },
                   "required": [
                     "professionals",
                     "pendingInvites"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -932,7 +945,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "tenantId",
@@ -941,7 +955,8 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "inviteId",
@@ -955,8 +970,8 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Convite revogado."
+          "200": {
+            "description": "Default Response"
           }
         }
       }
@@ -974,22 +989,16 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "token",
-                  "password",
-                  "name",
-                  "document",
-                  "documentType"
-                ],
                 "properties": {
                   "token": {
                     "type": "string",
+                    "minLength": 1,
                     "description": "Token de uso unico recebido no convite."
                   },
                   "password": {
                     "type": "string",
                     "minLength": 8,
-                    "description": "Senha em claro (min. 8)."
+                    "description": "Senha em claro (mín. 8)."
                   },
                   "name": {
                     "type": "string",
@@ -1008,7 +1017,14 @@
                       "CNPJ"
                     ]
                   }
-                }
+                },
+                "required": [
+                  "token",
+                  "password",
+                  "name",
+                  "document",
+                  "documentType"
+                ]
               }
             }
           }
@@ -1034,7 +1050,8 @@
                       "required": [
                         "accountId",
                         "tenantId"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "created": {
                       "type": "boolean"
@@ -1043,7 +1060,8 @@
                   "required": [
                     "professional",
                     "created"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -1057,25 +1075,23 @@
         "tags": [
           "patient"
         ],
-        "description": "Cria um convite de uso unico direcionado a UMA especialidade (D-006/D-052), declarando a MODALIDADE do atendimento (D-101), que o vinculo herda no aceite. Requer perfil profissional no tenant que reivindica a especialidade-alvo. Devolve o token em claro UMA vez (entrega por push/e-mail e fase futura); o banco guarda apenas o hash.",
+        "description": "Cria um convite de uso unico direcionado a UMA especialidade (D-006/D-052), declarando a MODALIDADE do atendimento (D-101), que o vinculo herda no aceite. Requer perfil profissional no tenant que reivindica a especialidade-alvo. Devolve o token em claro UMA vez; o banco guarda apenas o hash.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "email",
-                  "specialtyId",
-                  "modality"
-                ],
                 "properties": {
                   "email": {
                     "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
                     "description": "E-mail do paciente convidado."
                   },
                   "specialtyId": {
                     "type": "string",
+                    "minLength": 1,
                     "description": "Especialidade-alvo do vinculo (D-052)."
                   },
                   "modality": {
@@ -1085,9 +1101,14 @@
                       "PRESENCIAL",
                       "HIBRIDO"
                     ],
-                    "description": "Modalidade do atendimento (D-101). Definida pelo PROFISSIONAL — o paciente nao escolhe a modalidade do servico que contrata. Define o fluxo da anamnese: ONLINE (paciente preenche sozinho), PRESENCIAL (profissional preenche na consulta) ou HIBRIDO (ambos)."
+                    "description": "Modalidade do atendimento (D-101). Definida pelo PROFISSIONAL."
                   }
-                }
+                },
+                "required": [
+                  "email",
+                  "specialtyId",
+                  "modality"
+                ]
               }
             }
           }
@@ -1095,7 +1116,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "tenantId",
@@ -1134,7 +1156,8 @@
                             "ONLINE",
                             "PRESENCIAL",
                             "HIBRIDO"
-                          ]
+                          ],
+                          "description": "Modalidade do atendimento (D-101). Definida pelo PROFISSIONAL."
                         },
                         "status": {
                           "type": "string",
@@ -1147,11 +1170,13 @@
                         },
                         "expiresAt": {
                           "type": "string",
-                          "format": "date-time"
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                         },
                         "createdAt": {
                           "type": "string",
-                          "format": "date-time"
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                         }
                       },
                       "required": [
@@ -1162,7 +1187,8 @@
                         "status",
                         "expiresAt",
                         "createdAt"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "token": {
                       "type": "string"
@@ -1171,7 +1197,8 @@
                   "required": [
                     "invite",
                     "token"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -1189,7 +1216,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "tenantId",
@@ -1230,7 +1258,8 @@
                               "ONLINE",
                               "PRESENCIAL",
                               "HIBRIDO"
-                            ]
+                            ],
+                            "description": "Modalidade do atendimento (D-101). Definida pelo PROFISSIONAL."
                           },
                           "status": {
                             "type": "string",
@@ -1243,11 +1272,13 @@
                           },
                           "expiresAt": {
                             "type": "string",
-                            "format": "date-time"
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                           },
                           "createdAt": {
                             "type": "string",
-                            "format": "date-time"
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                           }
                         },
                         "required": [
@@ -1258,7 +1289,8 @@
                           "status",
                           "expiresAt",
                           "createdAt"
-                        ]
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "activeBonds": {
@@ -1287,7 +1319,8 @@
                               "ONLINE",
                               "PRESENCIAL",
                               "HIBRIDO"
-                            ]
+                            ],
+                            "description": "Modalidade do atendimento (D-101). Definida pelo PROFISSIONAL."
                           },
                           "status": {
                             "type": "string",
@@ -1298,14 +1331,14 @@
                           },
                           "createdAt": {
                             "type": "string",
-                            "format": "date-time"
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                           },
                           "archivedAt": {
-                            "type": [
-                              "null",
-                              "string"
-                            ],
-                            "format": "date-time"
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                           }
                         },
                         "required": [
@@ -1316,15 +1349,18 @@
                           "specialtyId",
                           "modality",
                           "status",
-                          "createdAt"
-                        ]
+                          "createdAt",
+                          "archivedAt"
+                        ],
+                        "additionalProperties": false
                       }
                     }
                   },
                   "required": [
                     "pendingInvites",
                     "activeBonds"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -1342,7 +1378,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "tenantId",
@@ -1351,7 +1388,8 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "inviteId",
@@ -1390,7 +1428,8 @@
                             "ONLINE",
                             "PRESENCIAL",
                             "HIBRIDO"
-                          ]
+                          ],
+                          "description": "Modalidade do atendimento (D-101). Definida pelo PROFISSIONAL."
                         },
                         "status": {
                           "type": "string",
@@ -1403,11 +1442,13 @@
                         },
                         "expiresAt": {
                           "type": "string",
-                          "format": "date-time"
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                         },
                         "createdAt": {
                           "type": "string",
-                          "format": "date-time"
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                         }
                       },
                       "required": [
@@ -1418,7 +1459,8 @@
                         "status",
                         "expiresAt",
                         "createdAt"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "token": {
                       "type": "string"
@@ -1427,7 +1469,8 @@
                   "required": [
                     "invite",
                     "token"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -1445,7 +1488,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "tenantId",
@@ -1454,7 +1498,8 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "inviteId",
@@ -1468,8 +1513,8 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Convite revogado."
+          "200": {
+            "description": "Default Response"
           }
         }
       }
@@ -1484,7 +1529,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "tenantId",
@@ -1493,7 +1539,8 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "bondId",
@@ -1507,8 +1554,8 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Vinculo arquivado."
+          "200": {
+            "description": "Default Response"
           }
         }
       }
@@ -1526,21 +1573,16 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "token",
-                  "password",
-                  "name",
-                  "document"
-                ],
                 "properties": {
                   "token": {
                     "type": "string",
+                    "minLength": 1,
                     "description": "Token de uso unico recebido no convite."
                   },
                   "password": {
                     "type": "string",
                     "minLength": 8,
-                    "description": "Senha em claro (min. 8)."
+                    "description": "Senha em claro (mín. 8)."
                   },
                   "name": {
                     "type": "string",
@@ -1552,7 +1594,13 @@
                     "maxLength": 14,
                     "description": "CPF do paciente (D-043)."
                   }
-                }
+                },
+                "required": [
+                  "token",
+                  "password",
+                  "name",
+                  "document"
+                ]
               }
             }
           }
@@ -1582,7 +1630,8 @@
                         "accountId",
                         "tenantId",
                         "patientProfileId"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "bond": {
                       "type": "object",
@@ -1597,7 +1646,8 @@
                       "required": [
                         "id",
                         "specialtyId"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "created": {
                       "type": "boolean"
@@ -1607,7 +1657,8 @@
                     "patient",
                     "bond",
                     "created"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -1628,20 +1679,22 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "granteeProfessionalProfileId",
-                  "specialtyId"
-                ],
                 "properties": {
                   "granteeProfessionalProfileId": {
                     "type": "string",
+                    "minLength": 1,
                     "description": "Profissional que RECEBE o acesso."
                   },
                   "specialtyId": {
                     "type": "string",
+                    "minLength": 1,
                     "description": "Especialidade cujo dado pode ser compartilhado."
                   }
-                }
+                },
+                "required": [
+                  "granteeProfessionalProfileId",
+                  "specialtyId"
+                ]
               }
             }
           }
@@ -1677,14 +1730,14 @@
                     },
                     "grantedAt": {
                       "type": "string",
-                      "format": "date-time"
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                     },
                     "revokedAt": {
-                      "type": [
-                        "null",
-                        "string"
-                      ],
-                      "format": "date-time"
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                     }
                   },
                   "required": [
@@ -1692,8 +1745,10 @@
                     "granteeProfessionalProfileId",
                     "specialtyId",
                     "status",
-                    "grantedAt"
-                  ]
+                    "grantedAt",
+                    "revokedAt"
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -1742,14 +1797,14 @@
                           },
                           "grantedAt": {
                             "type": "string",
-                            "format": "date-time"
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                           },
                           "revokedAt": {
-                            "type": [
-                              "null",
-                              "string"
-                            ],
-                            "format": "date-time"
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                           }
                         },
                         "required": [
@@ -1757,14 +1812,17 @@
                           "granteeProfessionalProfileId",
                           "specialtyId",
                           "status",
-                          "grantedAt"
-                        ]
+                          "grantedAt",
+                          "revokedAt"
+                        ],
+                        "additionalProperties": false
                       }
                     }
                   },
                   "required": [
                     "consents"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -1782,7 +1840,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "consentId",
@@ -1796,8 +1855,8 @@
           }
         ],
         "responses": {
-          "204": {
-            "description": "Consentimento revogado."
+          "200": {
+            "description": "Default Response"
           }
         }
       }
@@ -1850,13 +1909,16 @@
                                 },
                                 "amountCents": {
                                   "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
                                   "description": "Preco em centavos (D-069)."
                                 }
                               },
                               "required": [
                                 "periodicity",
                                 "amountCents"
-                              ]
+                              ],
+                              "additionalProperties": false
                             }
                           }
                         },
@@ -1866,13 +1928,15 @@
                           "name",
                           "tier",
                           "prices"
-                        ]
+                        ],
+                        "additionalProperties": false
                       }
                     }
                   },
                   "required": [
                     "plans"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -1893,14 +1957,10 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "planId",
-                  "periodicity",
-                  "idempotencyKey"
-                ],
                 "properties": {
                   "planId": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "periodicity": {
                     "type": "string",
@@ -1916,7 +1976,12 @@
                     "minLength": 8,
                     "maxLength": 200
                   }
-                }
+                },
+                "required": [
+                  "planId",
+                  "periodicity",
+                  "idempotencyKey"
+                ]
               }
             }
           }
@@ -1924,7 +1989,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "tenantId",
@@ -1971,26 +2037,27 @@
                       ]
                     },
                     "currentPeriodEnd": {
-                      "type": [
-                        "null",
-                        "string"
-                      ],
-                      "format": "date-time"
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                     },
                     "trialEndsAt": {
-                      "type": [
-                        "null",
-                        "string"
-                      ],
-                      "format": "date-time"
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                     }
                   },
                   "required": [
                     "id",
                     "planId",
                     "periodicity",
-                    "status"
-                  ]
+                    "status",
+                    "currentPeriodEnd",
+                    "trialEndsAt"
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -2005,7 +2072,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "tenantId",
@@ -2052,26 +2120,27 @@
                       ]
                     },
                     "currentPeriodEnd": {
-                      "type": [
-                        "null",
-                        "string"
-                      ],
-                      "format": "date-time"
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                     },
                     "trialEndsAt": {
-                      "type": [
-                        "null",
-                        "string"
-                      ],
-                      "format": "date-time"
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                     }
                   },
                   "required": [
                     "id",
                     "planId",
                     "periodicity",
-                    "status"
-                  ]
+                    "status",
+                    "currentPeriodEnd",
+                    "trialEndsAt"
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -2092,19 +2161,16 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "bondId",
-                  "amountCents",
-                  "method",
-                  "idempotencyKey"
-                ],
                 "properties": {
                   "bondId": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "amountCents": {
                     "type": "integer",
-                    "minimum": 1,
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
                     "description": "Valor em centavos (D-069)."
                   },
                   "method": {
@@ -2126,7 +2192,8 @@
                   },
                   "dueDate": {
                     "type": "string",
-                    "format": "date-time"
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                   },
                   "recurring": {
                     "type": "boolean"
@@ -2140,7 +2207,13 @@
                       "annual"
                     ]
                   }
-                }
+                },
+                "required": [
+                  "bondId",
+                  "amountCents",
+                  "method",
+                  "idempotencyKey"
+                ]
               }
             }
           }
@@ -2148,7 +2221,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "tenantId",
@@ -2176,7 +2250,9 @@
                       "type": "string"
                     },
                     "amountCents": {
-                      "type": "integer"
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
                     },
                     "method": {
                       "type": "string",
@@ -2201,22 +2277,25 @@
                       "type": "boolean"
                     },
                     "periodicity": {
+                      "nullable": true,
                       "type": "string",
                       "enum": [
                         "monthly",
                         "quarterly",
                         "biannual",
                         "annual"
-                      ],
-                      "nullable": true
+                      ]
                     },
                     "platformFeeCents": {
                       "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
                       "description": "Taxa FITVO retida, em centavos (D-061)."
                     },
                     "createdAt": {
                       "type": "string",
-                      "format": "date-time"
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                     }
                   },
                   "required": [
@@ -2226,9 +2305,11 @@
                     "method",
                     "status",
                     "recurring",
+                    "periodicity",
                     "platformFeeCents",
                     "createdAt"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -2246,7 +2327,8 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "in": "path",
             "name": "tenantId",
@@ -2268,20 +2350,27 @@
                   "type": "object",
                   "properties": {
                     "receivedCents": {
-                      "type": "integer"
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
                     },
                     "pendingCents": {
-                      "type": "integer"
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
                     },
                     "feesCents": {
-                      "type": "integer"
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
                     }
                   },
                   "required": [
                     "receivedCents",
                     "pendingCents",
                     "feesCents"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -2314,7 +2403,8 @@
                   "required": [
                     "received",
                     "duplicate"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }

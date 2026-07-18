@@ -32,6 +32,14 @@ RESPONSÁVEL** (decisão que só você pode tomar), **BLOQUEADO — TERCEIROS**
 
 ## EM ANDAMENTO
 
+- **PR (branch `docs/repo-standardization`)** — Padronização do repositório para
+  nível de sistema grande: README raiz reescrito como vitrine (o índice de ADR +
+  mapa D→ADR migrou para `docs/adr/README.md`), metadados do GitHub (description,
+  topics), templates de PR (com campo de área crítica da Política de Merge) e de
+  issue (bug/feature), `LICENSE` proprietária (all rights reserved — repo público
+  para avaliação), CODEOWNERS mapeando as áreas críticas, e **gate de commitlint
+  no CI** (fecha o furo: antes só rodava local, bypassável com `--no-verify`).
+  Docs/infra, baixo risco pela Política de Merge.
 - **PR #17** (`docs/politica-de-merge`) — Política de Merge + este roadmap.
   Este próprio commit ajusta a ordem do PENDENTE abaixo, a pedido do
   responsável, antes do merge.
@@ -184,6 +192,23 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
 
 ## BLOQUEADO — RESPONSÁVEL (decisão que só você pode tomar)
 
+- **⚠️ ISOLAMENTO DE TENANT SISTÊMICO — pré-requisito ANTES de qualquer cliente
+  real. PRIORIDADE ALTA.** Achado **#1 e mais grave** do inventário de
+  promessas-sem-gate (`docs/promessas-sem-gate.md`, #73): o isolamento de tenant
+  **não tem gate sistêmico**. Hoje, o que impede um tenant de ver dados de outro
+  é **disciplina** (o dev lembrar do escopo de `tenantId`) — **nada REPROVA** uma
+  query que esqueça. Num SaaS multi-tenant com dado de saúde, é o vazamento mais
+  caro possível: um `findMany` sem escopo e a Clínica A vê os pacientes da
+  Clínica B.
+  - **Criticidade:** bloqueia o go-live. Não urgente sem clientes, mas é a
+    PRIMEIRA coisa a resolver antes de qualquer pessoa real entrar.
+  - **Soluções conhecidas (decisão do responsável, a definir):** Prisma extension
+    que injeta `tenantId` automaticamente em toda query; RLS no Postgres (já
+    cogitado no ADR-0001); ou os dois (RLS no banco + extension na aplicação). O
+    objetivo é tornar o vazamento **IRREPRESENTÁVEL**, não confiar em disciplina.
+  - **Relacionado:** os itens AUDITAR 4 e 5 do mesmo mapa (admin puro não vê dado
+    clínico; leitura só com consentimento) são da **mesma família** — falta o gate
+    que prova o **BLOQUEIO**, não só o caminho feliz.
 - **Apps web**: liberar o início do item 1 do PENDENTE depende do merge do PR
   #18 (`brand-tokens`/`ui-web`/`ui-mobile`) e da sua confirmação de que estão
   maduros o suficiente para consumo em produto.
@@ -221,11 +246,20 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   com a convenção do harness (`test:integration` + serviço no CI): **falhar, não
   pular** — se a infra não subir, o job quebra. Ver `.github/workflows/ci.yml`, job
   `migrate`, e `packages/database/src/*.integration.test.ts`.
-- **DTOs de auth do `web-personal` deveriam morar em `@fitvo/contracts`** — o pacote
-  ainda está vazio (`export {}`), então o esqueleto do `web-personal` definiu os
-  tipos/Zod de login **localmente** (`apps/web-personal/src/lib/auth.ts`), espelhando
-  o contrato real da API. Mover para `@fitvo/contracts` é mudança cross-package
-  (fonte única de contrato entre API e clientes), **fora do escopo do esqueleto**.
+- **`web-personal`: importar os DTOs de auth de `@fitvo/contracts` (a terceira fonte
+  existe AGORA).** O #65 (D-032) populou o pacote: `@fitvo/contracts` exporta
+  `AuthResult`/`AccountSummary`/`LoginInput`/`MeResult`/`Tokens` — tipos de wire
+  inferidos dos schemas Zod de `@fitvo/validation` (fonte única), com job de CI
+  (`contract`) que reprova se dessincronizar da API. O esqueleto do `web-personal`
+  (#62) definiu esses tipos **localmente** (`apps/web-personal/src/lib/auth.ts`)
+  porque o contracts estava vazio na época — agora **duplicam** o que o contracts
+  exporta (a terceira fonte que o D-032 existe para evitar). **Próximo item do
+  `web-personal` (quando a sessão voltar):** importar os tipos de `@fitvo/contracts`
+  + o schema de validação de `@fitvo/validation`, remover os locais. **Com um teste
+  de INTEGRAÇÃO** que confirme que o contrato importado bate com o que a API responde
+  de verdade — a lição do forwardRef aplicada: teste isolado não pega desvio de
+  contrato, só o caso real pega. Dívida que **endurece** conforme o `web-personal`
+  cresce sobre os tipos locais.
 - **~~Os controles do `ui-web` não fazem `forwardRef`~~ — RESOLVIDO.** `Input`,
   `Textarea`, `Select`, `Checkbox`, `Radio` e `Switch` **agora encaminham o `ref`**
   ao elemento nativo (`mergeRefs` funde com o ref interno onde há). Habilita o
@@ -246,6 +280,30 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   (item deferido). A Fase 0 de medicina (D-130) **modela** `councilState`/`rqe`
   nuláveis de propósito por causa disto: a coluna não impõe verificação; o guard é
   que imporá, quando existir.
+- **Hardening de segurança/estabilidade da API (D-033)** — diagnóstico interno
+  contra a promessa "API privada e segura, padrão de sistema grande". Um item era
+  vazamento ativo (token de auth em log) e **já foi corrigido — PR #63**. Os
+  demais estão priorizados **P2–P5** em `docs/api-hardening-debt.md` (CORS
+  restritivo por default; paginação/teto nas listagens; timeout + resiliência de
+  dependências externas; topologia do rate limit). **Não implementados** — cada um
+  é seu próprio PR na ordem; **P4 toca financeiro → revisão humana obrigatória**.
+  O relatório é público-seguro (sem PoC nem `file:line` de vetor aberto); o
+  detalhe fino fica fora do repositório até corrigido.
+- **Fluxo de dev de auth — entrega do token de verificação/reset (dívida do PR
+  #63).** Fechar o token em log (correto — era vazamento) removeu o **único**
+  caminho pelo qual o dev obtinha o link de verificação de e-mail / reset de senha
+  localmente: o token é **hasheado** no banco, não há como recuperá-lo. Sem isso,
+  ninguém testa esses fluxos em dev — e o próprio agente do `web-personal` vai
+  bater nisto. **Não é teórico.** Solução recomendada (não implementada — decisão
+  de aprovar e escolher a forma): um mecanismo **dev-only atrás de flag de
+  ambiente**, que só existe com `NODE_ENV=development` e **falha ruidosamente em
+  produção** — numa de duas formas:
+  - sender dev-only que escreve o token em **arquivo local** (não em log, não no
+    repo, `gitignored`); ou
+  - endpoint dev-only que devolve o último token emitido.
+
+  O PR mínimo do #63 foi a escolha certa; isto é o follow-up. Ver
+  `docs/api-hardening-debt.md`.
 - **`timestamptz` nas 54 tabelas existentes** — **APROVADO; PR #44 aberto,
   aguardando revisão. Mover para FEITO quando mergear.** O contexto a seguir fica
   registrado porque é o que fundamenta a decisão: o D-067/D-111 decidem "tudo em

@@ -2,6 +2,7 @@ import type {
   ChargeMethod as DbChargeMethod,
   ChargeStatus as DbChargeStatus,
   Periodicity as DbPeriodicity,
+  SubscriptionStatus as DbSubscriptionStatus,
 } from '@fitvo/database';
 import {
   buildChargeSplits,
@@ -90,7 +91,10 @@ export interface SubscriptionView {
   id: string;
   planId: string;
   periodicity: GatewayPeriodicity;
-  status: string;
+  // D-032.2: o valor sempre foi o enum Prisma (`SubscriptionRecord.status`); a
+  // anotação `string` era um alargamento impreciso. Estreitada para o contrato
+  // real, que o `z.enum` do @fitvo/validation agora documenta E valida.
+  status: DbSubscriptionStatus;
   currentPeriodEnd: string | null;
   trialEndsAt: string | null;
 }
@@ -100,7 +104,9 @@ export interface ChargeView {
   bondId: string;
   amountCents: number;
   method: GatewayChargeMethod;
-  status: string;
+  // D-032.2: idem SubscriptionView — o valor sempre foi `ChargeRecord.status`
+  // (enum Prisma); anotação estreitada para o contrato real (z.enum valida).
+  status: DbChargeStatus;
   recurring: boolean;
   periodicity: GatewayPeriodicity | null;
   platformFeeCents: number;

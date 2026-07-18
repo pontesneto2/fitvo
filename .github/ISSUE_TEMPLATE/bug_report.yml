@@ -1,0 +1,72 @@
+name: Bug
+description: Relatar um comportamento incorreto ou inesperado
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado pelo report. **Não inclua segredos** (tokens, senhas,
+        `DATABASE_URL`, dados pessoais reais) — o repositório é público.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: O que aconteceu
+      description: Descreva o bug de forma objetiva.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamento esperado
+      description: O que deveria acontecer.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      description: Onde o bug ocorre.
+      options:
+        - api
+        - worker
+        - web-personal
+        - web-admin
+        - site
+        - mobile
+        - packages (auth, payments, ai, database, ui, ...)
+        - infra / CI / tooling
+        - docs
+        - não sei
+    validations:
+      required: true
+  - type: dropdown
+    id: critical
+    attributes:
+      label: Toca área crítica? (Política de Merge)
+      description: Financeiro, consentimento, auth/tenant, dado clínico ou migration destrutiva.
+      options:
+        - 'Não'
+        - 'Sim — financeiro (payments/split/cobrança/estorno)'
+        - 'Sim — consentimento/compartilhamento'
+        - 'Sim — auth/autorização/isolamento de tenant'
+        - 'Sim — dado clínico'
+        - 'Sim — migration destrutiva'
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto (versão, ambiente, logs)
+      description: Branch/commit, SO, Node, e logs relevantes (com request/correlation ID se houver). Redija segredos.
+    validations:
+      required: false

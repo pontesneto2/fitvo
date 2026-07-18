@@ -246,6 +246,30 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   (item deferido). A Fase 0 de medicina (D-130) **modela** `councilState`/`rqe`
   nuláveis de propósito por causa disto: a coluna não impõe verificação; o guard é
   que imporá, quando existir.
+- **Hardening de segurança/estabilidade da API (D-033)** — diagnóstico interno
+  contra a promessa "API privada e segura, padrão de sistema grande". Um item era
+  vazamento ativo (token de auth em log) e **já foi corrigido — PR #63**. Os
+  demais estão priorizados **P2–P5** em `docs/api-hardening-debt.md` (CORS
+  restritivo por default; paginação/teto nas listagens; timeout + resiliência de
+  dependências externas; topologia do rate limit). **Não implementados** — cada um
+  é seu próprio PR na ordem; **P4 toca financeiro → revisão humana obrigatória**.
+  O relatório é público-seguro (sem PoC nem `file:line` de vetor aberto); o
+  detalhe fino fica fora do repositório até corrigido.
+- **Fluxo de dev de auth — entrega do token de verificação/reset (dívida do PR
+  #63).** Fechar o token em log (correto — era vazamento) removeu o **único**
+  caminho pelo qual o dev obtinha o link de verificação de e-mail / reset de senha
+  localmente: o token é **hasheado** no banco, não há como recuperá-lo. Sem isso,
+  ninguém testa esses fluxos em dev — e o próprio agente do `web-personal` vai
+  bater nisto. **Não é teórico.** Solução recomendada (não implementada — decisão
+  de aprovar e escolher a forma): um mecanismo **dev-only atrás de flag de
+  ambiente**, que só existe com `NODE_ENV=development` e **falha ruidosamente em
+  produção** — numa de duas formas:
+  - sender dev-only que escreve o token em **arquivo local** (não em log, não no
+    repo, `gitignored`); ou
+  - endpoint dev-only que devolve o último token emitido.
+
+  O PR mínimo do #63 foi a escolha certa; isto é o follow-up. Ver
+  `docs/api-hardening-debt.md`.
 - **`timestamptz` nas 54 tabelas existentes** — **APROVADO; PR #44 aberto,
   aguardando revisão. Mover para FEITO quando mergear.** O contexto a seguir fica
   registrado porque é o que fundamenta a decisão: o D-067/D-111 decidem "tudo em

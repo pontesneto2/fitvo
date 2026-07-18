@@ -206,6 +206,10 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   vermelhos. O React 19 muda tipos (`ref` como prop, `children` implícito removido)
   e atravessa `ui-web` + `ui-mobile`; o RN 0.86 é salto grande. **PR próprio,
   planejado, com verificação** — e provavelmente um para cada, não os dois juntos.
+  - **Nota (pós-#62):** o `web-personal` roda **Next 15 sobre React 18** — o peer do
+    Next 15 aceita `^18.2.0 || ^19`, então **subir o Next NÃO exige React 19**. Next
+    e React 19 são dívidas **separadas**; esta migração vale só quando se decidir
+    mover `ui-web`/`ui-mobile` para React 19, não por causa da versão do Next.
 - **`lucide-react` / `lucide-react-native` 0.469 → 1.24 (major)** — o Lucide entrou
   no #20 e o Dependabot já ofereceu o major na sequência (PR #39, fechado). Subir
   major de dependência recém-adotada, junto de patches, é pedir problema. Tarefa
@@ -217,6 +221,19 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   com a convenção do harness (`test:integration` + serviço no CI): **falhar, não
   pular** — se a infra não subir, o job quebra. Ver `.github/workflows/ci.yml`, job
   `migrate`, e `packages/database/src/*.integration.test.ts`.
+- **DTOs de auth do `web-personal` deveriam morar em `@fitvo/contracts`** — o pacote
+  ainda está vazio (`export {}`), então o esqueleto do `web-personal` definiu os
+  tipos/Zod de login **localmente** (`apps/web-personal/src/lib/auth.ts`), espelhando
+  o contrato real da API. Mover para `@fitvo/contracts` é mudança cross-package
+  (fonte única de contrato entre API e clientes), **fora do escopo do esqueleto**.
+- **Os controles do `ui-web` não fazem `forwardRef`** — `Input`, `Textarea`,
+  `Select`, `Checkbox`, `Radio` e `Switch` são `export function X(props)` sem
+  encaminhar o `ref` ao elemento nativo. Isso **quebra o `register()` uncontrolled do
+  React Hook Form** (stack oficial — ADR-0005): o ref não chega e o consumidor é
+  forçado a usar `Controller` (controlado, mais verboso). Descoberto ao montar o
+  login do `web-personal` (primeiro consumidor real do design system). **Correção nos
+  primitivos — uma passada nos 6 controles, PR próprio** — habilita o padrão
+  uncontrolled do RHF em todo consumidor futuro.
 - **⚠️ LACUNA DE CONFORMIDADE — profissional não-verificado PODE atender.** O
   guard de vínculo exige a especialidade **reivindicada** (`ProfessionalSpecialty`
   — D-046), mas **NÃO** exige `verificationStatus === VERIFIED`. É `TODO(D-010)`

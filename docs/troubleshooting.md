@@ -653,3 +653,121 @@ por ano. Nenhum erro aparece — o dado só fica **errado em silêncio**.
 Antes de escrever `DateTime`, pergunte: **isto é um instante, um dia, ou uma regra
 que se repete?** Três respostas, três tipos. `birthDate` é o primeiro `@db.Date` do
 schema — não por acaso, e não deve ser o último tratado por reflexo como instante.
+
+---
+
+## 15. Redis fora do ar: a API **sobe**, mas o login quebra
+
+O `docker compose` sobe Postgres **e** Redis. É fácil subir só o Postgres (ou o
+container do Redis parar) e não perceber: a API **não** falha no boot por causa
+disso — ela escuta na 3333 como se estivesse tudo certo.
+
+**Sintoma**
+
+- `pnpm --filter @fitvo/api dev` sobe normalmente, `/docs` responde e rotas sem
+  sessão (ex.: `register/professional`) funcionam.
+- Mas `POST /v1/auth/login` e `POST /v1/auth/refresh` **quebram** (erro/timeout),
+  e o log da API mostra o `ioredis` tentando reconectar
+  (`ECONNREFUSED 127.0.0.1:6379`).
+- A leitura enganosa é _"a API subiu, então o ambiente está de pé — o login é que
+  está bugado"_. Não está: falta o Redis.
+
+**Causa**
+
+Redis **não é cache opcional aqui — é onde a sessão vive.** O refresh token e a
+revogação de sessão são persistidos no Redis (`RedisRefreshTokenStore` /
+`RedisVerificationTokenStore`, ADR-0002/D-029). No login, o `startSession` grava
+o refresh token no Redis; sem Redis, a gravação falha e a operação inteira cai. A
+API sobe assim mesmo porque o `ioredis` conecta de forma preguiçosa e fica em
+retry — a conexão só é **exigida** quando uma rota de auth a usa.
+
+**Resolver**
+
+```bash
+docker compose -f docker/docker-compose.yml ps           # redis deve estar "healthy"
+docker compose -f docker/docker-compose.yml up -d redis  # se faltou / caiu
+redis-cli -p 6379 ping                                    # PONG
+```
+
+---
+
+# Integrações externas
+
+Armadilhas que não são do ambiente local, mas do **gateway/serviço de terceiros**.
+Mordem na implementação, não no setup: o comportamento do provider não é o que a
+intuição supõe, e o código escrito sobre a suposição fica errado em silêncio.
+
+## 16. Asaas / split: a taxa incide sobre o `netValue`, e o estorno reverte tudo
+
+**Sintoma**
+
+Dois erros distintos, nenhum quebra nada — só dá número errado:
+
+1. A receita projetada do FITVO vem **inflada**: o dashboard soma mais do que o
+   Asaas de fato transfere.
+2. A implementação de estorno assume que a taxa do FITVO **fica retida** e concilia
+   um saldo que nunca existiu.
+
+**Causa**
+
+Duas premissas do split do Asaas que contrariam a intuição (fatos verificados,
+ver ADR-0004 / D-018 e D-021):
+
+1. **A taxa do Asaas é descontada ANTES do split.** O percentual do split incide
+   sobre o `netValue`, **nunca sobre o valor bruto**. Numa cobrança de **R$ 200 no
+   cartão** → o Asaas desconta **R$ 6,47** → `netValue` **R$ 193,53** → o split de
+   2% do FITVO rende **R$ 3,87**, não R$ 4,00. Calcular sobre o bruto infla a
+   receita esperada. A taxa do FITVO é margem limpa; o profissional absorve o custo
+   do gateway.
+
+2. **Estorno total reverte o split inteiro — taxa do FITVO incluída.** Em estorno
+   total da cobrança, todas as contas que receberam saldo têm a transferência
+   revertida, o FITVO entre elas. **Não é configurável** — é comportamento do
+   gateway. A implementação de estorno **deve assumir isso**: a taxa volta, não há
+   como retê-la dentro do split.
+
+**Regra**
+
+> O split do FITVO é **percentual sobre o `netValue`**, e o estorno **devolve a
+> taxa**. Não calcule receita sobre o bruto, e não modele estorno supondo que a
+> taxa fica. Os dois vêm do gateway, não da nossa configuração.
+
+A decisão e as alternativas rejeitadas (cobrar a taxa fora do split para
+preservá-la no estorno — rejeitado) estão em `docs/adr/0004-financeiro.md`. Este
+registro é o que morde quem for **codar** o split: o ADR é a decisão; isto é a
+consequência prática.
+
+## 17. Escolher versão de dependência sem rodar o `osv-scanner` ANTES é decidir no escuro
+
+**Sintoma**
+
+O plano fixa uma versão (ex.: Next 14, "a estável compatível com React 18"), tudo
+compila, o E2E passa, o PR abre — e o `dependency-scan` (osv-scanner) do CI reprova
+por vulnerabilidade conhecida naquela versão. O retrabalho não é uma linha: é
+reabrir a decisão de versão com o código já construído em cima dela.
+
+**Causa**
+
+`typecheck`/`lint`/`build`/E2E provam que o código **funciona** — não que a versão
+é **segura**. Vulnerabilidade conhecida é ortogonal a "compila". O CI tem o gate
+certo (`osv-scanner scan --lockfile=pnpm-lock.yaml`, ADR-0006), mas ele roda
+**depois** do plano inteiro.
+
+**Caso real (PR #62):** a escolha de **Next 14.2.35** (por casar com React 18, trava
+do ui-web) foi reprovada — 14 advisories, 5 High (até CVSS 8.6, SSRF), **sem fix na
+linha 14.x**, só em Next 15+. Custo: reabrir a versão do framework (Next 15, que
+também aceita React 18), migrar `cookies()` para async, refazer gates e E2E. Tudo
+evitável com um scan antes.
+
+**O que fazer**
+
+Antes de fixar a versão de uma dependência nova (ou subir major), rode o mesmo
+scanner do CI **local**:
+
+```bash
+# osv-scanner na mesma versao do CI (ver .github/workflows/ci.yml)
+./osv-scanner scan --lockfile=pnpm-lock.yaml   # exit 0 = sem vulnerabilidade
+```
+
+> A pergunta não é "compila com esta versão?" — é "esta versão tem vulnerabilidade
+> conhecida?". O CI responde a segunda, mas tarde. Responda-a no plano, não no PR.

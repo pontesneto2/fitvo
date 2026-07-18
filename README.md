@@ -71,8 +71,24 @@ nvm use                                                   # Node >= 22.12 (.nvmr
 pnpm install
 cp .env.example .env                                      # e os .env.example de cada app
 docker compose -f docker/docker-compose.yml up -d         # postgres (5434) + redis (6379)
-pnpm --filter @fitvo/database db:migrate
+pnpm --filter @fitvo/database db:migrate                  # cria/atualiza o schema + gera o Prisma Client
+pnpm --filter @fitvo/api dev                              # API em http://localhost:3333 (Swagger em /docs)
 ```
+
+O que precisa estar no ar: **Postgres (5434)** e **Redis (6379)** — ambos sobem
+no `docker compose` acima — mais a **API (3333)**.
+
+> ⚠️ **Redis é obrigatório, não opcional.** Sem ele a API **sobe** e escuta na
+> 3333 normalmente, mas **`/v1/auth/login` e `/refresh` quebram** — a sessão
+> (refresh token) vive no Redis. O sintoma engana: _"a API subiu, o login não
+> funciona"_. Ver [docs/troubleshooting.md](docs/troubleshooting.md).
+
+**Sobre os apps web/mobile:** na `main`, `web-personal`, `web-admin`, `site` e
+`mobile` ainda são _placeholders_ — nenhum tem script `dev`, então nada escuta na
+3000. O painel `web-personal` (login, shell, tema light/dark) está no **PR #62**
+(`feat/web-personal-skeleton`), ainda **não mergeado**; enquanto ele não entra na
+`main`, o único serviço que sobe é a API. Exercite o backend pelo **Swagger em
+`/docs`** ou por `curl`.
 
 > ⚠️ **O Postgres local roda na porta 5434, não na 5432.** A 5432 costuma estar
 > ocupada por uma instalação **nativa** do Postgres (comum no macOS): o container
@@ -84,6 +100,27 @@ pnpm --filter @fitvo/database db:migrate
 Esta e outras armadilhas (Node antigo no shell, `npx prisma` puxando a major
 errada) estão em **[docs/troubleshooting.md](docs/troubleshooting.md)**, com
 sintoma e causa.
+
+### Primeiro login (não há seed)
+
+Não existe seed. Para obter uma conta, **registre um profissional** — o registro
+já abre sessão e devolve os tokens (a verificação de e-mail **não** bloqueia o
+login; nesta fase o token de verificação é apenas logado no console da API pelo
+stub `LoggingAuthEmailSender`). Depois, `/login` com o mesmo e-mail/senha devolve
+novos tokens.
+
+```bash
+# Registra e já retorna { account, tokens } (documentType: CPF = 11 dígitos)
+curl -sS -X POST http://localhost:3333/v1/auth/register/professional \
+  -H 'content-type: application/json' \
+  -d '{"email":"dev@fitvo.local","password":"senha-forte-123","name":"Dev",
+       "document":"12345678901","documentType":"CPF","tenantName":"Clinica Dev"}'
+
+# Login subsequente com as mesmas credenciais
+curl -sS -X POST http://localhost:3333/v1/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"dev@fitvo.local","password":"senha-forte-123"}'
+```
 
 ## Trabalho futuro (fora do escopo do planejamento estrutural)
 

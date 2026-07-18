@@ -192,6 +192,23 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
 
 ## BLOQUEADO — RESPONSÁVEL (decisão que só você pode tomar)
 
+- **⚠️ ISOLAMENTO DE TENANT SISTÊMICO — pré-requisito ANTES de qualquer cliente
+  real. PRIORIDADE ALTA.** Achado **#1 e mais grave** do inventário de
+  promessas-sem-gate (`docs/promessas-sem-gate.md`, #73): o isolamento de tenant
+  **não tem gate sistêmico**. Hoje, o que impede um tenant de ver dados de outro
+  é **disciplina** (o dev lembrar do escopo de `tenantId`) — **nada REPROVA** uma
+  query que esqueça. Num SaaS multi-tenant com dado de saúde, é o vazamento mais
+  caro possível: um `findMany` sem escopo e a Clínica A vê os pacientes da
+  Clínica B.
+  - **Criticidade:** bloqueia o go-live. Não urgente sem clientes, mas é a
+    PRIMEIRA coisa a resolver antes de qualquer pessoa real entrar.
+  - **Soluções conhecidas (decisão do responsável, a definir):** Prisma extension
+    que injeta `tenantId` automaticamente em toda query; RLS no Postgres (já
+    cogitado no ADR-0001); ou os dois (RLS no banco + extension na aplicação). O
+    objetivo é tornar o vazamento **IRREPRESENTÁVEL**, não confiar em disciplina.
+  - **Relacionado:** os itens AUDITAR 4 e 5 do mesmo mapa (admin puro não vê dado
+    clínico; leitura só com consentimento) são da **mesma família** — falta o gate
+    que prova o **BLOQUEIO**, não só o caminho feliz.
 - **Apps web**: liberar o início do item 1 do PENDENTE depende do merge do PR
   #18 (`brand-tokens`/`ui-web`/`ui-mobile`) e da sua confirmação de que estão
   maduros o suficiente para consumo em produto.

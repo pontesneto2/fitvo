@@ -32,6 +32,14 @@ RESPONSÁVEL** (decisão que só você pode tomar), **BLOQUEADO — TERCEIROS**
 
 ## EM ANDAMENTO
 
+- **PR (branch `docs/repo-standardization`)** — Padronização do repositório para
+  nível de sistema grande: README raiz reescrito como vitrine (o índice de ADR +
+  mapa D→ADR migrou para `docs/adr/README.md`), metadados do GitHub (description,
+  topics), templates de PR (com campo de área crítica da Política de Merge) e de
+  issue (bug/feature), `LICENSE` proprietária (all rights reserved — repo público
+  para avaliação), CODEOWNERS mapeando as áreas críticas, e **gate de commitlint
+  no CI** (fecha o furo: antes só rodava local, bypassável com `--no-verify`).
+  Docs/infra, baixo risco pela Política de Merge.
 - **PR #17** (`docs/politica-de-merge`) — Política de Merge + este roadmap.
   Este próprio commit ajusta a ordem do PENDENTE abaixo, a pedido do
   responsável, antes do merge.

@@ -1,7 +1,8 @@
 name: CI
 
 # Checks obrigatorios para branch protection em main (configurar no GitHub):
-# lint, typecheck, test, build, format, dependency-scan, secret-scan, migrate.
+# lint, typecheck, test, build, format, dependency-scan, secret-scan, migrate,
+# commitlint (so em pull_request).
 on:
   pull_request:
     branches: [main]
@@ -127,6 +128,34 @@ jobs:
       #      quem percebe e este.
       - name: Testes de integracao (mapeamento + constraints)
         run: pnpm test:integration
+
+  commitlint:
+    name: commitlint
+    # Gate server-side do Conventional Commits. O hook husky commit-msg roda o
+    # MESMO commitlint localmente, mas some com `git commit --no-verify` — este
+    # job e o que garante. Reprova: tipo ausente/fora do enum (feat|fix|...),
+    # escopo/formato invalido, assunto vazio. Config em commitlint.config.cjs.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      # 1) Cada commit do PR. Se o merge for por squash o titulo prevalece
+      #    (passo 2), mas commits limpos mantem o historico da branch legivel.
+      - name: Lint dos commits do PR
+        run: >-
+          pnpm exec commitlint
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+          --verbose
+      # 2) O TITULO do PR — no squash-merge ele VIRA o commit na main. Passado
+      #    por env (nao interpolado no shell) para evitar injecao.
+      - name: Lint do titulo do PR (vira o commit no squash)
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s' "$PR_TITLE" | pnpm exec commitlint --verbose
 
   dependency-scan:
     name: dependency-scan

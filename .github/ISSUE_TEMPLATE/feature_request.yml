@@ -1,0 +1,57 @@
+name: Feature
+description: Propor uma funcionalidade ou melhoria
+labels: ['feature']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Regra do projeto: **não se inventa regra de negócio**. Se a proposta
+        depende de uma decisão que não está nos ADRs, ela precisa ser proposta ao
+        responsável antes de implementar. Ver [docs/adr/](../docs/adr/README.md).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema / motivação
+      description: Que dor ou necessidade isso resolve? Evite pular direto para a solução.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposta
+      description: O que você sugere. Se houver alternativas, cite-as e por que esta.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - api
+        - worker
+        - web-personal
+        - web-admin
+        - site
+        - mobile
+        - packages (auth, payments, ai, database, ui, ...)
+        - infra / CI / tooling
+        - docs
+        - transversal
+    validations:
+      required: true
+  - type: input
+    id: adr
+    attributes:
+      label: ADR / decisão relacionada
+      description: 'Se aplicável, o ADR ou D-xxx pertinente (ex.: docs/adr/0004-financeiro.md, D-018).'
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmações
+      options:
+        - label: Verifiquei que não existe issue/ADR cobrindo isto.
+          required: true
+        - label: Entendo que áreas críticas (financeiro, consentimento, auth, dado clínico) exigem decisão do responsável antes da implementação.
+          required: true

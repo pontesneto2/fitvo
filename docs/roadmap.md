@@ -209,6 +209,30 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   - **Relacionado:** os itens AUDITAR 4 e 5 do mesmo mapa (admin puro não vê dado
     clínico; leitura só com consentimento) são da **mesma família** — falta o gate
     que prova o **BLOQUEIO**, não só o caminho feliz.
+- **⚠️ OBRIGAÇÕES ENFRAQUECIDAS NA DESTILAÇÃO — definir como enforçar. Área
+  crítica (auth + LGPD).** Auditoria ADR × histórico bruto (D-001–D-073, palavra
+  de força a palavra de força; a **classe** do defeito está em
+  `docs/troubleshooting.md` §18): **duas obrigações ativas viraram registro/menção
+  passiva** na síntese do ADR — ninguém decidiu enfraquecê-las, evaporaram na
+  tradução. Não é "decidido e não implementado": é "decidido e DESTILADO ERRADO".
+  - **D-029 (auth):** histórico diz "verificação de e-mail **obrigatória**"; o
+    ADR-0002 destilou para "verificação de e-mail". O mecanismo existe inteiro,
+    mas **nada enforça** — o login não checa e-mail verificado.
+  - **D-025 (consentimento/LGPD):** histórico diz "**exigir novo aceite quando o
+    termo muda**"; o ADR-0005 destilou para "versionado (**registrar** qual versão
+    foi aceita)". **Registrar a versão ≠ re-consentir** — exposição LGPD direta.
+  - **Decisão do responsável:** *como* enforçar cada uma — bloquear login/ação até
+    verificar? travar só ações sensíveis? período de graça? re-consentimento
+    forçado no próximo acesso? Fechar = clarificar o ADR (reafirmando a força) +
+    implementar + testar. **Não implementar antes da decisão.**
+  - **Menores (registrados, baixa severidade):** D-018 (a trava "não atende antes
+    da subconta" não é enunciada no ADR-0004), D-027 ("opt-out de e-mail é
+    **requisito legal**" diluído), D-019 ("aluno **sempre grátis**" sobrevive só
+    por implicação estrutural).
+  - **NÃO são defeito (revisão deliberada, apenas anotado):** D-014 (o ADR
+    *apertou* a regra), D-021 (revisão datada da taxa no estorno), D-012 (clínica
+    modelada por completo). Revisão consciente ≠ destilação errada — confundir as
+    duas seria o erro.
 - **Apps web**: liberar o início do item 1 do PENDENTE depende do merge do PR
   #18 (`brand-tokens`/`ui-web`/`ui-mobile`) e da sua confirmação de que estão
   maduros o suficiente para consumo em produto.

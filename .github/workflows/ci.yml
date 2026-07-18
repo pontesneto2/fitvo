@@ -37,6 +37,30 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pnpm run format:check
 
+  contract:
+    name: contract
+    runs-on: ubuntu-latest
+    # O OpenAPI (/docs) e DERIVADO dos schemas Zod das rotas (D-032). Este job
+    # reprova quando o contrato versionado (packages/contracts/openapi.json)
+    # DESSINCRONIZA da implementacao: regenera o spec do codigo e compara.
+    #
+    # NAO passa por vacuidade: o arquivo commitado e GERADO (nao escrito a mao) e
+    # esta prettier-ignored, e o passo abaixo o reconstroi das ROTAS VIVAS e faz
+    # diff byte a byte. Um schema mudado sem regenerar deixa o diff != 0 e o job
+    # VERMELHO. (A divergencia OpenAPI-vs-validacao ja e IMPOSSIVEL por construcao
+    # — o mesmo schema Zod valida E documenta; este job pega o outro caso: o
+    # artefato versionado ficar para tras.)
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      # gen:openapi importa @fitvo/database — precisa do client Prisma gerado.
+      - name: Gera o client Prisma
+        run: pnpm --filter @fitvo/database build
+      - name: Regenera o OpenAPI dos schemas Zod
+        run: pnpm --filter @fitvo/api gen:openapi
+      - name: Contrato versionado bate com a implementacao (sem drift)
+        run: git diff --exit-code -- packages/contracts/openapi.json
+
   migrate:
     name: migrate
     runs-on: ubuntu-latest

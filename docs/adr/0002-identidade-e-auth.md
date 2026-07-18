@@ -56,3 +56,27 @@ reenviável.
   por controle e economia em escala.
 - Dois tipos de convite no sistema: profissional→paciente (ADR-0002) e
   admin→profissional (ADR-0003).
+
+## Autenticação no cliente web (BFF + cookies httpOnly)
+
+**Contexto:** a API é *bearer puro* — devolve `accessToken`/`refreshToken` no corpo
+do login e valida `Authorization: Bearer` em `/me`, `/logout` etc. Um cliente web
+que toca dado clínico e financeiro precisa guardar esses tokens **sem** expô-los a XSS.
+
+**Decisão:** o `web-personal` usa o padrão **BFF (Backend-for-Frontend)**. Os route
+handlers do próprio Next (`/api/auth/login|logout|refresh`, `/api/me`) intermediam a
+API: recebem as credenciais, chamam `/v1/auth/*` no servidor e guardam os tokens em
+**cookies `httpOnly`, `Secure`, `SameSite=Lax`** (`fitvo_at` / `fitvo_rt`). O
+navegador **nunca vê o token em JavaScript** — a resposta do login carrega só a conta.
+O middleware guarda as rotas por **presença** do cookie de sessão; a validação real
+continua na API (Bearer). O refresh (rotação — D-029) acontece server-side, no 401.
+
+**Por quê, e não token em `localStorage`/memória:**
+- **XSS = roubo de sessão.** Token legível por JS, num app com dado clínico e
+  financeiro, é inaceitável (este ADR pede rigor); `httpOnly` remove essa superfície.
+- **Dispensa CORS.** O browser só fala com o Next (same-origin); não é preciso abrir
+  CORS na API — coerente com manter a API fechada.
+
+**Consequência:** as chamadas à API a partir do cliente passam pelo BFF (route
+handlers / server components), não direto do browser. É o custo aceito pela
+segurança do token.

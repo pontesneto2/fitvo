@@ -1,4 +1,5 @@
 import type { InputHTMLAttributes, ReactNode } from 'react';
+import { forwardRef } from 'react';
 
 import { cn } from './cn';
 
@@ -11,6 +12,8 @@ import { cn } from './cn';
  *
  * Dark: §5 nao especifica; tokens semanticos de borda (`line`/`line-hover`/`line-
  * focus`, corretos nos dois temas) + neutros "sobem na rampa" (§21).
+ *
+ * `forwardRef` encaminha o ref ao `<input type=radio>` (register do RHF — ADR-0005).
  */
 export interface RadioProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
   readonly error?: boolean;
@@ -50,15 +53,10 @@ function RadioDot({
   );
 }
 
-export function Radio({
-  error = false,
-  disabled = false,
-  checked,
-  defaultChecked,
-  className,
-  children,
-  ...props
-}: RadioProps): ReactNode {
+export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio(
+  { error = false, disabled = false, checked, defaultChecked, className, children, ...props },
+  ref,
+) {
   const staticSelected = (checked ?? defaultChecked) === true; // so usado quando disabled
 
   const boxCls = disabled
@@ -78,6 +76,7 @@ export function Radio({
       )}
     >
       <input
+        ref={ref}
         type="radio"
         className="peer sr-only"
         disabled={disabled}
@@ -99,4 +98,4 @@ export function Radio({
       ) : null}
     </label>
   );
-}
+});

@@ -1,11 +1,12 @@
 import { Check, ChevronDown, Search } from 'lucide-react';
 import type { ChangeEvent, KeyboardEvent, ReactNode } from 'react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { forwardRef, useEffect, useId, useRef, useState } from 'react';
 
 import { cn } from './cn';
 import type { FieldStatus } from './field-styles';
 import { fieldBase, fieldStatusClasses } from './field-styles';
 import { Icon } from './icon';
+import { mergeRefs } from './merge-refs';
 
 /**
  * Select / Dropdown WEB (design-system-components.md §3 + dark §21). Primeiro
@@ -139,24 +140,27 @@ function SearchIcon(): ReactNode {
   return <Icon icon={Search} size="sm" className="shrink-0 text-fg-subtle" />;
 }
 
-export function Select({
-  options,
-  value,
-  defaultValue,
-  onValueChange,
-  placeholder = 'Selecione…',
-  searchable = false,
-  searchPlaceholder = 'Buscar…',
-  emptyLabel = 'Nenhum resultado',
-  status = 'default',
-  disabled = false,
-  name,
-  id,
-  className,
-  'aria-describedby': ariaDescribedby,
-  'aria-label': ariaLabel,
-  'aria-labelledby': ariaLabelledby,
-}: SelectProps): ReactNode {
+export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select(
+  {
+    options,
+    value,
+    defaultValue,
+    onValueChange,
+    placeholder = 'Selecione…',
+    searchable = false,
+    searchPlaceholder = 'Buscar…',
+    emptyLabel = 'Nenhum resultado',
+    status = 'default',
+    disabled = false,
+    name,
+    id,
+    className,
+    'aria-describedby': ariaDescribedby,
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledby,
+  }: SelectProps,
+  forwardedRef,
+) {
   const isControlled = value !== undefined;
   const [internal, setInternal] = useState<string | undefined>(defaultValue);
   const selected = isControlled ? value : internal;
@@ -306,7 +310,7 @@ export function Select({
   return (
     <div ref={containerRef} className={cn('relative', className)}>
       <button
-        ref={buttonRef}
+        ref={mergeRefs(buttonRef, forwardedRef)}
         type="button"
         id={rootId}
         disabled={disabled}
@@ -406,4 +410,4 @@ export function Select({
       ) : null}
     </div>
   );
-}
+});

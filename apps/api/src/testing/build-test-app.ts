@@ -10,6 +10,7 @@ import { type BondCreatedEvent, InMemoryQueueFactory, SHARING_QUEUE } from '@fit
 import type { FastifyInstance } from 'fastify';
 
 import { buildApp } from '../app';
+import type { AppDependencies } from '../dependencies';
 import { AuthApplicationService } from '../modules/auth/auth-application-service';
 import { InMemoryAccountRepository } from '../modules/auth/in-memory-account-repository';
 import { BillingApplicationService } from '../modules/billing/billing-application-service';
@@ -21,6 +22,17 @@ import { InMemoryConsentRepository } from '../modules/consent/in-memory-consent-
 import { InMemoryPatientRepository } from '../modules/patient/in-memory-patient-repository';
 import { PatientApplicationService } from '../modules/patient/patient-application-service';
 import { FakeAuthEmailSender } from './fake-auth-email-sender';
+
+/** Dependências in-memory + os repositórios expostos para arranjo nos testes. */
+export interface TestDependencies {
+  deps: AppDependencies;
+  emails: FakeAuthEmailSender;
+  clinic: InMemoryClinicRepository;
+  patient: InMemoryPatientRepository;
+  consent: InMemoryConsentRepository;
+  billing: InMemoryBillingRepository;
+  queue: InMemoryQueueFactory;
+}
 
 export interface TestHarness {
   app: FastifyInstance;
@@ -37,9 +49,13 @@ export interface TestHarness {
   queue: InMemoryQueueFactory;
 }
 
-/** Monta a app com dependencias em memoria (sem Postgres/Redis) e expoe o
- *  sender falso e o repositorio de clinica para arranjo/asserts nos testes. */
-export async function buildTestHarness(): Promise<TestHarness> {
+/**
+ * Monta as dependências da app com implementações in-memory (sem Postgres/Redis)
+ * e devolve também os repositórios/senders para arranjo e asserts. Separado de
+ * `buildTestHarness` para que a app possa ser montada com opções (ex.: hook de
+ * introspecção de rotas na trava de schema — D-032) reusando estas dependências.
+ */
+export function buildTestDependencies(): TestDependencies {
   const jwt = new JwtTokenService({
     accessSecret: 'test-access-secret-1234567890',
     refreshSecret: 'test-refresh-secret-1234567890',
@@ -75,15 +91,30 @@ export async function buildTestHarness(): Promise<TestHarness> {
     authCore,
     'wallet_fitvo_test',
   );
-  const app = await buildApp({
-    logLevel: 'silent',
-    corsOrigin: '*',
-    authService,
-    clinicService,
-    patientService,
-    consentService,
-    billingService,
-  });
+  return {
+    deps: {
+      logLevel: 'silent',
+      corsOrigin: '*',
+      authService,
+      clinicService,
+      patientService,
+      consentService,
+      billingService,
+    },
+    emails,
+    clinic,
+    patient,
+    consent,
+    billing,
+    queue,
+  };
+}
+
+/** Monta a app com dependencias em memoria (sem Postgres/Redis) e expoe o
+ *  sender falso e os repositorios para arranjo/asserts nos testes. */
+export async function buildTestHarness(): Promise<TestHarness> {
+  const { deps, emails, clinic, patient, consent, billing, queue } = buildTestDependencies();
+  const app = await buildApp(deps);
   return { app, emails, clinic, patient, consent, billing, queue };
 }
 

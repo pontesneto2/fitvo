@@ -19,6 +19,7 @@ export * from './field-styles';
 export * from './icon';
 export * from './input';
 export * from './logo';
+export * from './merge-refs';
 export * from './modal';
 export * from './radio';
 export * from './select';

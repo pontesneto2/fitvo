@@ -80,14 +80,23 @@ Cada item: web + mobile + testes + galeria (artifact HTML light/dark), um commit
 | 17 | Gráficos — `LineChart`/`BarChart` | `7d0d77b` | web = Recharts; mobile = `victory-native` v36 (SVG puro via `react-native-svg`, sem Skia/Reanimated — a v41 XL exige nativo pesado, sem app RN real pra validar). `seriesColor`/`dashPattern`/`ChartSeriesConfig` movidos para `@fitvo/brand-tokens/charts` (lógica pura, compartilhada entre os dois pacotes, evita duplicação). `chartGrid` corrigido: era cor fixa sem dark — agora reusa `borderDefault` (mesmo par, §21 "sobe na rampa"). Cor nunca é o único diferenciador (§17): line usa padrão de traço por série; bar sempre mostra a legenda. |
 | 19 | Ícones (Lucide) + componente `Icon` | `757bd88` | `lucide-react`/`lucide-react-native` (imports nomeados, tree-shaking ok). Substitui TODO o SVG inline/desenho manual anterior (Select, Badge, Toast, Modal, Checkbox, Button spinner, Table sort, states, Logo ícone provisório no mobile — agora `SvgXml` da mesma arte do web, não mais um "V" de texto). |
 
-**Contagem de testes:** ui-web **130**, ui-mobile **81** (+ lógica de série testada em `brand-tokens`).
+**Contagem de testes:** ui-web **136**, ui-mobile **81** (+ lógica de série testada em `brand-tokens`).
 
-> **⚠️ Dívida conhecida — controles sem `forwardRef`.** `Input`/`Textarea` (§2),
-> `Select` (§3) e `Checkbox`/`Radio`/`Switch` (§4/5/6) são `export function X(props)`
-> sem encaminhar o `ref` ao elemento nativo. Isso **quebra o `register()` uncontrolled
-> do React Hook Form** (ADR-0005) — o consumidor é forçado a `Controller` (mais
-> verboso). Descoberto no login do `web-personal`. Correção = `forwardRef` nos 6
-> controles, **PR próprio** (ver `docs/roadmap.md`).
+> **✅ RESOLVIDO — controles agora fazem `forwardRef`.** `Input`/`Textarea` (§2),
+> `Select` (§3, ref no botão-gatilho) e `Checkbox`/`Radio`/`Switch` (§4/5/6)
+> encaminham o `ref` ao elemento nativo (`mergeRefs` funde com o ref interno onde há
+> — Checkbox usa um para `indeterminate`). Habilita o `register()` uncontrolled do
+> React Hook Form (ADR-0005); o `web-personal` voltou de `Controller` para
+> `register()`. Teste por controle que **reprova** se o ref não chegar
+> (`ref.current instanceof HTMLInputElement` — sem `forwardRef`, fica `null`).
+>
+> **Lição (7º "verde que mente" do projeto):** os testes do ui-web testam
+> **renderização e variantes**, não **integração com formulário**. O `forwardRef`
+> faltante passou despercebido por **227 testes verdes** do design system
+> (ui-web + ui-mobile + brand-tokens) — a suíte testava a coisa certa (o visual) e,
+> ao mesmo tempo, a errada (presumia "cobrir" o componente). **Consumidor real é o
+> único teste que pega esse tipo de defeito**: foi um app de verdade, não a suíte,
+> que achou o bug.
 
 ## Framework glue (base, commits `a625c13`/`4c83379`/`5fa2104`)
 
@@ -107,7 +116,10 @@ Cada item: web + mobile + testes + galeria (artifact HTML light/dark), um commit
   **FEITO** — `apps/web-personal` (esqueleto): `presets: [fitvoTailwindPreset]` +
   `buildThemeCss()` injetado no layout raiz + `content` incluindo
   `packages/ui-web/src`. A cola deixou de ser teórica; build/tema light-dark verdes.
-  **Achado ao ser o primeiro consumidor:** `Input` (e os demais controles) não faz
-  `forwardRef` — o `register` (uncontrolled) do React Hook Form não recebe o `ref`;
-  o `web-personal` contornou com `Controller` (controlado). Avaliar adicionar
-  `forwardRef` aos controles para habilitar o uso uncontrolled do RHF.
+  **Achado ao ser o primeiro consumidor — e a conclusão que ele trouxe:** nenhum
+  dos 6 controles fazia `forwardRef`, quebrando o `register()` do RHF. **Corrigido**
+  (ver a nota de forwardRef acima; `web-personal` voltou a `register()`). A lição é
+  maior que o bug: **colar o design system num app de verdade não só provou que a
+  cola funciona — provou que a suíte de 227 testes verdes testava a coisa errada.**
+  Um design system só "existe" de fato quando um consumidor real o exercita; até
+  lá, verde é presunção.

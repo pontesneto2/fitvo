@@ -110,8 +110,9 @@ com sintoma e causa.
 ### Primeiro login (não há seed)
 
 Registre um profissional — o registro já abre sessão e devolve os tokens (a
-verificação de e-mail **não** bloqueia o login nesta fase; o token é apenas logado
-no console da API pelo stub `LoggingAuthEmailSender`).
+verificação de e-mail **não** bloqueia o login nesta fase; o token de
+verificação/reset não é exposto e não é necessário para exercitar a API — o
+registro e o login já devolvem os tokens de acesso).
 
 ```bash
 # Registra e já retorna { account, tokens } (documentType: CPF = 11 dígitos)

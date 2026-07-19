@@ -47,12 +47,15 @@ sem repetir o número. **A tabela é a autoridade sobre a cobertura**, não o `g
 | D-093 – D-100 | [0010](0010-fluxo-aluno-gates-atendimento.md) | Fluxo do aluno, gates, atendimento |
 | D-101 – D-104 | [0011](0011-modalidade-e-anamnese.md) | Modalidade e anamnese |
 | D-106 – D-111 | [0012](0012-agenda.md) | Agenda |
-| D-112 – D-121 | [0013](0013-dominio-nutricao.md) | Domínio de nutrição |
+| D-112 – D-121, **D-133 – D-134** | [0013](0013-dominio-nutricao.md) | Domínio de nutrição (D-133/D-134: adendos de concorrência) |
 | D-122 – D-132 | [0014](0014-dominio-medicina.md) | Domínio de medicina (nutrologia esportiva) |
 
-**Cobertura:** D-001 a D-132, sem lacunas. Algumas aparecem em dois ADRs (D-025
-em 0004/0005; D-050 em 0003/0004; D-054 em 0001/0003) — é intencional: a decisão
-tem consequência nos dois temas.
+**Cobertura:** D-001 a D-134, sem lacunas. **D-133 e D-134 são adendos de
+concorrência ao domínio de nutrição (ADR-0013)** numerados **depois** de medicina
+(D-122–D-132) porque nasceram depois — a numeração é cronológica, não temática, e
+por isso a linha do 0013 não é contígua. Algumas decisões aparecem em dois ADRs
+(D-025 em 0004/0005; D-050 em 0003/0004; D-054 em 0001/0003) — é intencional: a
+decisão tem consequência nos dois temas.
 
 **Revisões** — uma decisão pode ser revisada por outra mais nova. O ADR original
 recebe um ponteiro; o `Status` no topo de cada ADR e o campo `Revisa:` são a

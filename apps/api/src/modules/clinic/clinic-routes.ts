@@ -6,6 +6,7 @@ import {
   clinicInviteParamsSchema,
   clinicRosterResultSchema,
   clinicTenantParamsSchema,
+  problemDetailsSchema,
 } from '@fitvo/validation';
 import type { FastifyPluginAsync } from 'fastify';
 import {
@@ -41,13 +42,13 @@ export function clinicRoutes(service: ClinicApplicationService): FastifyPluginAs
           tags: TAGS,
           summary: 'Convida um profissional para a clinica (admin)',
           description:
-            'Cria um convite de uso unico (D-014/D-048). Requer CLINIC_ADMIN do tenant. ' +
-            'Devolve o token em claro UMA vez (entrega por e-mail e fase futura); ' +
-            'o banco guarda apenas o hash.',
+            'Cria um convite de uso unico (D-014/D-048). Requer CLINIC_ADMIN do tenant e ' +
+            'e-mail verificado (D-029). Devolve o token em claro UMA vez (entrega por ' +
+            'e-mail e fase futura); o banco guarda apenas o hash.',
           security: bearerAuth,
           params: clinicTenantParamsSchema,
           body: clinicCreateInviteSchema,
-          response: { 201: clinicCreateInviteResultSchema },
+          response: { 201: clinicCreateInviteResultSchema, 403: problemDetailsSchema },
         },
       },
       async (request, reply) => {

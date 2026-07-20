@@ -1,8 +1,12 @@
 import type { PasswordHasher } from '@fitvo/auth';
 import type { DocumentType, InviteStatus } from '@fitvo/database';
 
-import type { AccessTokenVerifier, AuthContext } from '../../shared/auth-context';
-import { requireAuth } from '../../shared/auth-context';
+import type {
+  AccessTokenVerifier,
+  AuthContext,
+  EmailVerificationLookup,
+} from '../../shared/auth-context';
+import { requireAuth, requireVerifiedEmail } from '../../shared/auth-context';
 import {
   ForbiddenError,
   InvalidInviteTokenError,
@@ -100,6 +104,8 @@ export class ClinicApplicationService {
     private readonly hasher: PasswordHasher,
     private readonly tokenVerifier: AccessTokenVerifier,
     private readonly inviteTtlSeconds: number,
+    /** Gate de e-mail verificado (D-029) ao convidar. */
+    private readonly emailVerification: EmailVerificationLookup,
   ) {}
 
   /** Admin cria um convite para um profissional. Devolve o token em claro 1x. */
@@ -108,7 +114,8 @@ export class ClinicApplicationService {
     tenantId: string,
     input: { email: string },
   ): Promise<CreateInviteResult> {
-    await this.requireClinicAdmin(authorization, tenantId);
+    const ctx = await this.requireClinicAdmin(authorization, tenantId);
+    await requireVerifiedEmail(this.emailVerification, ctx.accountId);
     const pending = await this.clinic.findPendingInviteByEmail(tenantId, input.email);
     if (pending) {
       throw new InvitePendingConflictError();

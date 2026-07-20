@@ -10,4 +10,5 @@ export * from './auth';
 export * from './billing';
 export * from './clinic';
 export * from './consent';
+export * from './errors';
 export * from './patient';

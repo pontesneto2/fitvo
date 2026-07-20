@@ -13,8 +13,8 @@ import {
   type Periodicity as GatewayPeriodicity,
 } from '@fitvo/payments';
 
-import type { AccessTokenVerifier } from '../../shared/auth-context';
-import { requireAuth } from '../../shared/auth-context';
+import type { AccessTokenVerifier, EmailVerificationLookup } from '../../shared/auth-context';
+import { requireAuth, requireVerifiedEmail } from '../../shared/auth-context';
 import {
   ForbiddenError,
   NotFoundError,
@@ -211,6 +211,8 @@ export class BillingApplicationService {
     private readonly tokenVerifier: AccessTokenVerifier,
     /** Wallet do FITVO para o split da taxa (config — GATED; pode faltar). */
     private readonly platformWalletId: string | null,
+    /** Gate de e-mail verificado (D-029) ao emitir cobranca. */
+    private readonly emailVerification: EmailVerificationLookup,
   ) {}
 
   /** Catalogo publico de planos Nivel 1 (D-060). Precos comerciais reais GATED. */
@@ -298,7 +300,11 @@ export class BillingApplicationService {
     tenantId: string,
     input: CreateChargeInput,
   ): Promise<ChargeView> {
-    const { professionalProfileId } = await this.requireProfessional(authorization, tenantId);
+    const { professionalProfileId, accountId } = await this.requireProfessional(
+      authorization,
+      tenantId,
+    );
+    await requireVerifiedEmail(this.emailVerification, accountId);
 
     const bond = await this.billing.findActiveBondForProfessional(
       tenantId,
@@ -401,13 +407,13 @@ export class BillingApplicationService {
   private async requireProfessional(
     authorization: string | undefined,
     tenantId: string,
-  ): Promise<{ professionalProfileId: string }> {
+  ): Promise<{ professionalProfileId: string; accountId: string }> {
     const ctx = await requireAuth(this.tokenVerifier, authorization);
     const professional = await this.billing.findProfessional(ctx.accountId, tenantId);
     if (!professional) {
       throw new ForbiddenError('Requer um perfil profissional neste tenant.');
     }
-    return professional;
+    return { ...professional, accountId: ctx.accountId };
   }
 }
 

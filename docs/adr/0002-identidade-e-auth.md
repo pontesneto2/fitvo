@@ -80,3 +80,35 @@ continua na API (Bearer). O refresh (rotação — D-029) acontece server-side, 
 **Consequência:** as chamadas à API a partir do cliente passam pelo BFF (route
 handlers / server components), não direto do browser. É o custo aceito pela
 segurança do token.
+
+## Gate de e-mail verificado nas ações sensíveis (D-029)
+
+**Contexto:** a destilação inicial deste ADR registrou a verificação de e-mail
+como parte do core de auth, mas nenhum ponto do sistema checava
+`emailVerifiedAt` — o campo existia, nada o lia. D-029 exige o rigor; faltava a
+aplicação.
+
+**Decisão:** um guard reusável (`requireVerifiedEmail`, em
+`apps/api/src/shared/auth-context.ts`) roda **depois** da autenticação/RBAC e
+**antes** da regra de negócio, nas ações sensíveis: convidar (paciente e
+profissional), emitir cobrança (Fluxo B). Login e onboarding **não** passam por
+ele — a conta não verificada loga e completa o perfil normalmente; só a ação
+sensível esbarra no gate. Falha com **403** e `type`
+`https://fitvo.dev/problems/email-not-verified` (`EmailNotVerifiedError`),
+tipado na fonte Zod (`@fitvo/validation`) e refletido no `openapi.json`
+versionado (D-032). Reenvio da verificação reusa o padrão de token de uso único
+com TTL e rate limit já existente (`VerificationTokenStore`, D-029).
+
+**Consequências:**
+- Reenviar convite (`resend`) também exige e-mail verificado — está na mesma
+  família de ação ("convidar"). Revogar convite e arquivar vínculo, não: são
+  ações que reduzem exposição, não que a criam.
+- O aceite de convite (`/invites/accept`) fica **fora** do gate: é público,
+  autorizado pelo próprio token de uso único do convite, e pode criar a conta
+  na hora — não há Bearer nem estado de verificação prévio a checar ali.
+- Ações clínicas (anamnese/plano/prescrição — Medicina, ADR-0014) ainda não têm
+  rota própria; o guard está pronto para ser aplicado quando essa slice
+  nascer.
+- `subscribe` (Fluxo A, assinatura) não foi incluído neste gate — o escopo
+  pedido foi "cobrança/split/saque"; revisitar se o responsável quiser
+  estender.

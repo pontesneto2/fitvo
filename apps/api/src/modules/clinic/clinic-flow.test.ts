@@ -15,7 +15,11 @@ const adminPayload = {
   tenantName: 'Clinica Vida (solo do admin)',
 };
 
-/** Registra o admin (via auth) e o torna CLINIC_ADMIN do tenant de teste. */
+/**
+ * Registra o admin (via auth), o torna CLINIC_ADMIN do tenant de teste e marca
+ * o e-mail como verificado (D-029) — convidar exige o gate; o teste do gate em
+ * si usa um admin NAO verificado a parte.
+ */
 async function setupAdmin(harness: TestHarness): Promise<{ accountId: string; token: string }> {
   const res = await harness.app.inject({
     method: 'POST',
@@ -24,6 +28,7 @@ async function setupAdmin(harness: TestHarness): Promise<{ accountId: string; to
   });
   expect(res.statusCode).toBe(201);
   const body = res.json();
+  await harness.accounts.markEmailVerified(body.account.id);
   harness.clinic.seedAdmin(body.account.id, CLINIC_TENANT);
   return { accountId: body.account.id, token: body.tokens.accessToken };
 }
@@ -110,6 +115,32 @@ describe('fluxo de clinica e convites (E2E via inject)', () => {
       payload: { email: 'pro@fitvo.dev' },
     });
     expect(unauthorized.statusCode).toBe(401);
+
+    await harness.app.close();
+  });
+
+  it('gate de e-mail verificado (D-029): admin nao verificado nao convida; verificado passa', async () => {
+    const harness = await buildTestHarness();
+
+    const res = await harness.app.inject({
+      method: 'POST',
+      url: '/v1/auth/register/professional',
+      payload: adminPayload,
+    });
+    const body = res.json();
+    harness.clinic.seedAdmin(body.account.id, CLINIC_TENANT);
+    const token = body.tokens.accessToken;
+
+    const blocked = await createInvite(harness.app, token, 'pro@fitvo.dev');
+    expect(blocked.statusCode).toBe(403);
+    expect(blocked.headers['content-type']).toContain('application/problem+json');
+    expect(blocked.json()).toMatchObject({
+      type: 'https://fitvo.dev/problems/email-not-verified',
+    });
+
+    await harness.accounts.markEmailVerified(body.account.id);
+    const created = await createInvite(harness.app, token, 'pro@fitvo.dev');
+    expect(created.statusCode).toBe(201);
 
     await harness.app.close();
   });

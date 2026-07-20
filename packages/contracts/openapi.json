@@ -710,7 +710,7 @@
         "tags": [
           "clinic"
         ],
-        "description": "Cria um convite de uso unico (D-014/D-048). Requer CLINIC_ADMIN do tenant. Devolve o token em claro UMA vez (entrega por e-mail e fase futura); o banco guarda apenas o hash.",
+        "description": "Cria um convite de uso unico (D-014/D-048). Requer CLINIC_ADMIN do tenant e e-mail verificado (D-029). Devolve o token em claro UMA vez (entrega por e-mail e fase futura); o banco guarda apenas o hash.",
         "requestBody": {
           "required": true,
           "content": {
@@ -802,6 +802,47 @@
                   "required": [
                     "invite",
                     "token"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
                   ],
                   "additionalProperties": false
                 }
@@ -1075,7 +1116,7 @@
         "tags": [
           "patient"
         ],
-        "description": "Cria um convite de uso unico direcionado a UMA especialidade (D-006/D-052), declarando a MODALIDADE do atendimento (D-101), que o vinculo herda no aceite. Requer perfil profissional no tenant que reivindica a especialidade-alvo. Devolve o token em claro UMA vez; o banco guarda apenas o hash.",
+        "description": "Cria um convite de uso unico direcionado a UMA especialidade (D-006/D-052), declarando a MODALIDADE do atendimento (D-101), que o vinculo herda no aceite. Requer perfil profissional no tenant que reivindica a especialidade-alvo E e-mail verificado (D-029). Devolve o token em claro UMA vez; o banco guarda apenas o hash.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1197,6 +1238,47 @@
                   "required": [
                     "invite",
                     "token"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
                   ],
                   "additionalProperties": false
                 }
@@ -1374,7 +1456,7 @@
         "tags": [
           "patient"
         ],
-        "description": "Rotaciona o token e estende a validade na mesma linha (D-055). Devolve o novo token em claro UMA vez. Requer perfil profissional no tenant.",
+        "description": "Rotaciona o token e estende a validade na mesma linha (D-055). Devolve o novo token em claro UMA vez. Requer perfil profissional no tenant e e-mail verificado (D-029).",
         "parameters": [
           {
             "schema": {
@@ -1469,6 +1551,47 @@
                   "required": [
                     "invite",
                     "token"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
                   ],
                   "additionalProperties": false
                 }
@@ -2154,7 +2277,7 @@
         "tags": [
           "billing"
         ],
-        "description": "Fluxo B (D-019): o profissional dono do vinculo cobra o paciente via split (subconta do profissional + taxa FITVO). Valor em centavos (D-069). idempotencyKey obrigatoria (D-035). Asaas GATED — usa o FakePaymentGateway.",
+        "description": "Fluxo B (D-019): o profissional dono do vinculo cobra o paciente via split (subconta do profissional + taxa FITVO). Valor em centavos (D-069). idempotencyKey obrigatoria (D-035). Requer e-mail verificado (D-029). Asaas GATED — usa o FakePaymentGateway.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2308,6 +2431,47 @@
                     "periodicity",
                     "platformFeeCents",
                     "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
                   ],
                   "additionalProperties": false
                 }

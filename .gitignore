@@ -92,6 +92,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json.example
+.claude/
 
 # ----- Temporários -----
 tmp/

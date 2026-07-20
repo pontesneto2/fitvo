@@ -91,13 +91,33 @@
 - **O que falta:** o correlation ID existe na borda HTTP, mas não se propaga para
   o código de aplicação nem para as chamadas a dependências externas; o log de
   negócio não fica correlacionado ao request. Além disso, o `redact` introduzido
-  no PR #63 cobre o logger de abstração, **não** o logger do servidor HTTP —
-  falta estender.
+  no PR #63 (e depois estendido a `cookie`/`set-cookie`) cobre o logger de
+  abstração, **não** o logger do servidor HTTP — falta estender.
 - **Critério de aceite:** contexto de request (request/correlation ID) propagado
   a serviços, repositórios e adapters, incluído no log de negócio e no header de
   saída das chamadas externas; `redact` aplicado também ao logger do servidor.
 - **Prioridade:** abaixo de P5 (robustez de operação, não exposição). Entra
   quando o responsável definir.
+
+### Furos remanescentes do `redact` (log de abstração) — parcial, não bloqueante
+- **O que falta (maior superfície):** o **logger do servidor HTTP** (Fastify, em
+  `apps/api`) é instanciado à parte e **não** passa pelo logger de abstração —
+  logo não tem nem `redact` nem `serializers` de request/response. É a maior
+  superfície de log (uma linha por request); hoje o serializer padrão não emite
+  header nem corpo, mas qualquer log de header/corpo adicionado ali vaza sem
+  rede. Duplica, sob outro ângulo, o "falta estender ao logger do servidor" da
+  seção acima — o critério de aceite é o mesmo.
+- **O que falta (profundidade):** o `redact` do logger de abstração censura o
+  campo sensível **no topo e em um único nível** de aninhamento. Um segredo
+  aninhado a **dois ou mais níveis** não é censurado. É rede de segurança, não o
+  piso (o dever primário segue sendo não logar o segredo na origem), mas a
+  cobertura é rasa por construção.
+- **Critério de aceite:** logger do servidor coberto por `redact`/`serializers`
+  equivalentes aos do logger de abstração; a censura alcança o aninhamento real
+  dos payloads logados (não só um nível); comportamento coberto por teste que
+  **reprova** o vazamento (não só "passa").
+- **Prioridade:** junto da observabilidade acima (rede de segurança, não
+  exposição ativa hoje). Entra quando o responsável definir.
 
 ---
 

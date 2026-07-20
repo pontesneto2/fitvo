@@ -112,3 +112,10 @@ com TTL e rate limit já existente (`VerificationTokenStore`, D-029).
 - `subscribe` (Fluxo A, assinatura) não foi incluído neste gate — o escopo
   pedido foi "cobrança/split/saque"; revisitar se o responsável quiser
   estender.
+
+**TODO(D-029/ADR-0014):** quando a slice de Medicina nascer, plugar
+`requireVerifiedEmail` nas rotas clínicas que criam/alteram anamnese, plano e
+prescrição (mesma posição no guard chain: depois de auth+RBAC/tenant, antes da
+regra de negócio) — este ADR já cobre "convidar" e "financeiro", mas "clínico"
+ficou sem rota para aplicar no momento desta decisão. Não é opcional: sem isso
+o gate fica incompleto por omissão silenciosa, não por decisão.

@@ -47,7 +47,8 @@ crítica, não opcional. Bots varrem repositórios públicos em minutos.
 
 O CI verde prova que o código compila e passa nos testes. NÃO prova que a regra
 de negócio está correta. Por isso, o auto-merge com `--admin` é permitido apenas
-em áreas de baixo risco.
+em áreas de baixo risco — e, mesmo aí, só com aprovação explícita do responsável
+(a aprovação no chat conta). O gate é por **risco**, não por conveniência.
 
 **AUTO-MERGE PERMITIDO (CI verde é gate suficiente):**
 - Infraestrutura, tooling, configs, CI
@@ -69,8 +70,10 @@ em áreas de baixo risco.
 - **Migrations destrutivas** — qualquer migration que remova ou altere coluna
   com dado existente.
 
-Nessas áreas: abra o PR, apresente o diff e AGUARDE aprovação explícita do
-responsável. Não use `--admin`. Não mergeie por conta própria mesmo com CI verde.
+Nessas áreas: abra o PR, apresente o diff e AGUARDE um **Approve formal no
+GitHub** do responsável — aprovação no chat **não basta**, e **nunca** use
+`--admin` para contornar a proteção de branch. Não mergeie por conta própria
+mesmo com CI verde.
 
 Se uma mudança tocar área crítica E não-crítica ao mesmo tempo, trate como
 crítica.

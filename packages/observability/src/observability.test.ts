@@ -74,6 +74,25 @@ describe('PinoLogger', () => {
     expect(JSON.stringify(entry)).not.toContain('segredo-123');
     expect(JSON.stringify(entry)).not.toContain('12345678900');
   });
+
+  it('censura cookie e set-cookie (o refresh token httpOnly vive no cookie)', () => {
+    const dest = captureDestination();
+    const logger = PinoLogger.create({ level: 'info', name: 'test' }, dest);
+
+    logger.info('requisicao', {
+      cookie: 'refreshToken=segredo-no-cookie; HttpOnly', // topo: censurado
+      headers: { 'set-cookie': 'refreshToken=segredo-no-set-cookie; HttpOnly' }, // 1 nivel: censurado
+    });
+
+    const [entry] = dest.lines();
+    expect(entry).toMatchObject({
+      cookie: '[REDACTED]',
+      headers: { 'set-cookie': '[REDACTED]' },
+    });
+    // O check so vale se reprovar o vazamento: o segredo do cookie nao pode sobrar.
+    expect(JSON.stringify(entry)).not.toContain('segredo-no-cookie');
+    expect(JSON.stringify(entry)).not.toContain('segredo-no-set-cookie');
+  });
 });
 
 describe('NoopLogger', () => {

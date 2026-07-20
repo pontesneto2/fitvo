@@ -16,6 +16,8 @@ export interface PinoLoggerOptions {
  * campo no topo e um nivel de aninhamento (ex.: `body.password`). O primeiro
  * dever e nunca logar o segredo na origem; isto e a rede, nao o piso: um handler
  * que logue um payload por engano nao vaza credencial nem CPF (`document`).
+ * Inclui `cookie`/`set-cookie` porque o refresh token httpOnly viaja no cookie —
+ * e o segredo de sessao mais sensivel.
  */
 const SENSITIVE_KEYS = [
   'token',
@@ -25,11 +27,19 @@ const SENSITIVE_KEYS = [
   'accessToken',
   'refreshToken',
   'authorization',
+  'cookie',
+  'set-cookie',
   'apiKey',
   'secret',
   'document',
 ] as const;
-const REDACT_PATHS = SENSITIVE_KEYS.flatMap((key) => [key, `*.${key}`]);
+
+/** Chave que e identificador JS valido usa notacao de ponto; as demais (ex.:
+ * `set-cookie`, com hifen) exigem notacao de colchete no path do fast-redact. */
+const isPlainKey = (key: string): boolean => /^[A-Za-z_$][\w$]*$/.test(key);
+const REDACT_PATHS = SENSITIVE_KEYS.flatMap((key) =>
+  isPlainKey(key) ? [key, `*.${key}`] : [`["${key}"]`, `*["${key}"]`],
+);
 
 /**
  * Adaptador concreto do contrato `Logger` sobre pino (D-073). Log estruturado

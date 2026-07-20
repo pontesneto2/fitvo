@@ -260,6 +260,7 @@ model Tenant {
   workoutSessions WorkoutSession[] // execucoes escopadas ao tenant (ADR-0009)
   formAnalyses    FormAnalysis[] // analises de forma escopadas ao tenant (ADR-0009)
   mealPlans       MealPlan[] // conteudo de nutricao escopado ao tenant (ADR-0006)
+  mealLogs        MealLog[] // registros de refeicao escopados ao tenant (D-118 — ADR-0013)
   encounters      Encounter[] // atendimentos escopados ao tenant (ADR-0006)
   medicalRecords  MedicalRecord[] // prontuarios escopados ao tenant (ADR-0006)
   prescriptions   Prescription[] // folhas de receita escopadas ao tenant (ADR-0006)
@@ -313,6 +314,7 @@ model ProfessionalProfile {
   suggestionsAsB         SharingSuggestion[]         @relation("SuggestionProfessionalB")
   ownedExercises         Exercise[] // itens de biblioteca proprios do profissional (privados — ADR-0006)
   ownedFoods             Food[] // itens de biblioteca proprios do profissional (privados — ADR-0006)
+  ownedFoodGroups        FoodGroup[] // grupos alimentares proprios do profissional (privados — D-114/D-117)
   agendaSettings         ProfessionalAgendaSettings? // fuso das janelas + lembretes (ADR-0012)
   availabilityRules      AvailabilityRule[] // janelas recorrentes (ADR-0012)
   availabilityExceptions AvailabilityException[] // bloqueios pontuais (ADR-0012)
@@ -334,6 +336,7 @@ model Specialty {
   sharingSuggestions SharingSuggestion[]
   exercises          Exercise[] // exercicios de biblioteca desta especialidade (ADR-0006)
   foods              Food[] // alimentos de biblioteca desta especialidade (ADR-0006)
+  foodGroups         FoodGroup[] // grupos alimentares desta especialidade (D-114 — ADR-0013)
 
   @@map("specialty")
 }
@@ -488,6 +491,7 @@ model Bond {
   workoutSessions     WorkoutSession[] // execucoes/check-ins isolados por vinculo (D-086)
   formAnalyses        FormAnalysis[] // analises de forma isoladas por vinculo (D-088)
   mealPlans           MealPlan[] // planos alimentares isolados por vinculo (ADR-0006/ADR-0001)
+  mealLogs            MealLog[] // registros de refeicao isolados por vinculo (D-118 — ADR-0013)
   encounters          Encounter[] // atendimentos isolados por vinculo (ADR-0006/ADR-0001)
   medicalRecord       MedicalRecord? // prontuario (um por vinculo — ADR-0006/ADR-0001)
   anamnesis           Anamnesis? // GATE: uma anamnese por vinculo (D-093/D-094)
@@ -1305,76 +1309,356 @@ model FormAnalysis {
   @@map("form_analysis")
 }
 
-// --- Nutricao --------------------------------------------------------------
-// ESCOPO: o D-063 continua ABERTO para nutricao (ADR-0009 fechou so treino).
-// Estes modelos permanecem com `detail Json?` ate a decisao de produto com
-// referencia propria (Dietbox) — nao inventar. Ganham apenas `status` de
-// delecao logica, que e regra GERAL do sistema (D-089).
+// --- Nutricao (D-112 a D-121 + emendas D-114/D-117 — ADR-0013) -------------
+// O D-063 FECHA para nutricao (ADR-0009 fechou treino; ADR-0011 fechou anamnese).
+// A hierarquia ganha o nivel que faltava — MealPlan -> Meal -> MealPlanItem
+// (D-112) — que DESTRAVA o D-104/D-118. A nutricao vira COLUNA TIPADA: a parte
+// nutricional do `detail Json?` do Food morre (colunas kcal/macros por medida de
+// referencia); `MealPlan.detail` e `MealPlanItem.detail` morrem por inteiro (a
+// taxonomia existe agora e o merge por campo do offline-first — D-099 — e
+// impossivel sobre Json). Ver docs/adr/0013-dominio-nutricao.md, "Impacto de
+// modelagem".
+//
+// FORA deste slice (aditivos, migracao separada): MealPlanImport (D-133) e
+// MealSuggestion (D-134). Medidas caseiras, hidratacao, receitas e gasto
+// energetico seguem gaps conhecidos — NAO modelar sem ADR proprio.
 // ---------------------------------------------------------------------------
 
-/// Item da biblioteca de alimentos (D-063). Mesmo modelo de biblioteca do
-/// Exercise: base da plataforma (PLATFORM, sem dono) OU item do profissional
-/// (PRIVATE por padrao). Composicao/macros deferidos para `detail Json?`.
+/// Origem/tabela nutricional de um alimento (D-117 emenda — ADR-0013). E COLUNA,
+/// nao convencao: a origem e o que IMPEDE o calculo de misturar fontes em
+/// silencio. Fecha o gap "tabelas alem da TACO". A trava do D-117 e expressavel
+/// POR ESTA COLUNA: a busca de MONTAGEM (profissional) filtra OPEN_FOOD_FACTS
+/// fora (base colaborativa, ruidosa); a de REGISTRO (paciente) inclui — sem flag
+/// paralela. Label exibido no i18n (D-066).
+enum FoodSource {
+  TACO // tabela oficial brasileira (referencia de medidas — D-114)
+  TBCA // Tabela Brasileira de Composicao de Alimentos
+  OPEN_FOOD_FACTS // base aberta/colaborativa; so na busca de registro (D-117)
+  PROFESSIONAL_CUSTOM // alimento/preparacao proprio do profissional (D-064/D-117)
+}
+
+/// Ancora da normalizacao calorica automatica (D-114 emenda — ADR-0013). Ao
+/// substituir um item, o sistema recalcula a quantidade do substituto para
+/// preservar o alvo NESTE nutriente (nutricao esportiva as vezes ancora em
+/// proteina, nao em kcal). E CAMPO, nao hardcode: vive no MealPlan (default) com
+/// override OPCIONAL na Meal — nao desce ao item (o alvo e do plano/refeicao;
+/// seria overengineering). A normalizacao em si e DERIVACAO em runtime, nunca
+/// armazenada — so congela no MealLog (D-118).
+enum NormalizationAnchor {
+  CALORIES
+  PROTEIN
+  CARB
+  FAT
+}
+
+/// Momento do dia de uma refeicao (D-113 — ADR-0013). Catalogo FIXO da
+/// plataforma, de perfil ESPORTIVO: pre e pos-treino sao momentos de PRIMEIRA
+/// CLASSE, nao observacao apelidada. Guarda o CODIGO; o rotulo vive no i18n
+/// (D-066), mesma disciplina de Weekday/SetTechnique.
+enum MealMoment {
+  CAFE_DA_MANHA
+  LANCHE_DA_MANHA
+  ALMOCO
+  LANCHE_DA_TARDE
+  PRE_TREINO
+  POS_TREINO
+  JANTAR
+  CEIA
+}
+
+/// Resposta do registro de refeicao (D-118 — ADR-0013, revisa o D-104). TRES
+/// estados, nao binario: "parcial" e a resposta honesta mais comum e colapsa-la
+/// em sim/nao destruiria o indicador de aderencia. Guarda o CODIGO; rotulo no
+/// i18n (D-066).
+enum MealLogStatus {
+  ATE_ALL // comi tudo
+  PARTIAL // comi parcial
+  SKIPPED // nao comi
+}
+
+/// Item da biblioteca de alimentos (D-063/D-089/D-117 — ADR-0013). Base da
+/// plataforma (PLATFORM, sem dono) OU item do profissional (PRIVATE por padrao),
+/// mesmo modelo do Exercise. Delecao SEMPRE LOGICA (`status` — D-089).
+///
+/// NUTRICAO TIPADA POR MEDIDA DE REFERENCIA (D-114 emenda): as colunas
+/// energyKcal/proteinMg/carbMg/fatMg guardam o valor nutricional POR
+/// `referencePortionGrams` — sem isso a normalizacao (D-114) e impossivel. Tudo
+/// INTEIRO (D-069, mesma disciplina dos gramas do treino): energia em kcal,
+/// macros em MILIGRAMAS (preserva 0,1g sem float). NULAVEIS de proposito:
+/// produtos do Open Food Facts tem macros incompletos (D-117) — congela o que
+/// existe, marca a lacuna, NUNCA inventa. `referencePortionGrams` default 100 = a
+/// base per-100g da TACO (D-114), sempre explicita para que o valor tenha sentido.
+///
+/// `source` (FoodSource) e a ORIGEM como coluna (D-117 emenda) — nao misturar
+/// tabelas em silencio. `barcode` (GTIN/EAN, indexado) e `externalRef` (id na
+/// fonte externa) suportam o scan do registro (D-118) e a materializacao de um
+/// produto do OFF como Food no primeiro scan.
+///
+/// `detail Json?` ENCOLHEU: a nutricao saiu para colunas; resta so o detalhe fino
+/// AINDA nao modelado (fibra, sodio, micronutrientes, preparacao) — deferido, nao
+/// inventar.
 model Food {
   id                         String            @id @default(cuid())
   ownerProfessionalProfileId String? // nulo = item da plataforma; preenchido = item do profissional
   specialtyId                String? // especialidade (ex.: NUTRITION) — estrutural
   name                       String
+  source                     FoodSource // origem/tabela — coluna, nao convencao (D-117)
+  barcode                    String? // GTIN/EAN (industrializado); a maioria da TACO nao tem (D-117)
+  externalRef                String? // id do produto na fonte externa (ex.: OFF) (D-117)
+  referencePortionGrams      Int               @default(100) // base da nutricao, em gramas (TACO per-100g — D-114)
+  energyKcal                 Int? // energia por porcao de referencia (kcal inteiro); nulo = lacuna (D-117)
+  proteinMg                  Int? // proteina por porcao de referencia (miligramas); nulo = lacuna (D-117)
+  carbMg                     Int? // carboidrato por porcao de referencia (miligramas); nulo = lacuna (D-117)
+  fatMg                      Int? // gordura por porcao de referencia (miligramas); nulo = lacuna (D-117)
   visibility                 LibraryVisibility @default(PRIVATE)
   status                     LibraryItemStatus @default(ACTIVE) // delecao logica — regra geral (D-089)
-  detail                     Json? // TODO(D-063): composicao/macros por fase — nao inventar
+  detail                     Json? // detalhe fino AINDA nao modelado (fibra/sodio/micros/preparacao) — nao inventar
   createdAt                  DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt                  DateTime          @updatedAt @db.Timestamptz(3)
 
   ownerProfessionalProfile ProfessionalProfile? @relation(fields: [ownerProfessionalProfileId], references: [id], onDelete: Cascade)
   specialty                Specialty?           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
   mealPlanItems            MealPlanItem[]
+  foodGroupMembers         FoodGroupMember[]
+  mealLogItems             MealLogItem[]
 
   @@index([ownerProfessionalProfileId])
   @@index([specialtyId])
   @@index([visibility])
   @@index([status]) // busca so devolve ACTIVE (D-089)
+  @@index([source]) // trava de escopo: montagem filtra OFF fora, registro inclui (D-117)
+  @@index([barcode]) // lookup do scan de codigo de barras no registro (D-118)
   @@map("food")
 }
 
-/// Plano alimentar de um paciente, atado a um VINCULO (Bond). tenantId
-/// denormalizado para escopo (D-002). Composicao/macros deferidos aos itens
-/// (MealPlanItem.detail — TODO D-063). Datas em UTC (D-067).
-model MealPlan {
-  id        String   @id @default(cuid())
-  tenantId  String // escopo denormalizado (D-002)
-  bondId    String // isolamento por vinculo (ADR-0001)
-  title     String
-  detail    Json? // TODO(D-063): campos finos por fase — nao inventar
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+/// Grupo alimentar com equivalencia nutricional (D-114 — ADR-0013). E o achado
+/// central da pesquisa: a substituicao NAO e troca ad hoc item a item — e por
+/// GRUPO com equivalencia (o grupo "proteina" reune frango, tilapia, ovo, cada um
+/// com sua porcao equivalente). Food sozinho nao expressa isso.
+///
+/// Mesmo modelo de biblioteca do Food (D-117 "reafirma D-064"): base da
+/// plataforma (PLATFORM, sem dono) OU grupo proprio do profissional (PRIVATE por
+/// padrao). Delecao SEMPRE LOGICA (`status`) — vale para alimento E grupo (D-089).
+///
+/// A media calorica/nutricional do grupo (D-114) NAO e armazenada: e DERIVADA em
+/// runtime dos membros (FoodGroupMember + a nutricao do Food). Congela-la
+/// violaria "nada de valor normalizado armazenado fora do MealLog".
+model FoodGroup {
+  id                         String            @id @default(cuid())
+  ownerProfessionalProfileId String? // nulo = grupo da plataforma; preenchido = grupo do profissional
+  specialtyId                String? // especialidade (ex.: NUTRITION) — estrutural
+  name                       String
+  visibility                 LibraryVisibility @default(PRIVATE)
+  status                     LibraryItemStatus @default(ACTIVE) // delecao logica — vale para grupo (D-089)
+  createdAt                  DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt                  DateTime          @updatedAt @db.Timestamptz(3)
 
-  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bond   Bond           @relation(fields: [bondId], references: [id], onDelete: Cascade)
-  items  MealPlanItem[]
+  ownerProfessionalProfile ProfessionalProfile? @relation(fields: [ownerProfessionalProfileId], references: [id], onDelete: Cascade)
+  specialty                Specialty?           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+  members                  FoodGroupMember[]
+  mealPlanItems            MealPlanItem[]
+
+  @@index([ownerProfessionalProfileId])
+  @@index([specialtyId])
+  @@index([visibility])
+  @@index([status]) // busca so devolve ACTIVE (D-089)
+  @@map("food_group")
+}
+
+/// Membro de um grupo alimentar (D-114 emenda — ADR-0013). NAO e M:N nua: cada
+/// membro carrega sua PORCAO DE REFERENCIA — os gramas DESTE alimento que
+/// constituem UMA porcao-padrao do grupo (no grupo "proteina", 1 porcao = 100g de
+/// frango OU 120g de tilapia, caloricamente equivalentes). Sem a porcao por membro
+/// a equivalencia nao se calcula — por isso `referencePortionGrams` e COLUNA
+/// NAO-NULA: membro sem porcao e estado IRREPRESENTAVEL (construir > validar).
+///
+/// A nutricao vem do Food referenciado (por Food.referencePortionGrams); o membro
+/// so diz QUANTOS GRAMAS = 1 porcao do grupo. A media do grupo e derivada disso em
+/// runtime, nunca armazenada.
+model FoodGroupMember {
+  id                    String   @id @default(cuid())
+  foodGroupId           String
+  foodId                String
+  referencePortionGrams Int // gramas deste alimento = 1 porcao-padrao do grupo (nao-nulo: equivalencia sempre calculavel)
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+
+  foodGroup FoodGroup @relation(fields: [foodGroupId], references: [id], onDelete: Cascade)
+  food      Food      @relation(fields: [foodId], references: [id], onDelete: Cascade)
+
+  @@unique([foodGroupId, foodId]) // um alimento aparece uma vez por grupo
+  @@index([foodId])
+  @@map("food_group_member")
+}
+
+/// Plano alimentar de um paciente, atado a um VINCULO (Bond). tenantId
+/// denormalizado para escopo (D-002). Ganha `normalizationAnchor` (D-114 emenda):
+/// a ancora default da normalizacao de substituicoes do plano; a Meal pode dar
+/// override. O `detail Json?` MORREU (a taxonomia existe agora; item 3 do ADR).
+/// A hierarquia agora vai a Meal, nao direto ao item (D-112). Datas em UTC (D-067).
+model MealPlan {
+  id                  String              @id @default(cuid())
+  tenantId            String // escopo denormalizado (D-002)
+  bondId              String // isolamento por vinculo (ADR-0001)
+  title               String
+  normalizationAnchor NormalizationAnchor @default(CALORIES) // ancora default das substituicoes (D-114)
+  createdAt           DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime            @updatedAt @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond   Bond   @relation(fields: [bondId], references: [id], onDelete: Cascade)
+  meals  Meal[]
 
   @@index([bondId])
   @@index([tenantId])
   @@map("meal_plan")
 }
 
-/// Item de um plano alimentar: referencia opcional a um alimento da biblioteca +
-/// ordem. Porcoes/macros sao DETALHE deferido para `detail Json?` (TODO D-063).
+/// Refeicao = momento do dia dentro de um plano (D-112/D-113 — ADR-0013). E o
+/// nivel que FALTAVA no esqueleto (MealPlan ia direto ao item) e que DESTRAVA o
+/// D-104/D-118 — nao havia a que atar "marquei que comi". Mesma lacuna que o D-079
+/// achou no treino.
+///
+/// D-115 (calculado x texto livre): a refeicao aceita ITENS calculados OU
+/// `freeText` de orientacao ("almoco: proteina + salada a vontade") — sem que "sem
+/// itens" e "orientacao livre" colapsem no mesmo estado (o freeText os distingue).
+///
+/// `anchorOverride`: override OPCIONAL da ancora do plano (D-114 emenda) — nutricao
+/// esportiva as vezes ancora UMA refeicao em proteina. null = herda o MealPlan.
+model Meal {
+  id             String               @id @default(cuid())
+  mealPlanId     String
+  moment         MealMoment // momento do dia (catalogo fixo — D-113)
+  freeText       String? // orientacao livre (D-115); null = refeicao calculada por itens
+  anchorOverride NormalizationAnchor? // override da ancora do plano (D-114); null = herda
+  position       Int                  @default(0) // ordem estrutural dentro do plano
+  createdAt      DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @db.Timestamptz(3)
+
+  mealPlan MealPlan       @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  items    MealPlanItem[]
+  logs     MealLog[]
+
+  @@index([mealPlanId, position])
+  @@map("meal")
+}
+
+/// Item de uma refeicao (D-114/D-115 — ADR-0013). TRES modos mutuamente
+/// exclusivos, sem colapsar num so estado:
+///  - ALIMENTO: `foodId` + `quantityGrams` (ex.: 150g de frango).
+///  - GRUPO: `foodGroupId` + `portionQuantity` (ex.: 1 porcao do grupo proteina —
+///    o frango e UMA das opcoes equivalentes, D-114). A quantidade normalizada do
+///    substituto e DERIVADA em runtime (D-114 emenda), nunca armazenada aqui.
+///  - TEXTO LIVRE: `freeText` (ex.: "cafe sem acucar") — item fora da base (D-115),
+///    distinto da orientacao da refeicao inteira (Meal.freeText).
+///
+/// O XOR entre os tres modos e INVARIANTE DE DOMINIO (aplicacao/Zod), nao do banco
+/// — mesma disciplina do WorkoutItem (item livre) e do supersetGroup. Porcao
+/// fracionaria (1/2) NAO e modelada (quantidades inteiras — gramas e porcoes); e
+/// limitacao declarada, na familia do gap de "medidas caseiras" (ADR-0013).
+///
+/// `detail Json?` MORREU aqui (a taxonomia existe agora): o merge por campo do
+/// offline-first (D-099) e impossivel sobre Json.
 model MealPlanItem {
-  id         String   @id @default(cuid())
-  mealPlanId String
-  foodId     String? // alimento da biblioteca (opcional; item livre permitido)
-  position   Int      @default(0) // ordem estrutural dentro do plano
-  detail     Json? // TODO(D-063): porcoes/macros por fase — nao inventar
-  createdAt  DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+  id              String   @id @default(cuid())
+  mealId          String
+  foodId          String? // modo ALIMENTO (biblioteca); nulo nos outros modos
+  foodGroupId     String? // modo GRUPO (equivalencia — D-114); nulo nos outros modos
+  freeText        String? // modo TEXTO LIVRE (D-115); nulo nos modos calculados
+  quantityGrams   Int? // gramas do alimento (modo ALIMENTO) — inteiro, nunca float
+  portionQuantity Int? // n de porcoes-padrao do grupo (modo GRUPO) — inteiro
+  position        Int      @default(0) // ordem estrutural dentro da refeicao
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
-  mealPlan MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
-  food     Food?    @relation(fields: [foodId], references: [id], onDelete: SetNull)
+  meal      Meal       @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  food      Food?      @relation(fields: [foodId], references: [id], onDelete: SetNull)
+  foodGroup FoodGroup? @relation(fields: [foodGroupId], references: [id], onDelete: SetNull)
 
-  @@index([mealPlanId])
+  @@index([mealId, position])
   @@index([foodId])
+  @@index([foodGroupId])
   @@map("meal_plan_item")
+}
+
+/// Registro de refeicao pelo paciente (D-118 — ADR-0013, revisa o D-104). O
+/// paciente marca comi tudo / parcial / nao comi (MealLogStatus) — tres estados,
+/// porque "parcial" e a resposta honesta mais comum e o binario destruiria a
+/// aderencia. Conta como CHECK-IN (igual ao treino — D-086) e alimenta o indicador
+/// de aderencia (D-120).
+///
+/// ESCRITA OFFLINE-FIRST (D-099/D-118): o paciente registra com ou sem sinal; o
+/// device e a fonte e o servidor reconcilia. Por isso tenantId+bondId
+/// denormalizados (escopo — D-002/ADR-0001), `deletedAt` (tombstone do pull) e
+/// `updatedAt` indexado (cursor pull-since), espelhando WorkoutSession. Historico
+/// nao se apaga (guarda legal — D-100), por isso `meal` e onDelete Restrict.
+///
+/// O SNAPSHOT nutricional congelado vive nos filhos (MealLogItem): o que foi
+/// comido naquele momento nao muda se a tabela de origem for corrigida depois
+/// (D-114 emenda — "mesmo principio do preco na compra").
+model MealLog {
+  id              String        @id @default(cuid())
+  tenantId        String // escopo denormalizado (D-002)
+  bondId          String // isolamento por vinculo (ADR-0001) — e dado clinico
+  mealId          String // refeicao registrada (do plano)
+  status          MealLogStatus // comi tudo / parcial / nao comi (D-118)
+  comment         String? // comentario opcional (D-118)
+  photoStorageKey String? // foto opcional: chave S3 (o binario nunca vive aqui) (D-118)
+  loggedAt        DateTime      @db.Timestamptz(3) // quando a refeicao foi consumida (UTC) — eixo da aderencia
+  createdAt       DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @db.Timestamptz(3)
+  deletedAt       DateTime?     @db.Timestamptz(3) // tombstone do sync (D-099); historico nao se apaga (D-100)
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bond   Bond          @relation(fields: [bondId], references: [id], onDelete: Cascade)
+  meal   Meal          @relation(fields: [mealId], references: [id], onDelete: Restrict)
+  items  MealLogItem[]
+
+  @@index([bondId, loggedAt]) // aderencia/streak do paciente (D-120)
+  @@index([tenantId, loggedAt]) // aderencia agregada do profissional (D-120)
+  @@index([mealId])
+  @@index([bondId, updatedAt]) // cursor de sync pull-since (D-099)
+  @@map("meal_log")
+}
+
+/// Item congelado de um registro de refeicao (D-114/D-117 emendas / D-118 —
+/// ADR-0013). E o SNAPSHOT: a nutricao do que foi comido NAQUELE momento,
+/// DENORMALIZADA (colunas frozen*), nao FK viva para Food. Se a tabela de origem
+/// for corrigida depois, o que o paciente comeu nao muda — "mesmo principio do
+/// preco na compra". E o UNICO lugar onde valor normalizado e ARMAZENADO (fora
+/// dele, normalizacao e sempre derivacao em runtime).
+///
+/// `foodId` e referencia OPCIONAL de proveniencia (que alimento originou), com
+/// onDelete SetNull — a proveniencia pode sumir, o snapshot permanece. Produto
+/// escaneado por codigo de barras (D-117) que ainda nao virou Food fica so nas
+/// colunas frozen + `barcode`.
+///
+/// LACUNA EXPLICITA (D-117 emenda): item do OFF logado com macros incompletos
+/// congela o que existe (frozen* nulo onde falta) e marca `hasNutritionGap` —
+/// nunca inventa. Preferir a lacuna explicita ao dado falso. Unidades iguais as do
+/// Food (kcal + mg); tudo inteiro (D-069).
+model MealLogItem {
+  id               String    @id @default(cuid())
+  mealLogId        String
+  foodId           String? // proveniencia opcional (D-117); nulo p/ escaneado-sem-Food ou texto livre
+  barcode          String? // GTIN/EAN escaneado no registro (D-117), quando houver
+  label            String // nome congelado do que foi comido (a origem pode mudar/sumir)
+  quantityGrams    Int? // quantidade consumida, em gramas — inteiro, nunca float
+  frozenEnergyKcal Int? // energia congelada da quantidade consumida; nulo = lacuna (D-117)
+  frozenProteinMg  Int? // proteina congelada (miligramas); nulo = lacuna (D-117)
+  frozenCarbMg     Int? // carboidrato congelado (miligramas); nulo = lacuna (D-117)
+  frozenFatMg      Int? // gordura congelada (miligramas); nulo = lacuna (D-117)
+  hasNutritionGap  Boolean   @default(false) // macro ausente no congelamento (D-117) — lacuna explicita
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt        DateTime? @db.Timestamptz(3) // tombstone do sync (D-099)
+
+  mealLog MealLog @relation(fields: [mealLogId], references: [id], onDelete: Cascade)
+  food    Food?   @relation(fields: [foodId], references: [id], onDelete: SetNull)
+
+  @@index([mealLogId])
+  @@index([foodId])
+  @@map("meal_log_item")
 }
 
 // --- Medico ----------------------------------------------------------------

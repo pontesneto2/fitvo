@@ -79,9 +79,10 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     new RedisRefreshTokenStore(redis),
     env.JWT_REFRESH_TTL_SECONDS,
   );
-  // Stub de envio: registra o token no log estruturado (console = JSON de dev)
-  // ate integrarmos um provedor real. O `console` satisfaz o sink `info(details,
-  // message)` sem acoplar @fitvo/auth a uma implementacao concreta.
+  // Stub de envio: registra APENAS o destinatario no log — nunca o token nem o
+  // link (o link carrega o token). Placeholder ate integrarmos um provedor real.
+  // O `console` satisfaz o sink `info(details, message)` sem acoplar @fitvo/auth
+  // a uma implementacao concreta.
   const emailSender = new LoggingAuthEmailSender(console);
   const passwordHasher = new Argon2PasswordHasher();
   const authService = new AuthApplicationService(

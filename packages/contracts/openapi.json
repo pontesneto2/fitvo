@@ -69,6 +69,30 @@
                   "tenantName": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "acceptedTerms": {
+                    "type": "object",
+                    "properties": {
+                      "termsOfUse": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ],
+                        "description": "Aceite explícito dos Termos de Uso."
+                      },
+                      "privacyPolicy": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ],
+                        "description": "Aceite explícito da Política de Privacidade."
+                      }
+                    },
+                    "required": [
+                      "termsOfUse",
+                      "privacyPolicy"
+                    ],
+                    "description": "Aceite dos termos no cadastro (D-025) — ambos obrigatoriamente `true`."
                   }
                 },
                 "required": [
@@ -77,7 +101,8 @@
                   "name",
                   "document",
                   "documentType",
-                  "tenantName"
+                  "tenantName",
+                  "acceptedTerms"
                 ]
               }
             }
@@ -186,13 +211,38 @@
                     "minLength": 11,
                     "maxLength": 14,
                     "description": "CPF (D-043)."
+                  },
+                  "acceptedTerms": {
+                    "type": "object",
+                    "properties": {
+                      "termsOfUse": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ],
+                        "description": "Aceite explícito dos Termos de Uso."
+                      },
+                      "privacyPolicy": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ],
+                        "description": "Aceite explícito da Política de Privacidade."
+                      }
+                    },
+                    "required": [
+                      "termsOfUse",
+                      "privacyPolicy"
+                    ],
+                    "description": "Aceite dos termos no cadastro (D-025) — ambos obrigatoriamente `true`."
                   }
                 },
                 "required": [
                   "email",
                   "password",
                   "name",
-                  "document"
+                  "document",
+                  "acceptedTerms"
                 ]
               }
             }
@@ -1972,6 +2022,150 @@
             "description": "ID do consentimento."
           }
         ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/terms/status": {
+      "get": {
+        "summary": "Status de aceite dos documentos de termos da conta autenticada",
+        "tags": [
+          "terms"
+        ],
+        "description": "Um status por documento do catalogo (Termos de Uso, Politica de Privacidade): CURRENT ou RECONSENT_REQUIRED (D-025). Derivado do historico append-only de eventos — nunca guardado de forma mutavel.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "documents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string",
+                            "enum": [
+                              "TERMS_OF_USE",
+                              "PRIVACY_POLICY"
+                            ],
+                            "description": "Documento de termos (catálogo fixo, extensível — D-025)."
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "CURRENT",
+                              "RECONSENT_REQUIRED"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "documents"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/terms/accept": {
+      "post": {
+        "summary": "Re-consentimento: aceita a versao atual publicada de um documento",
+        "tags": [
+          "terms"
+        ],
+        "description": "Escreve um novo evento ACCEPTED (append-only) contra a versao ATUAL publicada do documento (D-025). Usado apos RECONSENT_REQUIRED.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "enum": [
+                      "TERMS_OF_USE",
+                      "PRIVACY_POLICY"
+                    ],
+                    "description": "Documento de termos (catálogo fixo, extensível — D-025)."
+                  }
+                },
+                "required": [
+                  "slug"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/terms/revoke": {
+      "post": {
+        "summary": "Revoga o aceite de um documento de termos",
+        "tags": [
+          "terms"
+        ],
+        "description": "Escreve um novo evento REVOKED (append-only) — a conta passa a exigir re-consentimento (D-025) em qualquer acao gated ate aceitar de novo.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "enum": [
+                      "TERMS_OF_USE",
+                      "PRIVACY_POLICY"
+                    ],
+                    "description": "Documento de termos (catálogo fixo, extensível — D-025)."
+                  }
+                },
+                "required": [
+                  "slug"
+                ]
+              }
+            }
+          }
+        },
         "security": [
           {
             "bearerAuth": []

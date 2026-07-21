@@ -21,6 +21,20 @@ const email = z.string().email().describe('E-mail de login (único) — D-042.')
 const password = z.string().min(8).describe('Senha em claro (mín. 8).');
 const oneTimeToken = z.string().min(1).describe('Token de uso único recebido por e-mail.');
 
+/**
+ * Aceite OBRIGATÓRIO dos dois termos no cadastro (D-025 — LGPD). Cada campo
+ * exige o literal booleano `true` — não `false`, ausente ou qualquer outro
+ * valor. Isso torna uma caixa "pré-marcada" ou desmarcada IRREPRESENTÁVEL no
+ * request: o cliente precisa enviar `true` explicitamente por documento, ou o
+ * Zod rejeita com 400 antes de qualquer conta ser criada.
+ */
+const acceptedTerms = z
+  .object({
+    termsOfUse: z.literal(true).describe('Aceite explícito dos Termos de Uso.'),
+    privacyPolicy: z.literal(true).describe('Aceite explícito da Política de Privacidade.'),
+  })
+  .describe('Aceite dos termos no cadastro (D-025) — ambos obrigatoriamente `true`.');
+
 // ---------------------------------------------------------------------------
 // Requests (regras IDÊNTICAS ao antigo apps/api/.../auth-schemas.ts — só mudou
 // o lugar: o contrato agora é compartilhado).
@@ -33,6 +47,7 @@ export const registerProfessionalSchema = z.object({
   document: z.string().min(11).max(18).describe('CPF ou CNPJ (D-043).'),
   documentType: z.enum(['CPF', 'CNPJ']),
   tenantName: z.string().min(1),
+  acceptedTerms,
 });
 
 export const registerPatientSchema = z.object({
@@ -40,6 +55,7 @@ export const registerPatientSchema = z.object({
   password,
   name: z.string().min(1),
   document: z.string().min(11).max(14).describe('CPF (D-043).'),
+  acceptedTerms,
 });
 
 export const loginSchema = z.object({
@@ -102,6 +118,7 @@ export const emailVerifiedResultSchema = z.object({ verified: z.boolean() });
 
 export type RegisterProfessionalInput = z.infer<typeof registerProfessionalSchema>;
 export type RegisterPatientInput = z.infer<typeof registerPatientSchema>;
+export type AcceptedTerms = RegisterPatientInput['acceptedTerms'];
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshInput = z.infer<typeof refreshSchema>;
 export type RequestEmailVerificationInput = z.infer<typeof requestEmailVerificationSchema>;

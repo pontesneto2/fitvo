@@ -85,8 +85,12 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
   // a uma implementacao concreta.
   const emailSender = new LoggingAuthEmailSender(console);
   const passwordHasher = new Argon2PasswordHasher();
+  // Instancia unica reusada como EmailVerificationLookup (D-029) pelas demais
+  // slices — evita repositorios de identidade duplicados so para checar
+  // emailVerifiedAt no gate de acoes sensiveis (convidar/cobrar).
+  const accountRepository = new PrismaAccountRepository(prisma);
   const authService = new AuthApplicationService(
-    new PrismaAccountRepository(prisma),
+    accountRepository,
     passwordHasher,
     authCore,
     new RedisVerificationTokenStore(redis),
@@ -103,6 +107,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     passwordHasher,
     authCore,
     env.PROFESSIONAL_INVITE_TTL_SECONDS,
+    accountRepository,
   );
   // authCore satisfaz AccessTokenVerifier — a slice de paciente reusa o mesmo
   // verificador de access token da slice de auth para o guard do profissional.
@@ -112,6 +117,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     authCore,
     env.PATIENT_INVITE_TTL_SECONDS,
     bondEvents,
+    accountRepository,
   );
   // authCore satisfaz AccessTokenVerifier — a slice de consentimento reusa o
   // mesmo verificador de access token para o guard do paciente (titular).
@@ -126,6 +132,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     buildPaymentGateway(env, logger),
     authCore,
     env.ASAAS_PLATFORM_WALLET_ID ?? null,
+    accountRepository,
   );
 
   return {

@@ -7,6 +7,7 @@ import {
   patientInviteParamsSchema,
   patientOverviewResultSchema,
   patientTenantParamsSchema,
+  problemDetailsSchema,
 } from '@fitvo/validation';
 import type { FastifyPluginAsync } from 'fastify';
 import {
@@ -45,12 +46,13 @@ export function patientRoutes(service: PatientApplicationService): FastifyPlugin
           description:
             'Cria um convite de uso unico direcionado a UMA especialidade (D-006/D-052), ' +
             'declarando a MODALIDADE do atendimento (D-101), que o vinculo herda no aceite. ' +
-            'Requer perfil profissional no tenant que reivindica a especialidade-alvo. ' +
-            'Devolve o token em claro UMA vez; o banco guarda apenas o hash.',
+            'Requer perfil profissional no tenant que reivindica a especialidade-alvo E ' +
+            'e-mail verificado (D-029). Devolve o token em claro UMA vez; o banco guarda ' +
+            'apenas o hash.',
           security: bearerAuth,
           params: patientTenantParamsSchema,
           body: patientCreateInviteSchema,
-          response: { 201: patientCreateInviteResultSchema },
+          response: { 201: patientCreateInviteResultSchema, 403: problemDetailsSchema },
         },
       },
       async (request, reply) => {
@@ -92,10 +94,11 @@ export function patientRoutes(service: PatientApplicationService): FastifyPlugin
           summary: 'Reenvia um convite pendente (profissional)',
           description:
             'Rotaciona o token e estende a validade na mesma linha (D-055). Devolve o ' +
-            'novo token em claro UMA vez. Requer perfil profissional no tenant.',
+            'novo token em claro UMA vez. Requer perfil profissional no tenant e e-mail ' +
+            'verificado (D-029).',
           security: bearerAuth,
           params: patientInviteParamsSchema,
-          response: { 201: patientCreateInviteResultSchema },
+          response: { 201: patientCreateInviteResultSchema, 403: problemDetailsSchema },
         },
       },
       async (request, reply) => {

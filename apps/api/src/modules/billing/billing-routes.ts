@@ -3,6 +3,7 @@ import {
   chargeViewSchema,
   createChargeSchema,
   listPlansResultSchema,
+  problemDetailsSchema,
   subscribeSchema,
   subscriptionViewSchema,
   walletViewSchema,
@@ -118,11 +119,12 @@ export function billingRoutes(service: BillingApplicationService): FastifyPlugin
           description:
             'Fluxo B (D-019): o profissional dono do vinculo cobra o paciente via split ' +
             '(subconta do profissional + taxa FITVO). Valor em centavos (D-069). ' +
-            'idempotencyKey obrigatoria (D-035). Asaas GATED — usa o FakePaymentGateway.',
+            'idempotencyKey obrigatoria (D-035). Requer e-mail verificado (D-029). Asaas ' +
+            'GATED — usa o FakePaymentGateway.',
           security: bearerAuth,
           params: billingTenantParamsSchema,
           body: createChargeSchema,
-          response: { 201: chargeViewSchema },
+          response: { 201: chargeViewSchema, 403: problemDetailsSchema },
         },
       },
       async (request, reply) => {

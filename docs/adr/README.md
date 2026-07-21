@@ -36,7 +36,7 @@ sem repetir o número. **A tabela é a autoridade sobre a cobertura**, não o `g
 | Decisões | ADR | Tema |
 |---|---|---|
 | D-001 – D-004, D-052 – D-055 | [0001](0001-arquitetura-e-tenancy.md) | Arquitetura e tenancy |
-| D-005, D-006, D-029, D-030, D-041 – D-044 | [0002](0002-identidade-e-auth.md) | Identidade e auth |
+| D-005, D-006, D-025, D-029, D-030, D-041 – D-044 | [0002](0002-identidade-e-auth.md) | Identidade e auth |
 | D-007 – D-017, D-045 – D-051, D-054 | [0003](0003-multiespecialidade-rbac-consentimento.md) | Multi-especialidade, clínica, RBAC, consentimento |
 | D-018 – D-021, D-025, D-050, D-056 – D-062, D-069 | [0004](0004-financeiro.md) | Financeiro |
 | D-022 – D-028, D-031 – D-036 | [0005](0005-abstracoes-e-api.md) | Abstrações, IA, notificações, API |
@@ -54,7 +54,7 @@ sem repetir o número. **A tabela é a autoridade sobre a cobertura**, não o `g
 concorrência ao domínio de nutrição (ADR-0013)** numerados **depois** de medicina
 (D-122–D-132) porque nasceram depois — a numeração é cronológica, não temática, e
 por isso a linha do 0013 não é contígua. Algumas decisões aparecem em dois ADRs
-(D-025 em 0004/0005; D-050 em 0003/0004; D-054 em 0001/0003) — é intencional: a
+(D-025 em 0002/0004/0005; D-050 em 0003/0004; D-054 em 0001/0003) — é intencional: a
 decisão tem consequência nos dois temas.
 
 **Revisões** — uma decisão pode ser revisada por outra mais nova. O ADR original

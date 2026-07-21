@@ -218,13 +218,25 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   - **D-029 (auth):** histórico diz "verificação de e-mail **obrigatória**"; o
     ADR-0002 destilou para "verificação de e-mail". O mecanismo existe inteiro,
     mas **nada enforça** — o login não checa e-mail verificado.
-  - **D-025 (consentimento/LGPD):** histórico diz "**exigir novo aceite quando o
-    termo muda**"; o ADR-0005 destilou para "versionado (**registrar** qual versão
-    foi aceita)". **Registrar a versão ≠ re-consentir** — exposição LGPD direta.
-  - **Decisão do responsável:** *como* enforçar cada uma — bloquear login/ação até
-    verificar? travar só ações sensíveis? período de graça? re-consentimento
-    forçado no próximo acesso? Fechar = clarificar o ADR (reafirmando a força) +
-    implementar + testar. **Não implementar antes da decisão.**
+  - **D-025 (consentimento/LGPD) — RESOLVIDO.** Histórico dizia "**exigir novo
+    aceite quando o termo muda**"; o ADR-0005 tinha destilado para "versionado
+    (**registrar** qual versão foi aceita)" — registrar ≠ re-consentir, era
+    exposição LGPD direta. Decisão fechada e implementada: aceite dos dois
+    documentos (Termos de Uso, Política de Privacidade) **obrigatório no
+    cadastro** (bloqueia a criação da conta — `acceptedTerms` com literais
+    `true`, Zod rejeita qualquer outro valor com 400) e gate de
+    **re-consentimento em ações sensíveis** (mesma família/posição de chain do
+    gate de e-mail verificado — D-029) quando uma versão **materialmente**
+    diferente é publicada depois do último aceite, ou o aceite foi revogado.
+    Detalhe completo na nova seção "Aceite de termos e re-consentimento
+    (D-025)" do `docs/adr/0002-identidade-e-auth.md`; código em
+    `apps/api/src/modules/terms/` (+ gate em `shared/auth-context.ts`).
+    Pendências deixadas registradas nessa mesma seção do ADR (não bloqueiam o
+    fechamento): `PRIVACY_POLICY` ainda não está no chain de re-consentimento
+    dos call sites gateados (só `TERMS_OF_USE` está); contas criadas via
+    aceite de convite (não autocadastro) ainda não recebem o aceite inicial; o
+    conteúdo/hash real dos textos jurídicos segue GATED (ver item "Textos
+    jurídicos" abaixo).
   - **Menores (registrados, baixa severidade):** D-018 (a trava "não atende antes
     da subconta" não é enunciada no ADR-0004), D-027 ("opt-out de e-mail é
     **requisito legal**" diluído), D-019 ("aluno **sempre grátis**" sobrevive só

@@ -15,7 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "bullmq": "^5.80.6",
+    "bullmq": "^5.80.9",
     "ioredis": "^5.11.1"
   },
   "devDependencies": {

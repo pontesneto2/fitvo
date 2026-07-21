@@ -21,6 +21,8 @@ import { ClinicApplicationService } from './modules/clinic/clinic-application-se
 import { PrismaClinicRepository } from './modules/clinic/prisma-clinic-repository';
 import { ConsentApplicationService } from './modules/consent/consent-application-service';
 import { PrismaConsentRepository } from './modules/consent/prisma-consent-repository';
+import { NutritionApplicationService } from './modules/nutrition/nutrition-application-service';
+import { PrismaNutritionRepository } from './modules/nutrition/prisma-nutrition-repository';
 import { PatientApplicationService } from './modules/patient/patient-application-service';
 import { PrismaPatientRepository } from './modules/patient/prisma-patient-repository';
 import { PrismaTermsRepository } from './modules/terms/prisma-terms-repository';
@@ -36,6 +38,7 @@ export interface AppDependencies {
   consentService: ConsentApplicationService;
   termsService: TermsApplicationService;
   billingService: BillingApplicationService;
+  nutritionService: NutritionApplicationService;
   onClose?: () => Promise<void>;
 }
 
@@ -147,6 +150,13 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     termsService,
   );
 
+  // authCore satisfaz AccessTokenVerifier — a slice de nutricao reusa o mesmo
+  // verificador de access token para o guard do profissional dono do vinculo.
+  const nutritionService = new NutritionApplicationService(
+    new PrismaNutritionRepository(prisma),
+    authCore,
+  );
+
   return {
     logLevel: env.LOG_LEVEL,
     corsOrigin: env.CORS_ORIGIN,
@@ -156,6 +166,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     consentService,
     termsService,
     billingService,
+    nutritionService,
     onClose: async () => {
       await queueFactory.close();
       await redis.quit();

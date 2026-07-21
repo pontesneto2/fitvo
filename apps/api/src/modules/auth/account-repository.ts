@@ -10,6 +10,16 @@ export interface AccountRecord {
   emailVerifiedAt: Date | null;
 }
 
+/**
+ * Origem da requisicao de cadastro — usada para o evento ACCEPTED inicial dos
+ * termos (D-025). IP/UA vem SEMPRE da requisicao (route layer), nunca do
+ * corpo enviado pelo cliente.
+ */
+export interface TermsAcceptanceOrigin {
+  ipAddress: string;
+  userAgent: string;
+}
+
 export interface CreateProfessionalInput {
   email: string;
   passwordHash: string;
@@ -17,6 +27,13 @@ export interface CreateProfessionalInput {
   document: string;
   documentType: DocumentType;
   tenantName: string;
+  /**
+   * Aceite obrigatorio dos termos no cadastro (D-025). O Zod ja garante, na
+   * borda HTTP, que ambos os documentos foram aceitos (`z.literal(true)`) —
+   * aqui so a ORIGEM da requisicao, para escrever os dois eventos ACCEPTED
+   * (Termos de Uso + Politica de Privacidade) na MESMA transacao da conta.
+   */
+  termsAcceptance: TermsAcceptanceOrigin;
 }
 
 export interface CreatePatientInput {
@@ -24,6 +41,8 @@ export interface CreatePatientInput {
   passwordHash: string;
   name: string;
   document: string;
+  /** Ver `CreateProfessionalInput.termsAcceptance` (D-025). */
+  termsAcceptance: TermsAcceptanceOrigin;
 }
 
 /**

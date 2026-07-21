@@ -2,8 +2,16 @@ import type { PasswordHasher } from '@fitvo/auth';
 import type { BondStatus, CareModality, InviteStatus } from '@fitvo/database';
 import { BOND_CREATED_EVENT, type BondCreatedEvent, type Queue } from '@fitvo/queue';
 
-import type { AccessTokenVerifier, EmailVerificationLookup } from '../../shared/auth-context';
-import { requireAuth, requireVerifiedEmail } from '../../shared/auth-context';
+import type {
+  AccessTokenVerifier,
+  EmailVerificationLookup,
+  TermsAcceptanceLookup,
+} from '../../shared/auth-context';
+import {
+  requireAuth,
+  requireCurrentTermsAcceptance,
+  requireVerifiedEmail,
+} from '../../shared/auth-context';
 import {
   BondAlreadyExistsError,
   ForbiddenError,
@@ -120,6 +128,13 @@ export class PatientApplicationService {
     private readonly bondEvents: Queue<BondCreatedEvent>,
     /** Gate de e-mail verificado (D-029) ao convidar/reenviar convite. */
     private readonly emailVerification: EmailVerificationLookup,
+    /**
+     * Gate de re-consentimento de termos (D-025) ao convidar/reenviar convite —
+     * mesma familia e mesma posicao no chain do gate de e-mail verificado.
+     * TODO(D-025): hoje so gateamos TERMS_OF_USE nestes call sites; avaliar se
+     * PRIVACY_POLICY tambem deveria ser exigido aqui.
+     */
+    private readonly termsAcceptance: TermsAcceptanceLookup,
   ) {}
 
   /**
@@ -138,6 +153,7 @@ export class PatientApplicationService {
       input.specialtyId,
     );
     await requireVerifiedEmail(this.emailVerification, accountId);
+    await requireCurrentTermsAcceptance(this.termsAcceptance, accountId, 'TERMS_OF_USE');
     const pending = await this.patients.findPendingInvite(
       tenantId,
       professionalProfileId,
@@ -188,6 +204,7 @@ export class PatientApplicationService {
       tenantId,
     );
     await requireVerifiedEmail(this.emailVerification, accountId);
+    await requireCurrentTermsAcceptance(this.termsAcceptance, accountId, 'TERMS_OF_USE');
     const token = generateInviteToken();
     const expiresAt = new Date(Date.now() + this.inviteTtlSeconds * 1000);
     const invite = await this.patients.resendInvite(

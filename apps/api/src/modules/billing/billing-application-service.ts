@@ -13,8 +13,16 @@ import {
   type Periodicity as GatewayPeriodicity,
 } from '@fitvo/payments';
 
-import type { AccessTokenVerifier, EmailVerificationLookup } from '../../shared/auth-context';
-import { requireAuth, requireVerifiedEmail } from '../../shared/auth-context';
+import type {
+  AccessTokenVerifier,
+  EmailVerificationLookup,
+  TermsAcceptanceLookup,
+} from '../../shared/auth-context';
+import {
+  requireAuth,
+  requireCurrentTermsAcceptance,
+  requireVerifiedEmail,
+} from '../../shared/auth-context';
 import {
   ForbiddenError,
   NotFoundError,
@@ -213,6 +221,13 @@ export class BillingApplicationService {
     private readonly platformWalletId: string | null,
     /** Gate de e-mail verificado (D-029) ao emitir cobranca. */
     private readonly emailVerification: EmailVerificationLookup,
+    /**
+     * Gate de re-consentimento de termos (D-025) ao emitir cobranca — mesma
+     * familia e mesma posicao no chain do gate de e-mail verificado.
+     * TODO(D-025): hoje so gateamos TERMS_OF_USE neste call site; avaliar se
+     * PRIVACY_POLICY tambem deveria ser exigido aqui.
+     */
+    private readonly termsAcceptance: TermsAcceptanceLookup,
   ) {}
 
   /** Catalogo publico de planos Nivel 1 (D-060). Precos comerciais reais GATED. */
@@ -305,6 +320,7 @@ export class BillingApplicationService {
       tenantId,
     );
     await requireVerifiedEmail(this.emailVerification, accountId);
+    await requireCurrentTermsAcceptance(this.termsAcceptance, accountId, 'TERMS_OF_USE');
 
     const bond = await this.billing.findActiveBondForProfessional(
       tenantId,

@@ -14,6 +14,7 @@ import { billingRoutes } from './modules/billing/billing-routes';
 import { clinicRoutes } from './modules/clinic/clinic-routes';
 import { consentRoutes } from './modules/consent/consent-routes';
 import { patientRoutes } from './modules/patient/patient-routes';
+import { termsRoutes } from './modules/terms/terms-routes';
 import { registerErrorHandler } from './shared/error-handler';
 import { zodAwareTransform } from './shared/openapi-transform';
 
@@ -26,8 +27,9 @@ function firstHeader(value: string | string[] | undefined): string | undefined {
  * - Seguranca de sistema grande: Helmet, CORS restrito, rate limiting (D-033).
  * - Erros RFC 7807 (D-031); logger JSON + correlation ID (D-073).
  * - Slices em /v1: auth (/v1/auth), clinica (/v1/clinic), paciente/vinculo
- *   (/v1/patients), consentimento (/v1/consents) e financeiro (/v1/billing —
- *   inclui o webhook publico do Asaas); /health e /docs (Swagger, D-032/D-034).
+ *   (/v1/patients), consentimento (/v1/consents), termos (/v1/terms — D-025;
+ *   NAO confundir com /v1/consents) e financeiro (/v1/billing — inclui o
+ *   webhook publico do Asaas); /health e /docs (Swagger, D-032/D-034).
  */
 export async function buildApp(
   deps: AppDependencies,
@@ -82,6 +84,7 @@ export async function buildApp(
   await app.register(clinicRoutes(deps.clinicService), { prefix: '/v1/clinic' });
   await app.register(patientRoutes(deps.patientService), { prefix: '/v1/patients' });
   await app.register(consentRoutes(deps.consentService), { prefix: '/v1/consents' });
+  await app.register(termsRoutes(deps.termsService), { prefix: '/v1/terms' });
   await app.register(billingRoutes(deps.billingService), { prefix: '/v1/billing' });
 
   if (deps.onClose) {

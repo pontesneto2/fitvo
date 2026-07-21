@@ -15,7 +15,7 @@ import {
   InvalidVerificationTokenError,
   UnauthorizedError,
 } from '../../shared/http-errors';
-import type { AccountRecord, AccountRepository } from './account-repository';
+import type { AccountRecord, AccountRepository, TermsAcceptanceOrigin } from './account-repository';
 
 export interface AuthResult {
   account: { id: string; email: string; name: string };
@@ -36,6 +36,13 @@ export interface RegisterProfessionalInput {
   document: string;
   documentType: DocumentType;
   tenantName: string;
+  /**
+   * Aceite dos termos (D-025). O Zod ja garante `true` para os dois
+   * documentos na borda HTTP (`acceptedTerms`); aqui so a ORIGEM da
+   * requisicao (IP/UA, capturados na rota — nunca informados pelo cliente)
+   * necessaria para escrever os eventos ACCEPTED na mesma transacao da conta.
+   */
+  termsAcceptance: TermsAcceptanceOrigin;
 }
 
 export interface RegisterPatientInput {
@@ -43,6 +50,8 @@ export interface RegisterPatientInput {
   password: string;
   name: string;
   document: string;
+  /** Ver `RegisterProfessionalInput.termsAcceptance` (D-025). */
+  termsAcceptance: TermsAcceptanceOrigin;
 }
 
 /** TTLs dos tokens de uso unico enviados por e-mail (segundos). */
@@ -76,6 +85,7 @@ export class AuthApplicationService {
       document: input.document,
       documentType: input.documentType,
       tenantName: input.tenantName,
+      termsAcceptance: input.termsAcceptance,
     });
     return this.completeRegistration(account);
   }
@@ -88,6 +98,7 @@ export class AuthApplicationService {
       passwordHash,
       name: input.name,
       document: input.document,
+      termsAcceptance: input.termsAcceptance,
     });
     return this.completeRegistration(account);
   }

@@ -58,6 +58,23 @@ export class EmailNotVerifiedError extends AppError {
   }
 }
 
+/**
+ * Autenticado e com e-mail verificado, mas o aceite dos Termos de Uso/
+ * Politica de Privacidade esta desatualizado (D-025): ou foi revogado, ou uma
+ * versao com `isMaterialChange` foi publicada depois do ultimo aceite. Gate de
+ * acoes sensiveis (mesma familia do `EmailNotVerifiedError` — D-029), nunca
+ * bloqueia login. `slug` identifica qual documento precisa de re-consentimento.
+ */
+export class ReconsentRequiredError extends AppError {
+  readonly status = 403;
+  readonly problemType = 'https://fitvo.dev/problems/reconsent-required';
+  readonly title = 'Re-consentimento necessario';
+  constructor(slug: string) {
+    super(`E necessario re-consentir: ${slug}.`);
+    this.name = 'ReconsentRequiredError';
+  }
+}
+
 /** Autenticado, mas sem permissao para o recurso (RBAC — D-013/D-015). */
 export class ForbiddenError extends AppError {
   readonly status = 403;

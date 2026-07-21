@@ -43,21 +43,27 @@ crítica, não opcional. Bots varrem repositórios públicos em minutos.
 
 ---
 
-## Política de Merge — revisão humana obrigatória em áreas críticas
+## Política de Merge — repo solo: CI é o gate duro, revisão humana é o gate de risco
 
 O CI verde prova que o código compila e passa nos testes. NÃO prova que a regra
-de negócio está correta. Por isso, o auto-merge com `--admin` é permitido apenas
-em áreas de baixo risco — e, mesmo aí, só com aprovação explícita do responsável
-(a aprovação no chat conta). O gate é por **risco**, não por conveniência.
+de negócio está correta. O gate é por **risco**, não por conveniência.
 
-**AUTO-MERGE PERMITIDO (CI verde é gate suficiente):**
+**Contexto (mudou em relação à versão anterior desta política):** o repositório
+é mantido por uma única pessoa. Branch protection exigindo "1 approving review"
+é **impossível de satisfazer sozinho** (GitHub não permite auto-aprovar o
+próprio PR) — por isso a exigência de Approve formal no GitHub foi **removida**
+da configuração de proteção da branch; os **required status checks continuam
+ativos e são o gate duro**. `--admin` deixa de ser necessário para mergear com
+CI verde, porque não há mais review bloqueando.
+
+**AUTO-MERGE PERMITIDO (CI verde é gate suficiente, sem revisão adicional):**
 - Infraestrutura, tooling, configs, CI
 - Design system, tokens, primitivos de UI
 - Documentação
 - Refactors sem mudança de comportamento
 - Upgrades de dependência
 
-**REVISÃO HUMANA OBRIGATÓRIA ANTES DO MERGE (nunca auto-mergear):**
+**ÁREA CRÍTICA — CI verde não basta, precisa da minha revisão explícita do diff:**
 - **Financeiro** — qualquer coisa em `payments`, billing, split, subconta, fee,
   cobrança, assinatura, webhook de pagamento, reembolso/estorno. Erro aqui custa
   dinheiro real de terceiros.
@@ -70,10 +76,13 @@ em áreas de baixo risco — e, mesmo aí, só com aprovação explícita do res
 - **Migrations destrutivas** — qualquer migration que remova ou altere coluna
   com dado existente.
 
-Nessas áreas: abra o PR, apresente o diff e AGUARDE um **Approve formal no
-GitHub** do responsável — aprovação no chat **não basta**, e **nunca** use
-`--admin` para contornar a proteção de branch. Não mergeie por conta própria
-mesmo com CI verde.
+Nessas áreas: abra o PR, apresente o diff no chat e AGUARDE minha revisão
+explícita do diff + um **"pode ir" (ou equivalente) no chat**. Isso — não um
+Approve no GitHub — é o controle humano que substitui o review de terceiro
+neste repositório solo. Sem esse sinal explícito, não mergeie mesmo com CI
+verde. Com esse sinal, mergeie **sem `--admin`** (os required checks já
+liberam o botão) — `--admin` só se algum check específico travar por razão já
+identificada e aceita nesta mesma revisão.
 
 Se uma mudança tocar área crítica E não-crítica ao mesmo tempo, trate como
 crítica.

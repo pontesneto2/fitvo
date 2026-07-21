@@ -119,3 +119,71 @@ prescrição (mesma posição no guard chain: depois de auth+RBAC/tenant, antes 
 regra de negócio) — este ADR já cobre "convidar" e "financeiro", mas "clínico"
 ficou sem rota para aplicar no momento desta decisão. Não é opcional: sem isso
 o gate fica incompleto por omissão silenciosa, não por decisão.
+
+## Aceite de termos e re-consentimento (D-025)
+
+**Contexto:** o histórico bruto do planejamento (D-025) exigia "novo aceite
+quando o termo muda"; a destilação original do ADR-0005 registrou só
+"versionado (registrar qual versão foi aceita)" — **registrar a versão ≠
+re-consentir**. `docs/roadmap.md` marcou isso como obrigação enfraquecida na
+destilação (mesma família do D-029/login, ver auditoria ADR × histórico) e
+travou a implementação até a decisão de **como** enforçar. Esta seção é essa
+decisão, agora tomada e implementada.
+
+**Decisão:** aceite de Termos de Uso e Política de Privacidade é **obrigatório
+no cadastro** (bloqueia a criação da conta) e **re-exigido quando o termo muda
+materialmente** — gate de ação sensível, na mesma família e posição no chain
+que `requireVerifiedEmail` (auth → RBAC → e-mail verificado → **este gate**),
+nunca bloqueia login.
+
+- **Catálogo:** `TermsDocument` (hoje só `TERMS_OF_USE` e `PRIVACY_POLICY` —
+  enum extensível, não fechado a estes dois) e `TermsVersion` (append-only, uma
+  linha por versão publicada). Semeado na migração (mesmo padrão de
+  `Specialty` — D-047); o texto jurídico real e o `contentHash` verdadeiro são
+  input GATED (aguardam o time jurídico — ver `docs/roadmap.md`), a v1 semeada
+  usa um placeholder só para satisfazer a coluna `NOT NULL`.
+- **Cadastro:** `registerProfessionalSchema`/`registerPatientSchema` exigem
+  `acceptedTerms: { termsOfUse: true, privacyPolicy: true }` — cada campo
+  precisa do **literal booleano `true`**; `false`, ausente ou qualquer outro
+  valor é rejeitado pelo Zod com 400 **antes** de qualquer conta ser criada.
+  Isso torna uma caixa desmarcada ou pré-marcada **irrepresentável** no
+  request — o cliente precisa mandar `true` explicitamente por documento. A
+  rota captura IP e User-Agent da própria requisição (nunca do corpo) e o
+  `AccountRepository` escreve um `TermsAcceptanceEvent` (`ACCEPTED`) por
+  documento, **na mesma transação** da criação da conta, contra a versão
+  publicada atual de cada documento (lida dentro da própria transação).
+- **Status de aceite — sempre DERIVADO, nunca guardado de forma mutável:**
+  para uma conta e um documento, acha-se o último `TermsAcceptanceEvent` (por
+  `occurredAt`). Sem evento, ou o último é `REVOKED` → `RECONSENT_REQUIRED`.
+  Último é `ACCEPTED` → `RECONSENT_REQUIRED` se alguma versão do documento com
+  `isMaterialChange: true` foi publicada **depois** da versão aceita; senão
+  `CURRENT`. Um bump editorial (`isMaterialChange: false`) nunca força
+  re-consentimento; qualquer revogação sempre força, independente de versão.
+- **Gate (`requireCurrentTermsAcceptance`, em `shared/auth-context.ts`):**
+  mesmo formato porta+guard que `requireVerifiedEmail`
+  (`TermsAcceptanceLookup`/`ReconsentRequiredError`, 403,
+  `https://fitvo.dev/problems/reconsent-required`), aplicado nos **mesmos call
+  sites** que já tinham `requireVerifiedEmail` (convidar paciente, convidar
+  profissional de clínica, emitir cobrança), na mesma posição do chain — uma
+  chamada **por documento** (`TERMS_OF_USE` e `PRIVACY_POLICY`), cada um
+  avaliado independentemente: uma versão material nova de qualquer um dos dois
+  já basta para bloquear a ação com `RECONSENT_REQUIRED`.
+- **Slice `terms`** (`apps/api/src/modules/terms/`, prefixo `/v1/terms`):
+  `GET /status` (status por documento da conta autenticada), `POST /accept`
+  (re-consentimento — grava `ACCEPTED` contra a versão atual) e
+  `POST /revoke` (grava `REVOKED`) — sempre eventos **novos**, nunca update.
+
+**Consequências:**
+- `TermsVersion`/`TermsAcceptanceEvent` são append-only por construção: a
+  interface do repositório de propósito não expõe update/delete para nenhum
+  dos dois — qualquer mudança de estado é um evento novo. Prova probatória de
+  LGPD (o que foi aceito, quando, de onde) nunca é perdida ou reescrita.
+- **Gap conhecido:** o aceite inicial (D-025) está plugado nos dois endpoints
+  de **autocadastro** (`register/professional`, `register/patient`). Os fluxos
+  de **aceite de convite** (`clinic/invites/accept`,
+  `patients/.../invites/accept`) criam conta por um caminho **diferente**
+  (`ClinicRepository`/`PatientRepository`, não `AccountRepository`) e ainda
+  **não** escrevem o aceite inicial — uma conta criada por convite fica
+  `RECONSENT_REQUIRED` por omissão até aceitar via `POST /v1/terms/accept`.
+  Não corrigido nesta rodada (fora do escopo pedido); registrar como próximo
+  passo antes de habilitar aceite de convite em produção.

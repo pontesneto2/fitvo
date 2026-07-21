@@ -23,6 +23,8 @@ import { ConsentApplicationService } from './modules/consent/consent-application
 import { PrismaConsentRepository } from './modules/consent/prisma-consent-repository';
 import { PatientApplicationService } from './modules/patient/patient-application-service';
 import { PrismaPatientRepository } from './modules/patient/prisma-patient-repository';
+import { PrismaTermsRepository } from './modules/terms/prisma-terms-repository';
+import { TermsApplicationService } from './modules/terms/terms-application-service';
 
 /** Dependencias injetadas na app (permite trocar por fakes nos testes). */
 export interface AppDependencies {
@@ -32,6 +34,7 @@ export interface AppDependencies {
   clinicService: ClinicApplicationService;
   patientService: PatientApplicationService;
   consentService: ConsentApplicationService;
+  termsService: TermsApplicationService;
   billingService: BillingApplicationService;
   onClose?: () => Promise<void>;
 }
@@ -100,6 +103,12 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
       passwordResetTtlSeconds: env.PASSWORD_RESET_TTL_SECONDS,
     },
   );
+  // authCore satisfaz AccessTokenVerifier — a slice de termos (D-025) reusa o
+  // mesmo verificador. Instancia unica reusada como TermsAcceptanceLookup
+  // (shared/auth-context.ts) pelo guard `requireCurrentTermsAcceptance`, nas
+  // mesmas slices que ja aplicam `requireVerifiedEmail` — por isso e montada
+  // ANTES delas (clinic/patient/billing recebem esta mesma instancia).
+  const termsService = new TermsApplicationService(new PrismaTermsRepository(prisma), authCore);
   // authCore satisfaz AccessTokenVerifier (verifyAccessToken) — o guard de admin
   // da clinica reusa o mesmo verificador de access token da slice de auth.
   const clinicService = new ClinicApplicationService(
@@ -108,6 +117,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     authCore,
     env.PROFESSIONAL_INVITE_TTL_SECONDS,
     accountRepository,
+    termsService,
   );
   // authCore satisfaz AccessTokenVerifier — a slice de paciente reusa o mesmo
   // verificador de access token da slice de auth para o guard do profissional.
@@ -118,6 +128,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     env.PATIENT_INVITE_TTL_SECONDS,
     bondEvents,
     accountRepository,
+    termsService,
   );
   // authCore satisfaz AccessTokenVerifier — a slice de consentimento reusa o
   // mesmo verificador de access token para o guard do paciente (titular).
@@ -133,6 +144,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     authCore,
     env.ASAAS_PLATFORM_WALLET_ID ?? null,
     accountRepository,
+    termsService,
   );
 
   return {
@@ -142,6 +154,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     clinicService,
     patientService,
     consentService,
+    termsService,
     billingService,
     onClose: async () => {
       await queueFactory.close();

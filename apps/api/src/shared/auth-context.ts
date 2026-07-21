@@ -1,4 +1,4 @@
-import { EmailNotVerifiedError, UnauthorizedError } from './http-errors';
+import { EmailNotVerifiedError, ReconsentRequiredError, UnauthorizedError } from './http-errors';
 
 /** Contexto do chamador autenticado, derivado do access token (Bearer). */
 export interface AuthContext {
@@ -62,5 +62,36 @@ export async function requireVerifiedEmail(
   const account = await lookup.findById(accountId);
   if (!account || account.emailVerifiedAt === null) {
     throw new EmailNotVerifiedError();
+  }
+}
+
+/**
+ * Porta minima de leitura do status de aceite de termos (D-025). Satisfeita
+ * por `TermsRepository`/`TermsApplicationService` (slice `terms`) — o gate
+ * depende so desta interface, sem acoplar as demais slices ao repositorio
+ * concreto. `slug` identifica o documento (Termos de Uso, Politica de
+ * Privacidade — enum `TermsDocumentSlug`); `string` aqui de proposito, para
+ * este arquivo `shared/` nao depender de `@fitvo/database`.
+ */
+export interface TermsAcceptanceLookup {
+  getAcceptanceStatus(accountId: string, slug: string): Promise<'CURRENT' | 'RECONSENT_REQUIRED'>;
+}
+
+/**
+ * Gate de re-consentimento (D-025) para acoes sensiveis: mesma familia e
+ * mesma posicao no chain que `requireVerifiedEmail` (auth -> RBAC -> e-mail
+ * verificado -> ESTE gate), sempre no servidor. NAO bloqueia login/onboarding.
+ * Dispara quando o ultimo evento de aceite foi revogado, ou quando uma versao
+ * do documento com `isMaterialChange` foi publicada depois do ultimo aceite
+ * (ver `TermsApplicationService.getAcceptanceStatus` para a derivacao).
+ */
+export async function requireCurrentTermsAcceptance(
+  lookup: TermsAcceptanceLookup,
+  accountId: string,
+  slug: string,
+): Promise<void> {
+  const status = await lookup.getAcceptanceStatus(accountId, slug);
+  if (status !== 'CURRENT') {
+    throw new ReconsentRequiredError(slug);
   }
 }

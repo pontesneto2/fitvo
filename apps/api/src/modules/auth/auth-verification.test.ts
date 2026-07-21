@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { buildTestHarness } from '../../testing/build-test-app';
 
+const acceptedTerms = { termsOfUse: true, privacyPolicy: true } as const;
+
 const professional = {
   email: 'leo@fitvo.dev',
   password: 'senha-forte-123',
@@ -9,6 +11,7 @@ const professional = {
   document: '12345678901',
   documentType: 'CPF',
   tenantName: 'Leo Personal',
+  acceptedTerms,
 };
 
 const patient = {
@@ -16,6 +19,7 @@ const patient = {
   password: 'senha-forte-123',
   name: 'Ana',
   document: '12345678901',
+  acceptedTerms,
 };
 
 describe('verificacao de e-mail (E2E via inject)', () => {
@@ -130,6 +134,7 @@ describe('verificacao de e-mail (E2E via inject)', () => {
       document: '12345678901',
       documentType: 'CPF',
       tenantName: 'Tenant Expirado',
+      termsAcceptance: { ipAddress: '127.0.0.1', userAgent: 'vitest' },
     });
     // TTL negativo: o token ja nasce expirado no MESMO store que a rota consome.
     const { token } = await verificationTokens.issue('email_verification', account.id, -1);

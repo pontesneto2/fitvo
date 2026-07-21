@@ -9,6 +9,7 @@ const professional = {
   document: '12345678901',
   documentType: 'CPF',
   tenantName: 'Leo Personal',
+  acceptedTerms: { termsOfUse: true, privacyPolicy: true },
 };
 
 async function register(app: Awaited<ReturnType<typeof buildTestHarness>>['app']): Promise<string> {

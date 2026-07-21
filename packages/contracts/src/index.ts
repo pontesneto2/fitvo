@@ -16,6 +16,7 @@
  */
 export type {
   AcceptedResult,
+  AcceptTermsInput,
   AccountSummary,
   AuthResult,
   BillingTenantParams,
@@ -56,8 +57,13 @@ export type {
   RegisterProfessionalInput,
   RequestEmailVerificationInput,
   ResetPasswordInput,
+  RevokeTermsInput,
   SubscribeInput,
   SubscriptionView,
+  TermsAcceptanceStatus,
+  TermsDocumentSlug,
+  TermsStatusResult,
+  TermsStatusView,
   Tokens,
   VerifyEmailInput,
   WalletView,

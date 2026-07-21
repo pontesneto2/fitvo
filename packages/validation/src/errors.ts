@@ -37,3 +37,20 @@ export const emailNotVerifiedProblemSchema = z.object({
 });
 
 export type EmailNotVerifiedProblem = z.infer<typeof emailNotVerifiedProblemSchema>;
+
+/**
+ * 403 — a conta está autenticada e com e-mail verificado, mas o aceite dos
+ * Termos de Uso/Política de Privacidade está desatualizado (D-025): foi
+ * revogado, ou uma versão com `isMaterialChange` foi publicada depois do
+ * último aceite. Mesma família do gate de e-mail verificado (D-029); nunca
+ * bloqueia login. Forma ESPECÍFICA (mesmo motivo de `emailNotVerifiedProblemSchema`
+ * acima — ver `problemDetailsSchema` para o `response` genérico).
+ */
+export const reconsentRequiredProblemSchema = z.object({
+  type: z.literal('https://fitvo.dev/problems/reconsent-required'),
+  title: z.literal('Re-consentimento necessario'),
+  status: z.literal(403),
+  detail: z.string(),
+});
+
+export type ReconsentRequiredProblem = z.infer<typeof reconsentRequiredProblemSchema>;

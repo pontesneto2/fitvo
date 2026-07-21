@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { buildTestApp } from '../../testing/build-test-app';
 
+const acceptedTerms = { termsOfUse: true, privacyPolicy: true } as const;
+
 const professional = {
   email: 'leo@fitvo.dev',
   password: 'senha-forte-123',
@@ -9,6 +11,7 @@ const professional = {
   document: '12345678901',
   documentType: 'CPF',
   tenantName: 'Leo Personal',
+  acceptedTerms,
 };
 
 describe('fluxo de autenticacao (E2E via inject)', () => {
@@ -60,6 +63,7 @@ describe('fluxo de autenticacao (E2E via inject)', () => {
         password: 'senha-forte-123',
         name: 'Ana',
         document: '12345678901',
+        acceptedTerms,
       },
     });
 

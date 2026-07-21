@@ -53,6 +53,15 @@ webhook).
 **Termos:** aceite granular por contexto (nutrição/treino/medicina, cada um com
 seu termo) e versionado (registrar qual versão foi aceita e quando).
 
+> **Nota (enforcement — D-025, ADR-0002):** o aceite obrigatório e o gate de
+> re-consentimento quando o termo muda **materialmente** foram implementados —
+> ver "Aceite de termos e re-consentimento (D-025)" no ADR-0002. O escopo
+> implementado é os dois documentos OPERACIONAIS (Termos de Uso, Política de
+> Privacidade), não a granularidade por especialidade (nutrição/treino/
+> medicina) descrita no parágrafo acima — essa granularidade mais fina segue
+> **não implementada**; o catálogo (`TermsDocumentSlug`) é extensível para
+> cobri-la quando o responsável decidir os termos por especialidade.
+
 ## Alternativas consideradas
 
 - **Abstração pesada "multi-cloud" desde já:** overengineering; viola a

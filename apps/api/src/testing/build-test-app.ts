@@ -21,6 +21,8 @@ import { ConsentApplicationService } from '../modules/consent/consent-applicatio
 import { InMemoryConsentRepository } from '../modules/consent/in-memory-consent-repository';
 import { InMemoryPatientRepository } from '../modules/patient/in-memory-patient-repository';
 import { PatientApplicationService } from '../modules/patient/patient-application-service';
+import { InMemoryTermsRepository } from '../modules/terms/in-memory-terms-repository';
+import { TermsApplicationService } from '../modules/terms/terms-application-service';
 import { FakeAuthEmailSender } from './fake-auth-email-sender';
 
 /** Dependências in-memory + os repositórios expostos para arranjo nos testes. */
@@ -33,6 +35,7 @@ export interface TestDependencies {
   patient: InMemoryPatientRepository;
   consent: InMemoryConsentRepository;
   billing: InMemoryBillingRepository;
+  terms: InMemoryTermsRepository;
   queue: InMemoryQueueFactory;
 }
 
@@ -51,6 +54,8 @@ export interface TestHarness {
   consent: InMemoryConsentRepository;
   /** Repositorio de billing em memoria — expoe `seed*` para planos/subcontas/donos/vinculos. */
   billing: InMemoryBillingRepository;
+  /** Repositorio de termos em memoria (D-025) — expoe `seedVersion`/`seedDefaultCatalog` e helpers de leitura de eventos para os testes. */
+  terms: InMemoryTermsRepository;
   /** Fabrica de filas em memoria — coleta os eventos publicados (ex.: bond.created). */
   queue: InMemoryQueueFactory;
 }
@@ -72,10 +77,19 @@ export function buildTestDependencies(): TestDependencies {
   const authCore = new DefaultAuthService(jwt, new InMemoryRefreshTokenStore(), 3600);
   const emails = new FakeAuthEmailSender();
   const hasher = new Argon2PasswordHasher();
+  // Repositorio de termos (D-025) semeado com o catalogo padrao (mesmo
+  // conteudo da migracao de producao) — reusado como TermsAcceptanceLookup
+  // pelas slices que ja aplicam requireVerifiedEmail, e pelo InMemoryAccountRepository
+  // para escrever o aceite INICIAL no cadastro (mesma atomicidade da
+  // PrismaAccountRepository, so que sobre Maps single-thread).
+  const terms = new InMemoryTermsRepository();
+  terms.seedDefaultCatalog();
+  const termsService = new TermsApplicationService(terms, authCore);
   // Instancia unica reusada como EmailVerificationLookup (D-029) pelas demais
   // slices — mesmo padrao da producao (dependencies.ts): sem repositorio de
-  // identidade duplicado so para o gate de acoes sensiveis.
-  const accounts = new InMemoryAccountRepository();
+  // identidade duplicado so para o gate de acoes sensiveis. Recebe `terms`
+  // para escrever os eventos ACCEPTED iniciais no cadastro (D-025).
+  const accounts = new InMemoryAccountRepository(terms);
   const verificationTokens = new InMemoryVerificationTokenStore();
   const authService = new AuthApplicationService(
     accounts,
@@ -86,7 +100,14 @@ export function buildTestDependencies(): TestDependencies {
     { emailVerificationTtlSeconds: 3600, passwordResetTtlSeconds: 3600 },
   );
   const clinic = new InMemoryClinicRepository();
-  const clinicService = new ClinicApplicationService(clinic, hasher, authCore, 3600, accounts);
+  const clinicService = new ClinicApplicationService(
+    clinic,
+    hasher,
+    authCore,
+    3600,
+    accounts,
+    termsService,
+  );
   const queue = new InMemoryQueueFactory();
   const bondEvents = queue.createQueue<BondCreatedEvent>(SHARING_QUEUE);
   const patient = new InMemoryPatientRepository();
@@ -97,6 +118,7 @@ export function buildTestDependencies(): TestDependencies {
     3600,
     bondEvents,
     accounts,
+    termsService,
   );
   const consent = new InMemoryConsentRepository();
   const consentService = new ConsentApplicationService(consent, authCore);
@@ -109,6 +131,7 @@ export function buildTestDependencies(): TestDependencies {
     authCore,
     'wallet_fitvo_test',
     accounts,
+    termsService,
   );
   return {
     deps: {
@@ -118,6 +141,7 @@ export function buildTestDependencies(): TestDependencies {
       clinicService,
       patientService,
       consentService,
+      termsService,
       billingService,
     },
     emails,
@@ -127,6 +151,7 @@ export function buildTestDependencies(): TestDependencies {
     patient,
     consent,
     billing,
+    terms,
     queue,
   };
 }
@@ -134,10 +159,31 @@ export function buildTestDependencies(): TestDependencies {
 /** Monta a app com dependencias em memoria (sem Postgres/Redis) e expoe o
  *  sender falso e os repositorios para arranjo/asserts nos testes. */
 export async function buildTestHarness(): Promise<TestHarness> {
-  const { deps, emails, accounts, verificationTokens, clinic, patient, consent, billing, queue } =
-    buildTestDependencies();
+  const {
+    deps,
+    emails,
+    accounts,
+    verificationTokens,
+    clinic,
+    patient,
+    consent,
+    billing,
+    terms,
+    queue,
+  } = buildTestDependencies();
   const app = await buildApp(deps);
-  return { app, emails, accounts, verificationTokens, clinic, patient, consent, billing, queue };
+  return {
+    app,
+    emails,
+    accounts,
+    verificationTokens,
+    clinic,
+    patient,
+    consent,
+    billing,
+    terms,
+    queue,
+  };
 }
 
 /** Atalho para os testes que so precisam da instancia da app. */

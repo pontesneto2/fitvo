@@ -151,6 +151,23 @@ enum SuggestionStatus {
   ACTED
 }
 
+/// Documento legal rastreado para aceite (D-025 — LGPD). Extensivel de
+/// proposito (ADR-0002 gate de reconsentimento); hoje cobre so os dois
+/// documentos obrigatorios no cadastro. NAO confundir com o `Consent` acima:
+/// aquele e compartilhamento clinico entre profissionais (ADR-0003/D-016),
+/// este e aceite de Termos de Uso/Politica de Privacidade — conceitos legais
+/// distintos, por isso nomes distintos (Terms* vs Consent*).
+enum TermsDocumentSlug {
+  TERMS_OF_USE
+  PRIVACY_POLICY
+}
+
+/// Tipo de evento imutavel de aceite/revogacao de termos (D-025).
+enum TermsAcceptanceEventType {
+  ACCEPTED
+  REVOKED
+}
+
 // ---------------------------------------------------------------------------
 // Identidade
 // ---------------------------------------------------------------------------
@@ -181,13 +198,14 @@ model Account {
   createdAt         DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime      @updatedAt @db.Timestamptz(3)
 
-  professionalProfile ProfessionalProfile?
-  patientProfile      PatientProfile?
-  platformAdmin       PlatformAdmin?
-  clinicMemberships   ClinicMembership[]
-  notifications       Notification[] // central in-app / sininho (D-097/D-028)
-  attendancesOpened   Attendance[] // atendimentos abertos por esta conta (D-096)
-  attendanceMessages  AttendanceMessage[] // mensagens enviadas por esta conta (D-096)
+  professionalProfile   ProfessionalProfile?
+  patientProfile        PatientProfile?
+  platformAdmin         PlatformAdmin?
+  clinicMemberships     ClinicMembership[]
+  notifications         Notification[] // central in-app / sininho (D-097/D-028)
+  attendancesOpened     Attendance[] // atendimentos abertos por esta conta (D-096)
+  attendanceMessages    AttendanceMessage[] // mensagens enviadas por esta conta (D-096)
+  termsAcceptanceEvents TermsAcceptanceEvent[] // aceite/revogacao de termos (D-025); onDelete Restrict — nunca perde prova
 
   // Autoria de secoes da anamnese (D-102 — ADR-0011). onDelete Restrict nas
   // secoes: apagar a conta nao pode apagar a autoria de um documento clinico.
@@ -553,6 +571,77 @@ model Consent {
   @@index([patientProfileId])
   @@index([granteeProfessionalProfileId, status])
   @@map("consent")
+}
+
+/// Documento legal (Termos de Uso, Politica de Privacidade) rastreado para
+/// aceite obrigatorio (D-025 — LGPD). Uma linha por "tipo" de documento; as
+/// VERSOES publicadas vivem em `TermsVersion`. Catalogo fixo hoje (2 slugs),
+/// semeado na migracao (mesmo padrao de `Specialty` — D-047).
+model TermsDocument {
+  id   String            @id @default(cuid())
+  slug TermsDocumentSlug @unique
+
+  versions TermsVersion[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("terms_document")
+}
+
+/// Versao publicada de um documento (D-025). APPEND-ONLY: nunca atualizada
+/// apos criada — o repositorio nao expoe update/delete. `isMaterialChange`
+/// distingue mudanca que altera finalidade/compartilhamento/duracao/
+/// controlador (LGPD Art. 9 I/II/III/V — forca re-consentimento de quem ja
+/// aceitou versao anterior) de um bump so editorial (nao forca). Uma primeira
+/// versao e sempre material por definicao. `changeSummary` e exigido pela
+/// camada de aplicacao quando `isMaterialChange` — resumo mostrado ao usuario
+/// no re-consentimento (LGPD Art. 8 par. 6). `contentHash` prova que o texto
+/// efetivamente aceito nao mudou depois do fato (hash do conteudo exato).
+model TermsVersion {
+  id               String   @id @default(cuid())
+  documentId       String
+  /// String livre (ex.: data ou semver) — a app decide o esquema, so precisa
+  /// ser unica por documento.
+  version          String
+  isMaterialChange Boolean
+  changeSummary    String?
+  contentHash      String
+  publishedAt      DateTime @db.Timestamptz(3)
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  document TermsDocument          @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  events   TermsAcceptanceEvent[]
+
+  @@unique([documentId, version])
+  @@index([documentId, publishedAt])
+  @@map("terms_version")
+}
+
+/// Evento IMUTAVEL de aceite ou revogacao de uma versao de termo (D-025) —
+/// registro probatorio (LGPD). NUNCA atualizado apos criado: o repositorio so
+/// expoe criacao/leitura. `occurredAt` e o instante real da acao (tempo do
+/// SERVIDOR, nunca informado pelo cliente); `ipAddress`/`userAgent` vem da
+/// requisicao, nunca do body. O status de aceite ATUAL de uma conta para um
+/// documento e sempre DERIVADO do ultimo evento (nunca guardado de forma
+/// mutavel em nenhuma outra tabela) — ver `TermsApplicationService`.
+/// `onDelete: Restrict` em ambas FKs: apagar conta ou versao nao pode apagar
+/// prova de consentimento.
+model TermsAcceptanceEvent {
+  id             String                   @id @default(cuid())
+  accountId      String
+  termsVersionId String
+  type           TermsAcceptanceEventType
+  occurredAt     DateTime                 @db.Timestamptz(3)
+  ipAddress      String
+  userAgent      String
+  createdAt      DateTime                 @default(now()) @db.Timestamptz(3)
+
+  account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  termsVersion TermsVersion @relation(fields: [termsVersionId], references: [id], onDelete: Restrict)
+
+  @@index([accountId, termsVersionId])
+  @@map("terms_acceptance_event")
 }
 
 /// Sugestao de compartilhamento = saida do motor orientado a eventos (D-017). Ao

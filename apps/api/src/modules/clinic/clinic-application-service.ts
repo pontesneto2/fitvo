@@ -5,8 +5,13 @@ import type {
   AccessTokenVerifier,
   AuthContext,
   EmailVerificationLookup,
+  TermsAcceptanceLookup,
 } from '../../shared/auth-context';
-import { requireAuth, requireVerifiedEmail } from '../../shared/auth-context';
+import {
+  requireAuth,
+  requireCurrentTermsAcceptance,
+  requireVerifiedEmail,
+} from '../../shared/auth-context';
 import {
   ForbiddenError,
   InvalidInviteTokenError,
@@ -106,6 +111,12 @@ export class ClinicApplicationService {
     private readonly inviteTtlSeconds: number,
     /** Gate de e-mail verificado (D-029) ao convidar. */
     private readonly emailVerification: EmailVerificationLookup,
+    /**
+     * Gate de re-consentimento de termos (D-025) ao convidar — mesma familia e
+     * mesma posicao no chain do gate de e-mail verificado. Gateia os dois
+     * documentos obrigatorios (TERMS_OF_USE + PRIVACY_POLICY).
+     */
+    private readonly termsAcceptance: TermsAcceptanceLookup,
   ) {}
 
   /** Admin cria um convite para um profissional. Devolve o token em claro 1x. */
@@ -116,6 +127,8 @@ export class ClinicApplicationService {
   ): Promise<CreateInviteResult> {
     const ctx = await this.requireClinicAdmin(authorization, tenantId);
     await requireVerifiedEmail(this.emailVerification, ctx.accountId);
+    await requireCurrentTermsAcceptance(this.termsAcceptance, ctx.accountId, 'TERMS_OF_USE');
+    await requireCurrentTermsAcceptance(this.termsAcceptance, ctx.accountId, 'PRIVACY_POLICY');
     const pending = await this.clinic.findPendingInviteByEmail(tenantId, input.email);
     if (pending) {
       throw new InvitePendingConflictError();

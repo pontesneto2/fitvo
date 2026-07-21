@@ -48,6 +48,22 @@ function toAuthResultDto(result: AuthResult): AuthResultDto {
 }
 
 /**
+ * Origem da requisicao de cadastro (D-025) — IP/UA vem SEMPRE da requisicao,
+ * nunca do corpo enviado pelo cliente (o body so carrega os literais `true`
+ * do `acceptedTerms`, que o Zod ja validou antes deste handler rodar).
+ */
+function registrationOrigin(request: {
+  ip: string;
+  headers: Record<string, string | string[] | undefined>;
+}): { ipAddress: string; userAgent: string } {
+  const userAgent = request.headers['user-agent'];
+  return {
+    ipAddress: request.ip,
+    userAgent: (Array.isArray(userAgent) ? userAgent[0] : userAgent) ?? 'unknown',
+  };
+}
+
+/**
  * Vertical slice de autenticacao (D-034: versao na URL /v1). Registro por papel
  * (D-045/D-006), login (rate limited — D-029), refresh (rotacao), logout,
  * verificacao de e-mail, recuperacao de senha e conta atual (/me).
@@ -76,9 +92,14 @@ export function authRoutes(service: AuthApplicationService): FastifyPluginAsync 
         },
       },
       async (request, reply) => {
-        return reply
-          .code(201)
-          .send(toAuthResultDto(await service.registerProfessional(request.body)));
+        return reply.code(201).send(
+          toAuthResultDto(
+            await service.registerProfessional({
+              ...request.body,
+              termsAcceptance: registrationOrigin(request),
+            }),
+          ),
+        );
       },
     );
 
@@ -94,7 +115,14 @@ export function authRoutes(service: AuthApplicationService): FastifyPluginAsync 
         },
       },
       async (request, reply) => {
-        return reply.code(201).send(toAuthResultDto(await service.registerPatient(request.body)));
+        return reply.code(201).send(
+          toAuthResultDto(
+            await service.registerPatient({
+              ...request.body,
+              termsAcceptance: registrationOrigin(request),
+            }),
+          ),
+        );
       },
     );
 

@@ -33,6 +33,47 @@ updates:
       # docs/ui-primitives.md (§17). Destravar junto com o app mobile.
       - dependency-name: 'victory-native'
         update-types: ['version-update:semver-major']
+      # React 19: PRs #55 (react/@types/react) e #48 (react-test-renderer)
+      # derrubaram build/migrate/test — react-dom nao acompanha o bump no
+      # mesmo PR (ReactCurrentDispatcher undefined) e testing-library/RN 14
+      # (#50) depende do trio estar alinhado. Upgrade real, nao bump: precisa
+      # subir react + react-dom + @types/react + react-test-renderer +
+      # @testing-library/react-native JUNTOS, com PR proprio e verificacao
+      # manual. Divida registrada, sem prazo.
+      - dependency-name: 'react'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react-dom'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/react'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react-test-renderer'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@testing-library/react-native'
+        update-types: ['version-update:semver-major']
+      # react-native 0.86 (#46): preset do Jest mudou de pacote, StyleSheet
+      # .absoluteFillObject foi renomeado pra .absoluteFill, overloads de
+      # TextInputProps quebram o typecheck de ui-mobile. Upgrade de 10 minors
+      # de RN, com New Architecture no meio — precisa de PR proprio e teste
+      # manual em device/simulador, nao e bump automatico.
+      - dependency-name: 'react-native'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@react-native/babel-preset'
+        update-types: ['version-update:semver-major']
+      # jest 30 (#53): jest-mock mudou de API (clearMocksOnScope) e algo no
+      # preset/config do RN ainda espera a API do jest 29. Destravar quando o
+      # preset do RN suportar jest 30.
+      - dependency-name: 'jest'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/jest'
+        update-types: ['version-update:semver-major']
+      # lucide 0.469 -> 1.x (#49, #54): salto de major (0.x -> 1.x), mesma
+      # lib em web e mobile. #54 quebrou teste em ui-mobile; #49 passou CI mas
+      # e o mesmo breaking change — le o changelog do 1.0 antes de subir os
+      # dois juntos.
+      - dependency-name: 'lucide-react'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'lucide-react-native'
+        update-types: ['version-update:semver-major']
     # AGRUPA SO patch/minor. O major fica DE FORA do grupo e vira PR PROPRIO.
     #
     # O `ignore` acima resolve as versoes travadas, mas nao o defeito do

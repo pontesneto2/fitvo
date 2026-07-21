@@ -270,6 +270,40 @@ comportamentais e verificáveis — devem ser seguidas sem exceção.
   NÃO adotar antes dessa decisão. Não se aplica ao mobile (React Native/Expo).
 ---
 
+## Agent Skills (.claude/skills/)
+
+Skills são ajuda procedural. NÃO sobrescrevem as convenções deste CLAUDE.md, os ADRs,
+nem palavras de força (obrigatório/sempre/nunca). Em conflito, a convenção do projeto vence.
+Precedência: CLAUDE.md > ADRs/palavras de força > contract-first (D-032) > skills.
+Nenhuma skill inventa validação, mascara erro, faz refactor fora de escopo ou dá `git add .`.
+
+Quando cada skill deve atuar:
+- frontend-design — qualquer UI nova ou redesenho (landing, web-personal, telas mobile):
+  comprometer com uma direção estética antes de codar; fugir de default genérico de IA;
+  respeitar o design system existente quando já houver.
+- vercel-react-best-practices / vercel-composition-patterns — código React/Next
+  (web-personal, admin, landing).
+- vercel-react-native-skills — código RN/Expo (apps aluno e profissional).
+- web-design-guidelines — heurísticas de layout/UX em qualquer front.
+- domain-modeling / ubiquitous-language — modelar entidades/estados: reforça
+  "construir > validar" (estados inválidos irrepresentáveis) e nomes consistentes com os
+  ADRs (bond/vínculo, especialidade, seat, etc.).
+- test-driven-development — teste que reprova antes de implementar. Reforça o gate
+  anti-"verde que mente": o teste tem que exercer o código de fato.
+- verification-before-completion — antes de dar por pronto, validar de verdade conforme o
+  alvo (mobile: type-check/testes/build; API: type-check/build/testes/contrato;
+  web/admin/landing: type-check/build/smoke). Nunca reportar concluído sem verificar.
+- writing-plans — plano curto antes de mudança grande (já é o fluxo padrão).
+- systematic-debugging — bug/erro: reproduzir → isolar → diagnosticar → corrigir.
+- using-git-worktrees / dispatching-parallel-agents / subagent-driven-development /
+  finishing-a-development-branch — coordenação de sessões paralelas com territórios
+  disjuntos (branch + arquivos). NÃO substituem a política de merge #83 (CI required checks;
+  área crítica = revisão do diff pelo usuário + "pode ir"; agente mergeia sem --admin).
+- supabase-postgres-best-practices — consulta pontual de padrões de RLS ao decidir
+  isolamento de tenant (extensão Prisma vs RLS vs ambos). Ignorar o que for específico de Supabase.
+- skill-creator — usar quando formos escrever o skill PRIVADO FITVO (invariantes + coordenação).
+- webapp-testing — testes de fluxo em web.
+
 ## Plano de Execução
 
 A Fase 1 (fundação técnica) está concluída. O plano de execução completo — o

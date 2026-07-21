@@ -113,9 +113,8 @@ export class ClinicApplicationService {
     private readonly emailVerification: EmailVerificationLookup,
     /**
      * Gate de re-consentimento de termos (D-025) ao convidar — mesma familia e
-     * mesma posicao no chain do gate de e-mail verificado.
-     * TODO(D-025): hoje so gateamos TERMS_OF_USE neste call site; avaliar se
-     * PRIVACY_POLICY tambem deveria ser exigido aqui.
+     * mesma posicao no chain do gate de e-mail verificado. Gateia os dois
+     * documentos obrigatorios (TERMS_OF_USE + PRIVACY_POLICY).
      */
     private readonly termsAcceptance: TermsAcceptanceLookup,
   ) {}
@@ -129,6 +128,7 @@ export class ClinicApplicationService {
     const ctx = await this.requireClinicAdmin(authorization, tenantId);
     await requireVerifiedEmail(this.emailVerification, ctx.accountId);
     await requireCurrentTermsAcceptance(this.termsAcceptance, ctx.accountId, 'TERMS_OF_USE');
+    await requireCurrentTermsAcceptance(this.termsAcceptance, ctx.accountId, 'PRIVACY_POLICY');
     const pending = await this.clinic.findPendingInviteByEmail(tenantId, input.email);
     if (pending) {
       throw new InvitePendingConflictError();

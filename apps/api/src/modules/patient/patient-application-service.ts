@@ -131,8 +131,7 @@ export class PatientApplicationService {
     /**
      * Gate de re-consentimento de termos (D-025) ao convidar/reenviar convite —
      * mesma familia e mesma posicao no chain do gate de e-mail verificado.
-     * TODO(D-025): hoje so gateamos TERMS_OF_USE nestes call sites; avaliar se
-     * PRIVACY_POLICY tambem deveria ser exigido aqui.
+     * Gateia os dois documentos obrigatorios (TERMS_OF_USE + PRIVACY_POLICY).
      */
     private readonly termsAcceptance: TermsAcceptanceLookup,
   ) {}
@@ -154,6 +153,7 @@ export class PatientApplicationService {
     );
     await requireVerifiedEmail(this.emailVerification, accountId);
     await requireCurrentTermsAcceptance(this.termsAcceptance, accountId, 'TERMS_OF_USE');
+    await requireCurrentTermsAcceptance(this.termsAcceptance, accountId, 'PRIVACY_POLICY');
     const pending = await this.patients.findPendingInvite(
       tenantId,
       professionalProfileId,
@@ -205,6 +205,7 @@ export class PatientApplicationService {
     );
     await requireVerifiedEmail(this.emailVerification, accountId);
     await requireCurrentTermsAcceptance(this.termsAcceptance, accountId, 'TERMS_OF_USE');
+    await requireCurrentTermsAcceptance(this.termsAcceptance, accountId, 'PRIVACY_POLICY');
     const token = generateInviteToken();
     const expiresAt = new Date(Date.now() + this.inviteTtlSeconds * 1000);
     const invite = await this.patients.resendInvite(

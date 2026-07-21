@@ -219,4 +219,41 @@ describe('gate de re-consentimento (D-025 — ADR-0002)', () => {
 
     await harness.app.close();
   });
+
+  it('o gate tambem cobre PRIVACY_POLICY, independente do TERMS_OF_USE', async () => {
+    const harness = await buildTestHarness();
+    const { token } = await setupProfessional(harness);
+
+    // Sanidade: a acao gated funciona normalmente antes de qualquer mudanca.
+    const before = await createInvite(harness.app, token, 'aluno1@fitvo.dev');
+    expect(before.statusCode).toBe(201);
+
+    // Versao MATERIAL nova da Politica de Privacidade -> exige re-consentimento,
+    // mesmo com o TERMS_OF_USE em dia (documentos sao gateados independentemente).
+    harness.terms.seedVersion({
+      documentId: 'terms_doc_pp',
+      documentSlug: 'PRIVACY_POLICY',
+      version: '1.1.0',
+      isMaterialChange: true,
+      publishedAt: new Date('2026-02-01T00:00:00Z'),
+    });
+
+    const blocked = await createInvite(harness.app, token, 'aluno2@fitvo.dev');
+    expect(blocked.statusCode).toBe(403);
+    expect(blocked.json().type).toBe('https://fitvo.dev/problems/reconsent-required');
+
+    // Aceitar a versao atual da Politica de Privacidade libera a acao de novo.
+    const accept = await harness.app.inject({
+      method: 'POST',
+      url: '/v1/terms/accept',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { slug: 'PRIVACY_POLICY' },
+    });
+    expect(accept.statusCode).toBe(204);
+
+    const afterAccept = await createInvite(harness.app, token, 'aluno3@fitvo.dev');
+    expect(afterAccept.statusCode).toBe(201);
+
+    await harness.app.close();
+  });
 });

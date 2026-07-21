@@ -231,12 +231,12 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
     Detalhe completo na nova seção "Aceite de termos e re-consentimento
     (D-025)" do `docs/adr/0002-identidade-e-auth.md`; código em
     `apps/api/src/modules/terms/` (+ gate em `shared/auth-context.ts`).
-    Pendências deixadas registradas nessa mesma seção do ADR (não bloqueiam o
-    fechamento): `PRIVACY_POLICY` ainda não está no chain de re-consentimento
-    dos call sites gateados (só `TERMS_OF_USE` está); contas criadas via
-    aceite de convite (não autocadastro) ainda não recebem o aceite inicial; o
-    conteúdo/hash real dos textos jurídicos segue GATED (ver item "Textos
-    jurídicos" abaixo).
+    O gate cobre os dois documentos obrigatórios (`TERMS_OF_USE` e
+    `PRIVACY_POLICY`), cada um avaliado independentemente nos mesmos call
+    sites. Pendências deixadas registradas nessa mesma seção do ADR (não
+    bloqueiam o fechamento): contas criadas via aceite de convite (não
+    autocadastro) ainda não recebem o aceite inicial; o conteúdo/hash real dos
+    textos jurídicos segue GATED (ver item "Textos jurídicos" abaixo).
   - **Menores (registrados, baixa severidade):** D-018 (a trava "não atende antes
     da subconta" não é enunciada no ADR-0004), D-027 ("opt-out de e-mail é
     **requisito legal**" diluído), D-019 ("aluno **sempre grátis**" sobrevive só

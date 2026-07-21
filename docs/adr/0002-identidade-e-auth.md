@@ -164,8 +164,10 @@ nunca bloqueia login.
   (`TermsAcceptanceLookup`/`ReconsentRequiredError`, 403,
   `https://fitvo.dev/problems/reconsent-required`), aplicado nos **mesmos call
   sites** que já tinham `requireVerifiedEmail` (convidar paciente, convidar
-  profissional de clínica, emitir cobrança), na mesma posição do chain,
-  gateado em `TERMS_OF_USE`.
+  profissional de clínica, emitir cobrança), na mesma posição do chain — uma
+  chamada **por documento** (`TERMS_OF_USE` e `PRIVACY_POLICY`), cada um
+  avaliado independentemente: uma versão material nova de qualquer um dos dois
+  já basta para bloquear a ação com `RECONSENT_REQUIRED`.
 - **Slice `terms`** (`apps/api/src/modules/terms/`, prefixo `/v1/terms`):
   `GET /status` (status por documento da conta autenticada), `POST /accept`
   (re-consentimento — grava `ACCEPTED` contra a versão atual) e
@@ -176,11 +178,6 @@ nunca bloqueia login.
   interface do repositório de propósito não expõe update/delete para nenhum
   dos dois — qualquer mudança de estado é um evento novo. Prova probatória de
   LGPD (o que foi aceito, quando, de onde) nunca é perdida ou reescrita.
-- **TODO(D-025):** hoje só `TERMS_OF_USE` está no chain de re-consentimento
-  dos call sites listados acima; `PRIVACY_POLICY` tem a mesma infraestrutura
-  pronta (`TermsAcceptanceLookup` cobre qualquer slug) mas não foi plugada nos
-  mesmos pontos — decisão de escopo desta rodada, não lacuna técnica.
-  Reavaliar se o responsável quiser gatear os dois documentos nas mesmas ações.
 - **Gap conhecido:** o aceite inicial (D-025) está plugado nos dois endpoints
   de **autocadastro** (`register/professional`, `register/patient`). Os fluxos
   de **aceite de convite** (`clinic/invites/accept`,

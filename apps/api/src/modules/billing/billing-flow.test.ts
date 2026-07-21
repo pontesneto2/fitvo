@@ -14,6 +14,7 @@ const proPayload = {
   document: '12345678901',
   documentType: 'CPF',
   tenantName: 'Estudio Solo',
+  acceptedTerms: { termsOfUse: true, privacyPolicy: true },
 };
 
 /**

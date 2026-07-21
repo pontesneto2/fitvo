@@ -15,6 +15,7 @@ const proPayload = {
   document: '12345678901',
   documentType: 'CPF',
   tenantName: 'Estudio do Profissional (solo)',
+  acceptedTerms: { termsOfUse: true, privacyPolicy: true },
 };
 
 /**

@@ -13,6 +13,7 @@ const adminPayload = {
   document: '12345678901',
   documentType: 'CPF',
   tenantName: 'Clinica Vida (solo do admin)',
+  acceptedTerms: { termsOfUse: true, privacyPolicy: true },
 };
 
 /**

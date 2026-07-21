@@ -13,6 +13,7 @@ const patientPayload = {
   document: '12345678901',
   documentType: 'CPF',
   tenantName: 'Estudio (solo)',
+  acceptedTerms: { termsOfUse: true, privacyPolicy: true },
 };
 
 /**

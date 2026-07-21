@@ -19,6 +19,8 @@ import { ClinicApplicationService } from '../modules/clinic/clinic-application-s
 import { InMemoryClinicRepository } from '../modules/clinic/in-memory-clinic-repository';
 import { ConsentApplicationService } from '../modules/consent/consent-application-service';
 import { InMemoryConsentRepository } from '../modules/consent/in-memory-consent-repository';
+import { InMemoryNutritionRepository } from '../modules/nutrition/in-memory-nutrition-repository';
+import { NutritionApplicationService } from '../modules/nutrition/nutrition-application-service';
 import { InMemoryPatientRepository } from '../modules/patient/in-memory-patient-repository';
 import { PatientApplicationService } from '../modules/patient/patient-application-service';
 import { InMemorySpecialtyRepository } from '../modules/specialty/in-memory-specialty-repository';
@@ -39,6 +41,7 @@ export interface TestDependencies {
   billing: InMemoryBillingRepository;
   terms: InMemoryTermsRepository;
   specialty: InMemorySpecialtyRepository;
+  nutrition: InMemoryNutritionRepository;
   queue: InMemoryQueueFactory;
 }
 
@@ -61,6 +64,8 @@ export interface TestHarness {
   terms: InMemoryTermsRepository;
   /** Catalogo de especialidades em memoria (D-047) — expoe `seed`/`seedDefaultCatalog`. */
   specialty: InMemorySpecialtyRepository;
+  /** Repositorio de nutricao em memoria (ADR-0013) — expoe `seed*` para arranjar profissionais/vinculos/alimentos. */
+  nutrition: InMemoryNutritionRepository;
   /** Fabrica de filas em memoria — coleta os eventos publicados (ex.: bond.created). */
   queue: InMemoryQueueFactory;
 }
@@ -149,6 +154,8 @@ export function buildTestDependencies(): TestDependencies {
     accounts,
     termsService,
   );
+  const nutrition = new InMemoryNutritionRepository();
+  const nutritionService = new NutritionApplicationService(nutrition, authCore);
   return {
     deps: {
       logLevel: 'silent',
@@ -160,6 +167,7 @@ export function buildTestDependencies(): TestDependencies {
       termsService,
       billingService,
       specialtyService,
+      nutritionService,
     },
     emails,
     accounts,
@@ -170,6 +178,7 @@ export function buildTestDependencies(): TestDependencies {
     billing,
     terms,
     specialty,
+    nutrition,
     queue,
   };
 }
@@ -188,6 +197,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     billing,
     terms,
     specialty,
+    nutrition,
     queue,
   } = buildTestDependencies();
   const app = await buildApp(deps);
@@ -202,6 +212,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     billing,
     terms,
     specialty,
+    nutrition,
     queue,
   };
 }

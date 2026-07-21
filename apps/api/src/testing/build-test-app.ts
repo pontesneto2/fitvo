@@ -27,6 +27,8 @@ import { FakeAuthEmailSender } from './fake-auth-email-sender';
 export interface TestDependencies {
   deps: AppDependencies;
   emails: FakeAuthEmailSender;
+  accounts: InMemoryAccountRepository;
+  verificationTokens: InMemoryVerificationTokenStore;
   clinic: InMemoryClinicRepository;
   patient: InMemoryPatientRepository;
   consent: InMemoryConsentRepository;
@@ -37,6 +39,10 @@ export interface TestDependencies {
 export interface TestHarness {
   app: FastifyInstance;
   emails: FakeAuthEmailSender;
+  /** Repositorio de identidade em memoria — expoe `markEmailVerified` para arranjar contas verificadas (D-029). */
+  accounts: InMemoryAccountRepository;
+  /** Store de tokens de verificacao/recuperacao em memoria — permite semear tokens ja expirados (D-029). */
+  verificationTokens: InMemoryVerificationTokenStore;
   /** Repositorio de clinica em memoria — expoe `seed*` para arranjar clinicas/admins. */
   clinic: InMemoryClinicRepository;
   /** Repositorio de paciente/vinculo em memoria — expoe `seed*` para arranjar profissionais/especialidades. */
@@ -66,20 +72,32 @@ export function buildTestDependencies(): TestDependencies {
   const authCore = new DefaultAuthService(jwt, new InMemoryRefreshTokenStore(), 3600);
   const emails = new FakeAuthEmailSender();
   const hasher = new Argon2PasswordHasher();
+  // Instancia unica reusada como EmailVerificationLookup (D-029) pelas demais
+  // slices — mesmo padrao da producao (dependencies.ts): sem repositorio de
+  // identidade duplicado so para o gate de acoes sensiveis.
+  const accounts = new InMemoryAccountRepository();
+  const verificationTokens = new InMemoryVerificationTokenStore();
   const authService = new AuthApplicationService(
-    new InMemoryAccountRepository(),
+    accounts,
     hasher,
     authCore,
-    new InMemoryVerificationTokenStore(),
+    verificationTokens,
     emails,
     { emailVerificationTtlSeconds: 3600, passwordResetTtlSeconds: 3600 },
   );
   const clinic = new InMemoryClinicRepository();
-  const clinicService = new ClinicApplicationService(clinic, hasher, authCore, 3600);
+  const clinicService = new ClinicApplicationService(clinic, hasher, authCore, 3600, accounts);
   const queue = new InMemoryQueueFactory();
   const bondEvents = queue.createQueue<BondCreatedEvent>(SHARING_QUEUE);
   const patient = new InMemoryPatientRepository();
-  const patientService = new PatientApplicationService(patient, hasher, authCore, 3600, bondEvents);
+  const patientService = new PatientApplicationService(
+    patient,
+    hasher,
+    authCore,
+    3600,
+    bondEvents,
+    accounts,
+  );
   const consent = new InMemoryConsentRepository();
   const consentService = new ConsentApplicationService(consent, authCore);
   const billing = new InMemoryBillingRepository();
@@ -90,6 +108,7 @@ export function buildTestDependencies(): TestDependencies {
     new FakePaymentGateway(),
     authCore,
     'wallet_fitvo_test',
+    accounts,
   );
   return {
     deps: {
@@ -102,6 +121,8 @@ export function buildTestDependencies(): TestDependencies {
       billingService,
     },
     emails,
+    accounts,
+    verificationTokens,
     clinic,
     patient,
     consent,
@@ -113,9 +134,10 @@ export function buildTestDependencies(): TestDependencies {
 /** Monta a app com dependencias em memoria (sem Postgres/Redis) e expoe o
  *  sender falso e os repositorios para arranjo/asserts nos testes. */
 export async function buildTestHarness(): Promise<TestHarness> {
-  const { deps, emails, clinic, patient, consent, billing, queue } = buildTestDependencies();
+  const { deps, emails, accounts, verificationTokens, clinic, patient, consent, billing, queue } =
+    buildTestDependencies();
   const app = await buildApp(deps);
-  return { app, emails, clinic, patient, consent, billing, queue };
+  return { app, emails, accounts, verificationTokens, clinic, patient, consent, billing, queue };
 }
 
 /** Atalho para os testes que so precisam da instancia da app. */

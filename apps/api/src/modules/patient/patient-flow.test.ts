@@ -17,7 +17,11 @@ const proPayload = {
   tenantName: 'Estudio do Profissional (solo)',
 };
 
-/** Registra o profissional (via auth) e o semeia como profissional do tenant + especialidade. */
+/**
+ * Registra o profissional (via auth), semeia como profissional do tenant +
+ * especialidade, e marca o e-mail como verificado (D-029) — convidar exige o
+ * gate; o teste do gate em si usa um profissional NAO verificado a parte.
+ */
 async function setupProfessional(
   harness: TestHarness,
 ): Promise<{ accountId: string; token: string; professionalProfileId: string }> {
@@ -28,6 +32,7 @@ async function setupProfessional(
   });
   expect(res.statusCode).toBe(201);
   const body = res.json();
+  await harness.accounts.markEmailVerified(body.account.id);
   const professionalProfileId = harness.patient.seedProfessional({
     accountId: body.account.id,
     tenantId: PRO_TENANT,
@@ -205,6 +210,66 @@ describe('fluxo de paciente e vinculo (E2E via inject)', () => {
       payload: { email: 'paciente@fitvo.dev', specialtyId: SPECIALTY, modality: 'ONLINE' },
     });
     expect(unauthorized.statusCode).toBe(401);
+
+    await harness.app.close();
+  });
+
+  it('gate de e-mail verificado (D-029): profissional nao verificado nao convida nem reenvia; verificado passa', async () => {
+    const harness = await buildTestHarness();
+
+    // Profissional autenticado e dono da especialidade, mas SEM marcar o e-mail
+    // como verificado (setupProfessional faz isso; aqui reproduzimos so ate ali).
+    const res = await harness.app.inject({
+      method: 'POST',
+      url: '/v1/auth/register/professional',
+      payload: proPayload,
+    });
+    const body = res.json();
+    const professionalProfileId = harness.patient.seedProfessional({
+      accountId: body.account.id,
+      tenantId: PRO_TENANT,
+      specialtyIds: [SPECIALTY],
+    });
+    const token = body.tokens.accessToken;
+
+    const blocked = await createInvite(harness.app, token, 'paciente@fitvo.dev');
+    expect(blocked.statusCode).toBe(403);
+    expect(blocked.headers['content-type']).toContain('application/problem+json');
+    expect(blocked.json()).toMatchObject({
+      type: 'https://fitvo.dev/problems/email-not-verified',
+    });
+
+    // Reenvio tambem exige e-mail verificado — semeia o convite pendente
+    // diretamente no repositorio (o create via HTTP esbarraria no mesmo gate).
+    const pending = await harness.patient.createInvite({
+      tenantId: PRO_TENANT,
+      professionalProfileId,
+      specialtyId: SPECIALTY,
+      email: 'paciente@fitvo.dev',
+      modality: 'ONLINE',
+      tokenHash: hashInviteToken('raw-pendente'),
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    const resendBlocked = await harness.app.inject({
+      method: 'POST',
+      url: `/v1/patients/${PRO_TENANT}/invites/${pending.id}/resend`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(resendBlocked.statusCode).toBe(403);
+    expect(resendBlocked.json()).toMatchObject({
+      type: 'https://fitvo.dev/problems/email-not-verified',
+    });
+
+    // Verifica o e-mail: as mesmas acoes agora passam.
+    await harness.accounts.markEmailVerified(body.account.id);
+    const created = await createInvite(harness.app, token, 'outro@fitvo.dev');
+    expect(created.statusCode).toBe(201);
+    const resent = await harness.app.inject({
+      method: 'POST',
+      url: `/v1/patients/${PRO_TENANT}/invites/${pending.id}/resend`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(resent.statusCode).toBe(201);
 
     await harness.app.close();
   });

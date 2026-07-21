@@ -44,6 +44,20 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+/**
+ * Autenticado, mas o e-mail da conta ainda nao foi verificado (D-029). Gate de
+ * acoes sensiveis (convidar, financeiro, clinico) — nunca bloqueia login.
+ */
+export class EmailNotVerifiedError extends AppError {
+  readonly status = 403;
+  readonly problemType = 'https://fitvo.dev/problems/email-not-verified';
+  readonly title = 'E-mail nao verificado';
+  constructor() {
+    super('Confirme seu e-mail antes de realizar esta acao.');
+    this.name = 'EmailNotVerifiedError';
+  }
+}
+
 /** Autenticado, mas sem permissao para o recurso (RBAC — D-013/D-015). */
 export class ForbiddenError extends AppError {
   readonly status = 403;

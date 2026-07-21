@@ -2,8 +2,8 @@ import type { PasswordHasher } from '@fitvo/auth';
 import type { BondStatus, CareModality, InviteStatus } from '@fitvo/database';
 import { BOND_CREATED_EVENT, type BondCreatedEvent, type Queue } from '@fitvo/queue';
 
-import type { AccessTokenVerifier } from '../../shared/auth-context';
-import { requireAuth } from '../../shared/auth-context';
+import type { AccessTokenVerifier, EmailVerificationLookup } from '../../shared/auth-context';
+import { requireAuth, requireVerifiedEmail } from '../../shared/auth-context';
 import {
   BondAlreadyExistsError,
   ForbiddenError,
@@ -102,6 +102,8 @@ function toBondView(bond: BondRecord): BondView {
  * vinculo (ACTIVE->ARCHIVED, nunca apaga — D-053). O aceite e publico
  * (autorizado pelo token). Guard de convite reusa `requireAuth` (shared) e checa
  * o perfil profissional no tenant alvo; tenant isolado em toda operacao (D-002).
+ * Criar/reenviar convite tambem exige e-mail verificado (D-029 — gate de acao
+ * sensivel, nunca bloqueia login); o aceite publico NAO passa por este gate.
  */
 export class PatientApplicationService {
   constructor(
@@ -116,6 +118,8 @@ export class PatientApplicationService {
      * slice a uma implementacao concreta (BullMQ em prod, in-memory nos testes).
      */
     private readonly bondEvents: Queue<BondCreatedEvent>,
+    /** Gate de e-mail verificado (D-029) ao convidar/reenviar convite. */
+    private readonly emailVerification: EmailVerificationLookup,
   ) {}
 
   /**
@@ -128,11 +132,12 @@ export class PatientApplicationService {
     tenantId: string,
     input: { email: string; specialtyId: string; modality: CareModality },
   ): Promise<CreatePatientInviteResult> {
-    const { professionalProfileId } = await this.requireProfessionalOwningSpecialty(
+    const { professionalProfileId, accountId } = await this.requireProfessionalOwningSpecialty(
       authorization,
       tenantId,
       input.specialtyId,
     );
+    await requireVerifiedEmail(this.emailVerification, accountId);
     const pending = await this.patients.findPendingInvite(
       tenantId,
       professionalProfileId,
@@ -178,7 +183,11 @@ export class PatientApplicationService {
     tenantId: string,
     inviteId: string,
   ): Promise<CreatePatientInviteResult> {
-    const { professionalProfileId } = await this.requireProfessional(authorization, tenantId);
+    const { professionalProfileId, accountId } = await this.requireProfessional(
+      authorization,
+      tenantId,
+    );
+    await requireVerifiedEmail(this.emailVerification, accountId);
     const token = generateInviteToken();
     const expiresAt = new Date(Date.now() + this.inviteTtlSeconds * 1000);
     const invite = await this.patients.resendInvite(
@@ -268,13 +277,13 @@ export class PatientApplicationService {
   private async requireProfessional(
     authorization: string | undefined,
     tenantId: string,
-  ): Promise<{ professionalProfileId: string }> {
+  ): Promise<{ professionalProfileId: string; accountId: string }> {
     const ctx = await requireAuth(this.tokenVerifier, authorization);
     const professional = await this.patients.findProfessional(ctx.accountId, tenantId);
     if (!professional) {
       throw new ForbiddenError('Requer um perfil profissional neste tenant.');
     }
-    return professional;
+    return { ...professional, accountId: ctx.accountId };
   }
 
   /**
@@ -290,7 +299,7 @@ export class PatientApplicationService {
     authorization: string | undefined,
     tenantId: string,
     specialtyId: string,
-  ): Promise<{ professionalProfileId: string }> {
+  ): Promise<{ professionalProfileId: string; accountId: string }> {
     const professional = await this.requireProfessional(authorization, tenantId);
     const exists = await this.patients.specialtyExists(specialtyId);
     if (!exists) {

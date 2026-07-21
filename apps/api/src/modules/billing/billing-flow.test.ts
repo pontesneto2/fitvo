@@ -17,7 +17,8 @@ const proPayload = {
 };
 
 /**
- * Registra um profissional (via auth) e arranja o mundo do billing no repo em
+ * Registra um profissional (via auth), marca o e-mail como verificado (D-029 —
+ * emitir cobranca exige o gate) e arranja o mundo do billing no repo em
  * memoria: dono solo do tenant, plano com preco, subconta com taxa e um vinculo
  * ATIVO. Retorna o token do profissional e o id do vinculo.
  */
@@ -32,6 +33,7 @@ async function setup(
   expect(res.statusCode).toBe(201);
   const body = res.json();
   const accountId = body.account.id;
+  await harness.accounts.markEmailVerified(accountId);
   const professionalProfileId = harness.billing.seedSoloProfessional(accountId, TENANT);
   const planId = harness.billing.seedPlan({
     code: 'solo',
@@ -179,6 +181,50 @@ describe('fluxo de billing (E2E via inject, FakePaymentGateway)', () => {
       headers: auth(token),
     });
     expect(walletAfter.json()).toEqual({ receivedCents: 10_000, pendingCents: 0, feesCents: 500 });
+
+    await harness.app.close();
+  });
+
+  it('gate de e-mail verificado (D-029): profissional nao verificado nao emite cobranca; verificado passa', async () => {
+    const harness = await buildTestHarness();
+
+    // Registra e arranja o mundo do billing SEM marcar o e-mail como verificado
+    // (setup() faz isso; aqui reproduzimos so ate ali).
+    const res = await harness.app.inject({
+      method: 'POST',
+      url: '/v1/auth/register/professional',
+      payload: proPayload,
+    });
+    const body = res.json();
+    const accountId = body.account.id;
+    const professionalProfileId = harness.billing.seedSoloProfessional(accountId, TENANT);
+    harness.billing.seedPaymentAccount(TENANT, {
+      asaasWalletId: 'wallet_pro',
+      feeBasisPoints: 500,
+    });
+    const bondId = harness.billing.seedActiveBond({ tenantId: TENANT, professionalProfileId });
+    const token = body.tokens.accessToken;
+
+    const blocked = await harness.app.inject({
+      method: 'POST',
+      url: `/v1/billing/${TENANT}/charges`,
+      headers: auth(token),
+      payload: { bondId, amountCents: 10_000, method: 'pix', idempotencyKey: 'idem-gate-0001' },
+    });
+    expect(blocked.statusCode).toBe(403);
+    expect(blocked.headers['content-type']).toContain('application/problem+json');
+    expect(blocked.json()).toMatchObject({
+      type: 'https://fitvo.dev/problems/email-not-verified',
+    });
+
+    await harness.accounts.markEmailVerified(accountId);
+    const created = await harness.app.inject({
+      method: 'POST',
+      url: `/v1/billing/${TENANT}/charges`,
+      headers: auth(token),
+      payload: { bondId, amountCents: 10_000, method: 'pix', idempotencyKey: 'idem-gate-0001' },
+    });
+    expect(created.statusCode).toBe(201);
 
     await harness.app.close();
   });

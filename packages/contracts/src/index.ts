@@ -53,7 +53,6 @@ export type {
   PlanView,
   RefreshInput,
   RefreshResult,
-  RegisterPatientInput,
   RegisterProfessionalInput,
   RequestEmailVerificationInput,
   ResetPasswordInput,

@@ -42,7 +42,7 @@ export const loginInputSchema = z.object({
 export type LoginInput = z.infer<typeof loginInputSchema>;
 
 /**
- * Espelha `acceptedTerms` de `registerProfessionalSchema`/`registerPatientSchema`
+ * Espelha `acceptedTerms` de `registerProfessionalSchema`/`patientAcceptInviteSchema`
  * (D-025 — LGPD). Cada campo exige o literal `true`: uma caixa desmarcada vira
  * `false` no form state, o Zod rejeita e a UI mostra o erro — nunca chega a
  * criar a conta sem os dois aceites.
@@ -71,23 +71,17 @@ export const registerProfessionalInputSchema = z.object({
 });
 export type RegisterProfessionalInput = z.infer<typeof registerProfessionalInputSchema>;
 
-/** Espelha `registerPatientSchema` da API. */
-export const registerPatientInputSchema = z.object({
-  email: registerEmail,
-  password: registerPassword,
-  name: registerName,
-  document: cpf,
-  acceptedTerms: acceptedTermsInput,
-});
-export type RegisterPatientInput = z.infer<typeof registerPatientInputSchema>;
-
-/** Espelha `patientAcceptInviteSchema` da API — sem aceite de termos (D-025 nao
- * cobre ainda contas criadas por convite; divida registrada no roadmap). */
+/**
+ * Espelha `patientAcceptInviteSchema` da API. Unico caminho de nascimento de
+ * conta de paciente (D-135/ADR-0015) — por isso exige o mesmo aceite de
+ * termos (D-025) que antes vinha do autocadastro removido.
+ */
 export const acceptInviteInputSchema = z.object({
   token: z.string().min(1, 'Convite invalido.'),
   password: registerPassword,
   name: registerName,
   document: cpf,
+  acceptedTerms: acceptedTermsInput,
 });
 export type AcceptInviteInput = z.infer<typeof acceptInviteInputSchema>;
 

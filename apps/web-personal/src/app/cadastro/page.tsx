@@ -1,68 +1,17 @@
 'use client';
 
-import { Button, Card, Checkbox, Field, Input, Logo, Radio, Tabs } from '@fitvo/ui-web';
+import { Button, Card, Field, Input, Logo, Radio } from '@fitvo/ui-web';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
+import { TermsFields } from '@/components/terms-fields';
 import { ThemeToggle } from '@/components/theme-toggle';
-import {
-  type RegisterPatientInput,
-  registerPatientInputSchema,
-  type RegisterProfessionalInput,
-  registerProfessionalInputSchema,
-} from '@/lib/auth';
+import { type RegisterProfessionalInput, registerProfessionalInputSchema } from '@/lib/auth';
 import { zodResolver } from '@/lib/zod-resolver';
 
-type Role = 'professional' | 'patient';
-
-const roleTabs = [
-  { value: 'professional', label: 'Sou profissional' },
-  { value: 'patient', label: 'Sou paciente' },
-] as const;
-
 const acceptedTermsDefaults = { termsOfUse: false, privacyPolicy: false };
-
-function TermsFields({
-  errors,
-  register,
-}: {
-  readonly errors: {
-    readonly termsOfUse?: { message?: string } | undefined;
-    readonly privacyPolicy?: { message?: string } | undefined;
-  };
-  readonly register: (name: 'acceptedTerms.termsOfUse' | 'acceptedTerms.privacyPolicy') => object;
-}): ReactNode {
-  return (
-    <div className="flex flex-col gap-2">
-      <Checkbox {...(register('acceptedTerms.termsOfUse') as object)}>
-        Li e aceito os{' '}
-        <Link href="/termos" className="underline">
-          Termos de Uso
-        </Link>
-        .
-      </Checkbox>
-      {errors.termsOfUse?.message ? (
-        <p role="alert" className="text-caption text-danger-700 dark:text-danger-400">
-          {errors.termsOfUse.message}
-        </p>
-      ) : null}
-      <Checkbox {...(register('acceptedTerms.privacyPolicy') as object)}>
-        Li e aceito a{' '}
-        <Link href="/privacidade" className="underline">
-          Politica de Privacidade
-        </Link>
-        .
-      </Checkbox>
-      {errors.privacyPolicy?.message ? (
-        <p role="alert" className="text-caption text-danger-700 dark:text-danger-400">
-          {errors.privacyPolicy.message}
-        </p>
-      ) : null}
-    </div>
-  );
-}
 
 function ProfessionalForm(): ReactNode {
   const router = useRouter();
@@ -162,86 +111,7 @@ function ProfessionalForm(): ReactNode {
   );
 }
 
-function PatientForm(): ReactNode {
-  const router = useRouter();
-  const [formError, setFormError] = useState<string | null>(null);
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<RegisterPatientInput>({
-    resolver: zodResolver(registerPatientInputSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-      name: '',
-      document: '',
-      acceptedTerms: acceptedTermsDefaults,
-    },
-  });
-
-  const onSubmit = handleSubmit(async (values) => {
-    setFormError(null);
-    const res = await fetch('/api/auth/register/patient', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(values),
-    });
-    if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      setFormError(data.error ?? 'Nao foi possivel criar a conta.');
-      return;
-    }
-    router.replace('/painel');
-    router.refresh();
-  });
-
-  return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-      <Field label="Nome completo" error={errors.name?.message}>
-        <Input autoComplete="name" placeholder="Seu nome" {...register('name')} />
-      </Field>
-      <Field label="E-mail" error={errors.email?.message}>
-        <Input
-          type="email"
-          autoComplete="email"
-          placeholder="voce@exemplo.com"
-          {...register('email')}
-        />
-      </Field>
-      <Field label="Senha" error={errors.password?.message}>
-        <Input
-          type="password"
-          autoComplete="new-password"
-          placeholder="Minimo 8 caracteres"
-          {...register('password')}
-        />
-      </Field>
-      <Field label="CPF" error={errors.document?.message}>
-        <Input placeholder="Somente numeros" {...register('document')} />
-      </Field>
-      <TermsFields
-        errors={{
-          termsOfUse: errors.acceptedTerms?.termsOfUse,
-          privacyPolicy: errors.acceptedTerms?.privacyPolicy,
-        }}
-        register={(name) => register(name)}
-      />
-      {formError ? (
-        <p role="alert" className="text-caption text-danger-700 dark:text-danger-400">
-          {formError}
-        </p>
-      ) : null}
-      <Button type="submit" loading={isSubmitting} className="mt-2 w-full">
-        Criar conta
-      </Button>
-    </form>
-  );
-}
-
 export default function CadastroPage(): ReactNode {
-  const [role, setRole] = useState<Role>('professional');
-
   return (
     <main className="relative flex min-h-screen items-center justify-center p-6">
       <div className="absolute right-4 top-4">
@@ -252,13 +122,7 @@ export default function CadastroPage(): ReactNode {
           <Logo size={36} />
           <p className="text-small text-fg-muted">Crie sua conta na FITVO</p>
         </div>
-        <Tabs
-          items={roleTabs}
-          value={role}
-          onValueChange={(value) => setRole(value as Role)}
-          aria-label="Tipo de cadastro"
-        />
-        {role === 'professional' ? <ProfessionalForm /> : <PatientForm />}
+        <ProfessionalForm />
         <p className="text-center text-caption text-fg-subtle">
           Ja tem conta?{' '}
           <Link href="/login" className="underline">

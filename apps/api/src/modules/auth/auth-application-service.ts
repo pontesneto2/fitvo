@@ -45,15 +45,6 @@ export interface RegisterProfessionalInput {
   termsAcceptance: TermsAcceptanceOrigin;
 }
 
-export interface RegisterPatientInput {
-  email: string;
-  password: string;
-  name: string;
-  document: string;
-  /** Ver `RegisterProfessionalInput.termsAcceptance` (D-025). */
-  termsAcceptance: TermsAcceptanceOrigin;
-}
-
 /** TTLs dos tokens de uso unico enviados por e-mail (segundos). */
 export interface AuthTtlConfig {
   emailVerificationTtlSeconds: number;
@@ -85,19 +76,6 @@ export class AuthApplicationService {
       document: input.document,
       documentType: input.documentType,
       tenantName: input.tenantName,
-      termsAcceptance: input.termsAcceptance,
-    });
-    return this.completeRegistration(account);
-  }
-
-  async registerPatient(input: RegisterPatientInput): Promise<AuthResult> {
-    await this.ensureEmailIsFree(input.email);
-    const passwordHash = await this.hasher.hash(input.password);
-    const account = await this.accounts.createPatient({
-      email: input.email,
-      passwordHash,
-      name: input.name,
-      document: input.document,
       termsAcceptance: input.termsAcceptance,
     });
     return this.completeRegistration(account);

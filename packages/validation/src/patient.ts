@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { acceptedTerms } from './auth';
+
 /**
  * Contrato de paciente/vínculo (D-006/D-052/D-032) — fonte única. Nomes
  * prefixados com `patient` (barrel flat; colidiria com clinic). O service já
@@ -36,6 +38,12 @@ export const patientAcceptInviteSchema = z.object({
   password: z.string().min(8).describe('Senha em claro (mín. 8).'),
   name: z.string().min(1),
   document: z.string().min(11).max(14).describe('CPF do paciente (D-043).'),
+  /**
+   * Aceite dos termos (D-025). Unico caminho de nascimento de conta de
+   * paciente (D-135 — ADR-0015): sem o autocadastro, o aceite de convite
+   * precisa capturar o consentimento inicial que antes vinha do cadastro.
+   */
+  acceptedTerms,
 });
 
 // ---- Response ----

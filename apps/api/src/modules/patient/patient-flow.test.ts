@@ -66,6 +66,7 @@ function accept(app: FastifyInstance, token: string) {
       password: 'senha-forte-456',
       name: 'Novo Paciente',
       document: '98765432100',
+      acceptedTerms: { termsOfUse: true, privacyPolicy: true },
     },
   });
 }

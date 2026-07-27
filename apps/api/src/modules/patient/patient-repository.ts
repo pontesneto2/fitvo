@@ -1,5 +1,7 @@
 import type { BondStatus, CareModality, InviteStatus } from '@fitvo/database';
 
+import type { RequestOrigin } from '../terms/terms-repository';
+
 /** Projecao do convite profissional->paciente usada pela slice (D-006). */
 export interface PatientInviteRecord {
   id: string;
@@ -151,7 +153,14 @@ export interface PatientRepository {
    * PENDING + nao expirado, cria a conta+perfil de paciente (se o e-mail e novo)
    * OU anexa/reusa o perfil de paciente da conta existente, abre o vinculo (tripla
    * unica — conflito se ja existe) e marca o convite ACCEPTED — tudo numa
-   * transacao (guard updateMany PENDING->ACCEPTED, race-safe).
+   * transacao (guard updateMany PENDING->ACCEPTED, race-safe). Quando uma conta
+   * NOVA e criada, grava tambem o aceite inicial dos termos (D-025 — unico
+   * caminho de nascimento de conta de paciente, D-135/ADR-0015) na MESMA
+   * transacao; contas existentes ja aceitaram no seu proprio cadastro.
    */
-  acceptInvite(tokenHash: string, account: NewPatientAccount): Promise<AcceptPatientInviteOutcome>;
+  acceptInvite(
+    tokenHash: string,
+    account: NewPatientAccount,
+    origin: RequestOrigin,
+  ): Promise<AcceptPatientInviteOutcome>;
 }

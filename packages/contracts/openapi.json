@@ -177,146 +177,6 @@
         }
       }
     },
-    "/v1/auth/register/patient": {
-      "post": {
-        "summary": "Cadastra um paciente (conta em estado minimo)",
-        "tags": [
-          "auth"
-        ],
-        "description": "Autocadastro de paciente (D-006); dispara a verificacao de e-mail.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
-                    "description": "E-mail de login (único) — D-042."
-                  },
-                  "password": {
-                    "type": "string",
-                    "minLength": 8,
-                    "description": "Senha em claro (mín. 8)."
-                  },
-                  "name": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "document": {
-                    "type": "string",
-                    "minLength": 11,
-                    "maxLength": 14,
-                    "description": "CPF (D-043)."
-                  },
-                  "acceptedTerms": {
-                    "type": "object",
-                    "properties": {
-                      "termsOfUse": {
-                        "type": "boolean",
-                        "enum": [
-                          true
-                        ],
-                        "description": "Aceite explícito dos Termos de Uso."
-                      },
-                      "privacyPolicy": {
-                        "type": "boolean",
-                        "enum": [
-                          true
-                        ],
-                        "description": "Aceite explícito da Política de Privacidade."
-                      }
-                    },
-                    "required": [
-                      "termsOfUse",
-                      "privacyPolicy"
-                    ],
-                    "description": "Aceite dos termos no cadastro (D-025) — ambos obrigatoriamente `true`."
-                  }
-                },
-                "required": [
-                  "email",
-                  "password",
-                  "name",
-                  "document",
-                  "acceptedTerms"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "account": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "email": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "email",
-                        "name"
-                      ],
-                      "additionalProperties": false
-                    },
-                    "tokens": {
-                      "type": "object",
-                      "properties": {
-                        "accessToken": {
-                          "type": "string"
-                        },
-                        "refreshToken": {
-                          "type": "string"
-                        },
-                        "accessExpiresAt": {
-                          "type": "string",
-                          "format": "date-time",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                        },
-                        "refreshExpiresAt": {
-                          "type": "string",
-                          "format": "date-time",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                        }
-                      },
-                      "required": [
-                        "accessToken",
-                        "refreshToken",
-                        "accessExpiresAt",
-                        "refreshExpiresAt"
-                      ],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": [
-                    "account",
-                    "tokens"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/auth/login": {
       "post": {
         "summary": "Autentica por e-mail e senha (rate limited)",
@@ -1766,13 +1626,38 @@
                     "minLength": 11,
                     "maxLength": 14,
                     "description": "CPF do paciente (D-043)."
+                  },
+                  "acceptedTerms": {
+                    "type": "object",
+                    "properties": {
+                      "termsOfUse": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ],
+                        "description": "Aceite explícito dos Termos de Uso."
+                      },
+                      "privacyPolicy": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ],
+                        "description": "Aceite explícito da Política de Privacidade."
+                      }
+                    },
+                    "required": [
+                      "termsOfUse",
+                      "privacyPolicy"
+                    ],
+                    "description": "Aceite dos termos no cadastro (D-025) — ambos obrigatoriamente `true`."
                   }
                 },
                 "required": [
                   "token",
                   "password",
                   "name",
-                  "document"
+                  "document",
+                  "acceptedTerms"
                 ]
               }
             }

@@ -6,14 +6,18 @@ import { useSearchParams } from 'next/navigation';
 import { type ReactNode, Suspense, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
+import { TermsFields } from '@/components/terms-fields';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { type AcceptInviteInput, acceptInviteInputSchema } from '@/lib/auth';
 import { zodResolver } from '@/lib/zod-resolver';
 
+const acceptedTermsDefaults = { termsOfUse: false, privacyPolicy: false };
+
 /**
  * Aceite de convite de paciente (publico, por token — D-006/D-052/D-055). O
- * token vem da URL (link enviado pelo profissional); sem aceite de termos
- * aqui (fora do escopo atual do contrato — ver roadmap.md).
+ * token vem da URL (link enviado pelo profissional). Unico caminho de
+ * nascimento de conta de paciente (D-135/ADR-0015): por isso coleta o mesmo
+ * aceite de termos (D-025) que antes vinha do autocadastro removido.
  */
 export default function AceitarConvitePage(): ReactNode {
   return (
@@ -34,7 +38,13 @@ function AceitarConviteForm(): ReactNode {
     formState: { errors, isSubmitting },
   } = useForm<AcceptInviteInput>({
     resolver: zodResolver(acceptInviteInputSchema),
-    defaultValues: { token, password: '', name: '', document: '' },
+    defaultValues: {
+      token,
+      password: '',
+      name: '',
+      document: '',
+      acceptedTerms: acceptedTermsDefaults,
+    },
   });
 
   const onSubmit = handleSubmit(async (values) => {
@@ -92,6 +102,13 @@ function AceitarConviteForm(): ReactNode {
                 {...register('password')}
               />
             </Field>
+            <TermsFields
+              errors={{
+                termsOfUse: errors.acceptedTerms?.termsOfUse,
+                privacyPolicy: errors.acceptedTerms?.privacyPolicy,
+              }}
+              register={(name) => register(name)}
+            />
             {formError ? (
               <p role="alert" className="text-caption text-danger-700 dark:text-danger-400">
                 {formError}

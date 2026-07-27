@@ -1,5 +1,9 @@
 import type { BondStatus, CareModality, InviteStatus } from '@fitvo/database';
 
+import type { InMemoryAccountRepository } from '../auth/in-memory-account-repository';
+import type { InMemoryTermsRepository } from '../terms/in-memory-terms-repository';
+import { recordInitialTermsAcceptanceInMemory } from '../terms/initial-terms-acceptance';
+import type { RequestOrigin } from '../terms/terms-repository';
 import type {
   AcceptPatientInviteOutcome,
   BondRecord,
@@ -77,6 +81,19 @@ export class InMemoryPatientRepository implements PatientRepository {
   private readonly professionalSpecialties = new Set<string>();
   private readonly specialties = new Set<string>();
   private sequence = 0;
+
+  /**
+   * `terms` e `accounts` sao OPCIONAIS — so necessarios nos testes que
+   * exercitam o aceite inicial dos termos (D-025) e/ou precisam que a conta
+   * criada pelo aceite de convite (D-135/ADR-0015) seja visivel para
+   * login/verificacao de e-mail (slice `auth`). Em producao as duas escrevem
+   * na MESMA tabela `account`; nos doubles in-memory isso exige repassar a
+   * mesma instancia de `InMemoryAccountRepository` usada no harness de teste.
+   */
+  constructor(
+    private readonly terms?: InMemoryTermsRepository,
+    private readonly accounts?: InMemoryAccountRepository,
+  ) {}
 
   // --- Seed helpers (testes/dev; fora da interface de producao) ---
 
@@ -249,17 +266,21 @@ export class InMemoryPatientRepository implements PatientRepository {
     return Promise.resolve(true);
   }
 
-  acceptInvite(tokenHash: string, account: NewPatientAccount): Promise<AcceptPatientInviteOutcome> {
+  async acceptInvite(
+    tokenHash: string,
+    account: NewPatientAccount,
+    origin: RequestOrigin,
+  ): Promise<AcceptPatientInviteOutcome> {
     const invite = this.findByTokenHash(tokenHash);
     if (!invite || invite.status !== 'PENDING' || invite.expiresAt.getTime() <= Date.now()) {
-      return Promise.resolve({ status: 'invalid' });
+      return { status: 'invalid' };
     }
 
     const existingId = this.accountIdByEmail.get(invite.email);
     const existing = existingId ? this.accountsById.get(existingId) : undefined;
 
     if (existing?.patientProfileId && this.bondExists(existing.patientProfileId, invite)) {
-      return Promise.resolve({ status: 'bond-conflict' });
+      return { status: 'bond-conflict' };
     }
 
     invite.status = 'ACCEPTED';
@@ -269,8 +290,15 @@ export class InMemoryPatientRepository implements PatientRepository {
     let created: boolean;
 
     if (!existing) {
+      // Se `accounts` foi injetado, a conta nasce LA (mesma tabela unica que o
+      // Prisma usa em producao) — assim login/verificacao de e-mail (slice
+      // `auth`) enxergam esta conta nos testes. Sem `accounts` (harness que nao
+      // precisa disso), mantem o id local de sempre.
+      const seeded = this.accounts
+        ? await this.accounts.seedAccount(invite.email, account.passwordHash, account.name)
+        : null;
       const stored: StoredAccount = {
-        id: this.nextId('acc'),
+        id: seeded?.id ?? this.nextId('acc'),
         email: invite.email,
         name: account.name,
         patientProfileId: this.nextId('patp'),
@@ -280,6 +308,11 @@ export class InMemoryPatientRepository implements PatientRepository {
       accountId = stored.id;
       patientProfileId = stored.patientProfileId!;
       created = true;
+      // Unico caminho de nascimento de conta de paciente (D-135/ADR-0015): ver
+      // `PrismaPatientRepository.acceptInvite` (mesma regra, D-025).
+      if (this.terms) {
+        await recordInitialTermsAcceptanceInMemory(this.terms, accountId, origin);
+      }
     } else if (existing.patientProfileId) {
       accountId = existing.id;
       patientProfileId = existing.patientProfileId;

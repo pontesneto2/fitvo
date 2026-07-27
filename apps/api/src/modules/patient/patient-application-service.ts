@@ -20,6 +20,7 @@ import {
   NotFoundError,
 } from '../../shared/http-errors';
 import { generateInviteToken, hashInviteToken } from '../clinic/invite-token';
+import type { RequestOrigin } from '../terms/terms-repository';
 import type { BondRecord, PatientInviteRecord, PatientRepository } from './patient-repository';
 
 /** Projecao do convite de paciente exposta na API (datas em ISO UTC — D-067). */
@@ -66,6 +67,12 @@ export interface AcceptPatientInviteInput {
   password: string;
   name: string;
   document: string;
+  /**
+   * Origem da requisicao (IP/UA, capturada na rota — nunca informada pelo
+   * cliente), necessaria para gravar o aceite inicial dos termos (D-025)
+   * quando o aceite cria uma conta NOVA (D-135/ADR-0015).
+   */
+  origin: RequestOrigin;
 }
 
 export interface AcceptPatientInviteResult {
@@ -251,15 +258,17 @@ export class PatientApplicationService {
    * Paciente aceita o convite pelo token (endpoint publico — o token de uso unico
    * e a propria autorizacao). Cria a conta+perfil de paciente (se novo) OU
    * anexa/reusa o perfil na conta existente (multi-papel — D-041), e abre o
-   * vinculo na especialidade do convite.
+   * vinculo na especialidade do convite. Unico caminho de nascimento de conta
+   * de paciente (D-135/ADR-0015) — por isso, quando a conta e nova, o aceite
+   * inicial dos termos (D-025) e gravado junto, na mesma transacao.
    */
   async acceptInvite(input: AcceptPatientInviteInput): Promise<AcceptPatientInviteResult> {
     const passwordHash = await this.hasher.hash(input.password);
-    const outcome = await this.patients.acceptInvite(hashInviteToken(input.token), {
-      passwordHash,
-      name: input.name,
-      document: input.document,
-    });
+    const outcome = await this.patients.acceptInvite(
+      hashInviteToken(input.token),
+      { passwordHash, name: input.name, document: input.document },
+      input.origin,
+    );
     if (outcome.status === 'invalid') {
       throw new InvalidInviteTokenError();
     }

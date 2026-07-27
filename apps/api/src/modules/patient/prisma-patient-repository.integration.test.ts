@@ -17,6 +17,7 @@ import { PrismaPatientRepository } from './prisma-patient-repository';
 
 const prisma = new PrismaClient();
 const repo = new PrismaPatientRepository(prisma);
+const ORIGIN = { ipAddress: '127.0.0.1', userAgent: 'vitest-integration' };
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -60,11 +61,11 @@ describe('PrismaPatientRepository — mapeamento contra Postgres real', () => {
     });
     expect(invite.modality).toBe('PRESENCIAL');
 
-    const outcome = await repo.acceptInvite(tokenHash, {
-      passwordHash: 'y',
-      name: 'Paciente',
-      document: '1',
-    });
+    const outcome = await repo.acceptInvite(
+      tokenHash,
+      { passwordHash: 'y', name: 'Paciente', document: '1' },
+      ORIGIN,
+    );
     expect(outcome.status).toBe('accepted');
     if (outcome.status !== 'accepted') return;
 
@@ -89,11 +90,11 @@ describe('PrismaPatientRepository — mapeamento contra Postgres real', () => {
       tokenHash,
       expiresAt: new Date(Date.now() + 60_000),
     });
-    const outcome = await repo.acceptInvite(tokenHash, {
-      passwordHash: 'y',
-      name: 'Paciente Online',
-      document: '2',
-    });
+    const outcome = await repo.acceptInvite(
+      tokenHash,
+      { passwordHash: 'y', name: 'Paciente Online', document: '2' },
+      ORIGIN,
+    );
     expect(outcome.status).toBe('accepted');
     if (outcome.status !== 'accepted') return;
 
@@ -113,7 +114,11 @@ describe('PrismaPatientRepository — mapeamento contra Postgres real', () => {
       tokenHash,
       expiresAt: new Date(Date.now() + 60_000),
     });
-    await repo.acceptInvite(tokenHash, { passwordHash: 'y', name: 'Pac Ov', document: '3' });
+    await repo.acceptInvite(
+      tokenHash,
+      { passwordHash: 'y', name: 'Pac Ov', document: '3' },
+      ORIGIN,
+    );
 
     // INVITE_PROJECTION / a projecao de bonds sao `select` explicitos: um campo
     // esquecido ali some silenciosamente da API sem quebrar tipo nenhum.

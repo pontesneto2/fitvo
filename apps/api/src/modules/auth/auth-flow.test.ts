@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildTestApp } from '../../testing/build-test-app';
+import { buildTestApp, buildTestHarness } from '../../testing/build-test-app';
+import { createPatientViaInvite } from '../../testing/patient-invite-fixture';
 
 const acceptedTerms = { termsOfUse: true, privacyPolicy: true } as const;
 
@@ -54,20 +55,15 @@ describe('fluxo de autenticacao (E2E via inject)', () => {
   });
 
   it('rejeita login com senha errada com 401 RFC 7807', async () => {
-    const app = await buildTestApp();
-    await app.inject({
-      method: 'POST',
-      url: '/v1/auth/register/patient',
-      payload: {
-        email: 'ana@fitvo.dev',
-        password: 'senha-forte-123',
-        name: 'Ana',
-        document: '12345678901',
-        acceptedTerms,
-      },
+    const harness = await buildTestHarness();
+    await createPatientViaInvite(harness, {
+      email: 'ana@fitvo.dev',
+      password: 'senha-forte-123',
+      name: 'Ana',
+      document: '12345678901',
     });
 
-    const bad = await app.inject({
+    const bad = await harness.app.inject({
       method: 'POST',
       url: '/v1/auth/login',
       payload: { email: 'ana@fitvo.dev', password: 'errada' },
@@ -76,7 +72,7 @@ describe('fluxo de autenticacao (E2E via inject)', () => {
     expect(bad.headers['content-type']).toContain('application/problem+json');
     expect(bad.json().title).toBe('Credenciais invalidas');
 
-    await app.close();
+    await harness.app.close();
   });
 
   it('rejeita corpo invalido com 400 e lista de erros', async () => {

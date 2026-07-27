@@ -40,3 +40,65 @@ export const loginInputSchema = z.object({
 });
 
 export type LoginInput = z.infer<typeof loginInputSchema>;
+
+/**
+ * Espelha `acceptedTerms` de `registerProfessionalSchema`/`registerPatientSchema`
+ * (D-025 — LGPD). Cada campo exige o literal `true`: uma caixa desmarcada vira
+ * `false` no form state, o Zod rejeita e a UI mostra o erro — nunca chega a
+ * criar a conta sem os dois aceites.
+ */
+const acceptedTermsInput = z.object({
+  termsOfUse: z.boolean().refine((v) => v, { message: 'E preciso aceitar os Termos de Uso.' }),
+  privacyPolicy: z
+    .boolean()
+    .refine((v) => v, { message: 'E preciso aceitar a Politica de Privacidade.' }),
+});
+
+const registerEmail = z.string().email('Informe um e-mail valido.');
+const registerPassword = z.string().min(8, 'A senha precisa ter no minimo 8 caracteres.');
+const registerName = z.string().min(1, 'Informe o nome completo.');
+const cpf = z.string().min(11, 'Informe um CPF valido.').max(14, 'Informe um CPF valido.');
+
+/** Espelha `registerProfessionalSchema` da API. */
+export const registerProfessionalInputSchema = z.object({
+  email: registerEmail,
+  password: registerPassword,
+  name: registerName,
+  documentType: z.enum(['CPF', 'CNPJ'], { message: 'Selecione o tipo de documento.' }),
+  document: z.string().min(11, 'Informe um CPF ou CNPJ valido.').max(18, 'Documento invalido.'),
+  tenantName: z.string().min(1, 'Informe o nome do consultorio/clinica.'),
+  acceptedTerms: acceptedTermsInput,
+});
+export type RegisterProfessionalInput = z.infer<typeof registerProfessionalInputSchema>;
+
+/** Espelha `registerPatientSchema` da API. */
+export const registerPatientInputSchema = z.object({
+  email: registerEmail,
+  password: registerPassword,
+  name: registerName,
+  document: cpf,
+  acceptedTerms: acceptedTermsInput,
+});
+export type RegisterPatientInput = z.infer<typeof registerPatientInputSchema>;
+
+/** Espelha `patientAcceptInviteSchema` da API — sem aceite de termos (D-025 nao
+ * cobre ainda contas criadas por convite; divida registrada no roadmap). */
+export const acceptInviteInputSchema = z.object({
+  token: z.string().min(1, 'Convite invalido.'),
+  password: registerPassword,
+  name: registerName,
+  document: cpf,
+});
+export type AcceptInviteInput = z.infer<typeof acceptInviteInputSchema>;
+
+/** Espelha `patientAcceptInviteResultSchema` — sem tokens (a conta e criada,
+ * mas o login e feito a parte). */
+export interface AcceptInviteResult {
+  readonly patient: {
+    readonly accountId: string;
+    readonly tenantId: string;
+    readonly patientProfileId: string;
+  };
+  readonly bond: { readonly id: string; readonly specialtyId: string };
+  readonly created: boolean;
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, Field, Input, Logo } from '@fitvo/ui-web';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -73,6 +74,12 @@ export default function LoginPage(): ReactNode {
             Entrar
           </Button>
         </form>
+        <p className="text-center text-caption text-fg-subtle">
+          Ainda nao tem conta?{' '}
+          <Link href="/cadastro" className="underline">
+            Criar conta
+          </Link>
+        </p>
       </Card>
     </main>
   );

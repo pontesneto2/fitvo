@@ -110,7 +110,11 @@ export function buildTestDependencies(): TestDependencies {
   );
   const queue = new InMemoryQueueFactory();
   const bondEvents = queue.createQueue<BondCreatedEvent>(SHARING_QUEUE);
-  const patient = new InMemoryPatientRepository();
+  // Recebe `terms` para gravar o aceite inicial dos termos (D-025) e
+  // `accounts` para que a conta criada no aceite de convite (D-135/ADR-0015)
+  // seja visivel para login/verificacao de e-mail (mesma tabela `account`
+  // unica que o Prisma usa em producao) — ver doc no construtor.
+  const patient = new InMemoryPatientRepository(terms, accounts);
   const patientService = new PatientApplicationService(
     patient,
     hasher,

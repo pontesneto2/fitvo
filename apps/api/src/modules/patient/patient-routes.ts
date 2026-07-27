@@ -22,6 +22,22 @@ const TAGS = ['patient'];
 const bearerAuth = [{ bearerAuth: [] }];
 
 /**
+ * Origem da requisicao do aceite de convite (D-025) — IP/UA vem SEMPRE da
+ * requisicao, nunca do corpo enviado pelo cliente (mesmo padrao de
+ * `registrationOrigin` em `auth-routes.ts`).
+ */
+function inviteAcceptOrigin(request: {
+  ip: string;
+  headers: Record<string, string | string[] | undefined>;
+}): { ipAddress: string; userAgent: string } {
+  const userAgent = request.headers['user-agent'];
+  return {
+    ipAddress: request.ip,
+    userAgent: (Array.isArray(userAgent) ? userAgent[0] : userAgent) ?? 'unknown',
+  };
+}
+
+/**
  * Vertical slice de paciente/vinculo (D-006/D-052/D-053/D-055; versao na URL /v1
  * — D-034). Convite profissional->paciente por especialidade: criar, visao
  * operacional (pendentes + vinculos ativos), reenviar (D-055), revogar e
@@ -173,7 +189,15 @@ export function patientRoutes(service: PatientApplicationService): FastifyPlugin
         config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
       },
       async (request, reply) => {
-        return reply.code(201).send(await service.acceptInvite(request.body));
+        return reply.code(201).send(
+          await service.acceptInvite({
+            token: request.body.token,
+            password: request.body.password,
+            name: request.body.name,
+            document: request.body.document,
+            origin: inviteAcceptOrigin(request),
+          }),
+        );
       },
     );
   };

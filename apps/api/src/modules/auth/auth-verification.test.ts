@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildTestHarness } from '../../testing/build-test-app';
+import { createPatientViaInvite } from '../../testing/patient-invite-fixture';
 
 const acceptedTerms = { termsOfUse: true, privacyPolicy: true } as const;
 
@@ -67,8 +68,9 @@ describe('verificacao de e-mail (E2E via inject)', () => {
   });
 
   it('reenvia a verificacao (202) e o novo token verifica a conta', async () => {
-    const { app, emails } = await buildTestHarness();
-    await app.inject({ method: 'POST', url: '/v1/auth/register/patient', payload: patient });
+    const harness = await buildTestHarness();
+    const { app, emails } = harness;
+    await createPatientViaInvite(harness, patient);
 
     const sentOnRegister = emails.sent.length;
     const resend = await app.inject({
@@ -152,8 +154,9 @@ describe('verificacao de e-mail (E2E via inject)', () => {
   });
 
   it('bloqueia reenvio de verificacao alem do rate limit (429)', async () => {
-    const { app } = await buildTestHarness();
-    await app.inject({ method: 'POST', url: '/v1/auth/register/patient', payload: patient });
+    const harness = await buildTestHarness();
+    const { app } = harness;
+    await createPatientViaInvite(harness, patient);
 
     const resend = () =>
       app.inject({

@@ -83,14 +83,19 @@ describe('aceite de termos no cadastro (D-025)', () => {
     await harness.app.close();
   });
 
-  it('aceitar so um dos dois documentos (o outro ausente) ainda falha com 400', async () => {
+  it('aceitar so um dos dois documentos (o outro ausente) ainda falha com 400 no aceite de convite', async () => {
     const harness = await buildTestHarness();
 
+    // Validacao de schema roda ANTES do handler (Zod, fastify-type-provider-zod):
+    // nem precisa de um convite real para provar a rejeicao — o token nem chega
+    // a ser resolvido. Unico caminho de nascimento de conta de paciente
+    // (D-135/ADR-0015): o mesmo gate de acceptedTerms (D-025) do cadastro agora
+    // vive em `patientAcceptInviteSchema`.
     const response = await harness.app.inject({
       method: 'POST',
-      url: '/v1/auth/register/patient',
+      url: '/v1/patients/invites/accept',
       payload: {
-        email: 'paciente-terms@fitvo.dev',
+        token: 'token-nao-importa-falha-antes-de-resolver',
         password: 'senha-forte-123',
         name: 'Paciente',
         document: '12345678901',
@@ -98,7 +103,28 @@ describe('aceite de termos no cadastro (D-025)', () => {
       },
     });
     expect(response.statusCode).toBe(400);
-    expect(await harness.accounts.findByEmail('paciente-terms@fitvo.dev')).toBeNull();
+
+    await harness.app.close();
+  });
+
+  it('omitir acceptedTerms inteiramente tambem falha com 400 no aceite de convite (trava a obrigatoriedade)', async () => {
+    const harness = await buildTestHarness();
+
+    // Diferente do teste acima (parcial-presente): aqui o campo nao existe no
+    // payload. Prova que `acceptedTerms` e OBRIGATORIO no schema — se um
+    // refactor futuro o tornar opcional, so este teste (nao o de aceite
+    // parcial) quebra para acusar a regressao.
+    const response = await harness.app.inject({
+      method: 'POST',
+      url: '/v1/patients/invites/accept',
+      payload: {
+        token: 'token-nao-importa-falha-antes-de-resolver',
+        password: 'senha-forte-123',
+        name: 'Paciente',
+        document: '12345678901',
+      },
+    });
+    expect(response.statusCode).toBe(400);
 
     await harness.app.close();
   });

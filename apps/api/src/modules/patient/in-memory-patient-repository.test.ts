@@ -15,6 +15,8 @@ const NEW_ACCOUNT: NewPatientAccount = {
   document: '12345678901',
 };
 
+const ORIGIN = { ipAddress: '127.0.0.1', userAgent: 'vitest' };
+
 function arrangeProfessional(repo: InMemoryPatientRepository): string {
   return repo.seedProfessional({
     accountId: 'acc_pro',
@@ -91,8 +93,12 @@ describe('InMemoryPatientRepository', () => {
     expect(updated?.expiresAt).toEqual(newExpires);
 
     // Token antigo ja nao aceita; o novo sim.
-    expect((await repo.acceptInvite(hashInviteToken('velho'), NEW_ACCOUNT)).status).toBe('invalid');
-    expect((await repo.acceptInvite(hashInviteToken('novo'), NEW_ACCOUNT)).status).toBe('accepted');
+    expect((await repo.acceptInvite(hashInviteToken('velho'), NEW_ACCOUNT, ORIGIN)).status).toBe(
+      'invalid',
+    );
+    expect((await repo.acceptInvite(hashInviteToken('novo'), NEW_ACCOUNT, ORIGIN)).status).toBe(
+      'accepted',
+    );
   });
 
   it('aceita uma unica vez e abre um vinculo ativo (segundo aceite invalido)', async () => {
@@ -100,9 +106,9 @@ describe('InMemoryPatientRepository', () => {
     const proId = arrangeProfessional(repo);
     await repo.createInvite(inviteFor(proId, 'novo@fitvo.dev', hashInviteToken('t2')));
 
-    const first = await repo.acceptInvite(hashInviteToken('t2'), NEW_ACCOUNT);
+    const first = await repo.acceptInvite(hashInviteToken('t2'), NEW_ACCOUNT, ORIGIN);
     expect(first.status).toBe('accepted');
-    const second = await repo.acceptInvite(hashInviteToken('t2'), NEW_ACCOUNT);
+    const second = await repo.acceptInvite(hashInviteToken('t2'), NEW_ACCOUNT, ORIGIN);
     expect(second.status).toBe('invalid');
 
     const bonds = await repo.listActiveBonds(TENANT, proId);
@@ -114,7 +120,9 @@ describe('InMemoryPatientRepository', () => {
     const repo = new InMemoryPatientRepository();
     const proId = arrangeProfessional(repo);
     await repo.createInvite(inviteFor(proId, 'exp@fitvo.dev', hashInviteToken('t3'), -1_000));
-    expect((await repo.acceptInvite(hashInviteToken('t3'), NEW_ACCOUNT)).status).toBe('invalid');
+    expect((await repo.acceptInvite(hashInviteToken('t3'), NEW_ACCOUNT, ORIGIN)).status).toBe(
+      'invalid',
+    );
   });
 
   it('anexa perfil a conta existente sem perfil (multi-papel) e conflita se a tripla ja tem vinculo', async () => {
@@ -123,12 +131,12 @@ describe('InMemoryPatientRepository', () => {
     repo.seedPatientAccount({ email: 'multi@fitvo.dev', name: 'Multi Papel' });
 
     await repo.createInvite(inviteFor(proId, 'multi@fitvo.dev', hashInviteToken('t4')));
-    const attach = await repo.acceptInvite(hashInviteToken('t4'), NEW_ACCOUNT);
+    const attach = await repo.acceptInvite(hashInviteToken('t4'), NEW_ACCOUNT, ORIGIN);
     expect(attach).toMatchObject({ status: 'accepted', created: false });
 
     // Novo convite a mesma tripla: agora ja existe vinculo -> conflito.
     await repo.createInvite(inviteFor(proId, 'multi@fitvo.dev', hashInviteToken('t5')));
-    expect((await repo.acceptInvite(hashInviteToken('t5'), NEW_ACCOUNT)).status).toBe(
+    expect((await repo.acceptInvite(hashInviteToken('t5'), NEW_ACCOUNT, ORIGIN)).status).toBe(
       'bond-conflict',
     );
   });
@@ -137,7 +145,7 @@ describe('InMemoryPatientRepository', () => {
     const repo = new InMemoryPatientRepository();
     const proId = arrangeProfessional(repo);
     await repo.createInvite(inviteFor(proId, 'arq@fitvo.dev', hashInviteToken('t6')));
-    const accepted = await repo.acceptInvite(hashInviteToken('t6'), NEW_ACCOUNT);
+    const accepted = await repo.acceptInvite(hashInviteToken('t6'), NEW_ACCOUNT, ORIGIN);
     const bondId = accepted.status === 'accepted' ? accepted.bondId : '';
 
     // Escopo errado nao arquiva.

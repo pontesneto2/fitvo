@@ -9,7 +9,6 @@ import {
   meResultSchema,
   refreshResultSchema,
   refreshSchema,
-  registerPatientSchema,
   registerProfessionalSchema,
   requestEmailVerificationSchema,
   resetPasswordSchema,
@@ -64,9 +63,11 @@ function registrationOrigin(request: {
 }
 
 /**
- * Vertical slice de autenticacao (D-034: versao na URL /v1). Registro por papel
- * (D-045/D-006), login (rate limited — D-029), refresh (rotacao), logout,
- * verificacao de e-mail, recuperacao de senha e conta atual (/me).
+ * Vertical slice de autenticacao (D-034: versao na URL /v1). Cadastro de
+ * profissional (D-045; paciente nao se autocadastra — D-135/ADR-0015, nasce
+ * so pelo aceite de convite na slice `patient`), login (rate limited —
+ * D-029), refresh (rotacao), logout, verificacao de e-mail, recuperacao de
+ * senha e conta atual (/me).
  *
  * D-032: os schemas Zod de `@fitvo/validation` são a FONTE ÚNICA — validam o
  * request E geram o OpenAPI (via `fastify-type-provider-zod`). O validador e o
@@ -95,29 +96,6 @@ export function authRoutes(service: AuthApplicationService): FastifyPluginAsync 
         return reply.code(201).send(
           toAuthResultDto(
             await service.registerProfessional({
-              ...request.body,
-              termsAcceptance: registrationOrigin(request),
-            }),
-          ),
-        );
-      },
-    );
-
-    app.post(
-      '/register/patient',
-      {
-        schema: {
-          tags: TAGS,
-          summary: 'Cadastra um paciente (conta em estado minimo)',
-          description: 'Autocadastro de paciente (D-006); dispara a verificacao de e-mail.',
-          body: registerPatientSchema,
-          response: { 201: authResultSchema },
-        },
-      },
-      async (request, reply) => {
-        return reply.code(201).send(
-          toAuthResultDto(
-            await service.registerPatient({
               ...request.body,
               termsAcceptance: registrationOrigin(request),
             }),

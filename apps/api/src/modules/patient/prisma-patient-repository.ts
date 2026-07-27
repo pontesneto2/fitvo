@@ -1,6 +1,8 @@
 import type { PrismaClient } from '@fitvo/database';
 import { prisma as defaultPrisma } from '@fitvo/database';
 
+import { recordInitialTermsAcceptance } from '../terms/initial-terms-acceptance';
+import type { RequestOrigin } from '../terms/terms-repository';
 import type {
   AcceptPatientInviteOutcome,
   BondRecord,
@@ -164,7 +166,11 @@ export class PrismaPatientRepository implements PatientRepository {
     return result.count > 0;
   }
 
-  acceptInvite(tokenHash: string, account: NewPatientAccount): Promise<AcceptPatientInviteOutcome> {
+  acceptInvite(
+    tokenHash: string,
+    account: NewPatientAccount,
+    origin: RequestOrigin,
+  ): Promise<AcceptPatientInviteOutcome> {
     return this.db.$transaction(async (tx) => {
       const invite = await tx.patientInvite.findUnique({
         where: { tokenHash },
@@ -234,6 +240,11 @@ export class PrismaPatientRepository implements PatientRepository {
         accountId = createdAccount.id;
         patientProfileId = createdAccount.patientProfile!.id;
         created = true;
+        // Unico caminho de nascimento de conta de paciente (D-135/ADR-0015):
+        // o aceite de convite precisa gravar o consentimento inicial (D-025)
+        // que antes vinha do autocadastro removido. Contas existentes (outros
+        // dois ramos abaixo) ja aceitaram termos no seu proprio cadastro.
+        await recordInitialTermsAcceptance(tx, accountId, origin);
       } else if (existing.patientProfile) {
         accountId = existing.id;
         patientProfileId = existing.patientProfile.id;

@@ -1,16 +1,11 @@
-import type { TermsDocumentSlug } from '@fitvo/database';
-
 import type { InMemoryTermsRepository } from '../terms/in-memory-terms-repository';
+import { recordInitialTermsAcceptanceInMemory } from '../terms/initial-terms-acceptance';
 import type {
   AccountRecord,
   AccountRepository,
-  CreatePatientInput,
   CreateProfessionalInput,
   TermsAcceptanceOrigin,
 } from './account-repository';
-
-/** Documentos com aceite obrigatorio no cadastro (D-025) — espelha o Prisma. */
-const REQUIRED_TERMS_DOCUMENTS: TermsDocumentSlug[] = ['TERMS_OF_USE', 'PRIVACY_POLICY'];
 
 /**
  * Implementacao em memoria para testes e desenvolvimento local. Recebe
@@ -41,10 +36,16 @@ export class InMemoryAccountRepository implements AccountRepository {
     return account;
   }
 
-  async createPatient(input: CreatePatientInput): Promise<AccountRecord> {
-    const account = await this.insert(input.email, input.passwordHash, input.name);
-    await this.recordInitialTermsAcceptance(account.id, input.termsAcceptance);
-    return account;
+  /**
+   * Seed de teste (fora da interface `AccountRepository` de producao): registra
+   * uma conta criada por OUTRO modulo — o aceite de convite de paciente
+   * (`InMemoryPatientRepository`, D-135/ADR-0015). Espelha a unica tabela
+   * `account` do Postgres: em producao os dois caminhos escrevem na mesma
+   * tabela; nos doubles in-memory (Maps separados por modulo), sem isto o
+   * login/verificacao de e-mail (slice `auth`) nunca enxergariam a conta.
+   */
+  seedAccount(email: string, passwordHash: string, name: string): Promise<AccountRecord> {
+    return this.insert(email, passwordHash, name);
   }
 
   markEmailVerified(id: string): Promise<void> {
@@ -63,7 +64,7 @@ export class InMemoryAccountRepository implements AccountRepository {
     return Promise.resolve();
   }
 
-  /** Ver `PrismaAccountRepository.recordInitialTermsAcceptance` (mesma regra). */
+  /** Ver `recordInitialTermsAcceptance` (`../terms/initial-terms-acceptance`, mesma regra). */
   private async recordInitialTermsAcceptance(
     accountId: string,
     origin: TermsAcceptanceOrigin,
@@ -71,20 +72,7 @@ export class InMemoryAccountRepository implements AccountRepository {
     if (!this.terms) {
       return;
     }
-    for (const slug of REQUIRED_TERMS_DOCUMENTS) {
-      const currentVersion = await this.terms.findCurrentVersion(slug);
-      if (!currentVersion) {
-        throw new Error(
-          `Nenhuma versao publicada para o documento de termos ${slug} — catalogo nao semeado.`,
-        );
-      }
-      await this.terms.recordAcceptance({
-        accountId,
-        termsVersionId: currentVersion.id,
-        ipAddress: origin.ipAddress,
-        userAgent: origin.userAgent,
-      });
-    }
+    await recordInitialTermsAcceptanceInMemory(this.terms, accountId, origin);
   }
 
   private insert(email: string, passwordHash: string, name: string): Promise<AccountRecord> {

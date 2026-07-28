@@ -307,7 +307,10 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
 - **⚠️ LACUNA DE CONFORMIDADE — profissional não-verificado PODE atender.** O
   guard de vínculo exige a especialidade **reivindicada** (`ProfessionalSpecialty`
   — D-046), mas **NÃO** exige `verificationStatus === VERIFIED`. É `TODO(D-010)`
-  explícito em [`patient-application-service.ts:286`](../apps/api/src/modules/patient/patient-application-service.ts#L286).
+  explícito em [`patient-application-service.ts:322`](../apps/api/src/modules/patient/patient-application-service.ts#L322)
+  (mesma regra citada em `packages/database/prisma/schema.prisma:374` e
+  `packages/validation/src/auth.ts:59` — "obrigatório preencher" ≠ "verificado",
+  reforçada no cadastro do profissional autônomo — D-137/D-138, ADR-0015).
   O **D-051** ("o profissional não atende até ser verificado") está **decidido, não
   implementado** — depende do fluxo de verificação, deferido desde a Fase 2. Fica
   **visível aqui**, não escondido num TODO: num produto de saúde com repositório
@@ -316,6 +319,35 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
   (item deferido). A Fase 0 de medicina (D-130) **modela** `councilState`/`rqe`
   nuláveis de propósito por causa disto: a coluna não impõe verificação; o guard é
   que imporá, quando existir.
+- **Notificações reais ainda são stub (D-027).** `packages/notifications/src/notification-dispatcher.ts:52-54`
+  registra os três canais (push/e-mail/SMS) sobre o `logging` adapter — nenhum FCM,
+  provedor de e-mail ou SMS real plugado. `in-app-notification-store.ts:31` ainda
+  não persiste em Prisma (guarda em memória) — `TODO(D-027): impl. Prisma (tabela
+  Notification) quando a migração for coordenada`. `logging-notification-sender.ts:10`
+  documenta a troca por adaptadores reais quando houver credenciais. **Decisão já
+  tomada (D-027/ADR-0005), implementação deferida** — depende de credenciais dos
+  provedores (fora do controle do código) e de coordenar a migração do modelo
+  `Notification` que o ADR-0005 já descreveu (ver `docs/adr/0010-fluxo-aluno-gates-atendimento.md:243`).
+  Efeito hoje: nenhuma notificação sai de fato do sistema — tudo vira log.
+- **Entrega via adapter de notificações ainda não conectada (D-028).** Três call
+  sites aguardam o mesmo adapter: `apps/worker/src/index.ts:73`,
+  `apps/worker/src/sharing/overlap-detection-service.ts:54` e
+  `apps/worker/src/billing/collection-ruler-service.ts:56` — todos com
+  `TODO(D-028): deliver via notifications adapter`. Mesma dependência do item
+  anterior (D-027): o adapter real não existe ainda, então o worker calcula a
+  notificação (motor de compartilhamento, cobrança) mas não a entrega de verdade.
+  Decidido, não implementado — mesmo bloqueio (credenciais de provedor).
+- **Campos clínicos `detail Json?` — decisão de produto ainda aberta (D-063).**
+  Diferente da nutrição (**D-063 FECHADO** ali — ver ADR-0013), os domínios de
+  atendimento/prontuário/receita/avaliação ainda guardam conteúdo fino num `Json?`
+  genérico, de propósito ("não inventar"): `packages/database/prisma/schema.prisma:1770`
+  (`Encounter`, "conteúdo clínico por fase"), `:1792` (`MedicalRecord`, "entradas
+  do prontuário por fase"), `:1811` (`Prescription`, "conteúdo da receita por
+  fase") e `:2234` (`Assessment`, "campos por especialidade"). Comentário-guia em
+  `:873`. Fechar
+  cada um depende de ADR próprio por domínio (mesmo processo que já fechou
+  nutrição) — não modelar sem ADR, ver seção "Gaps do domínio de medicina" acima
+  para o que já está desenhado vs. pendente.
 - **Hardening de segurança/estabilidade da API (D-033)** — diagnóstico interno
   contra a promessa "API privada e segura, padrão de sistema grande". Um item era
   vazamento ativo (token de auth em log) e **já foi corrigido — PR #63**. Os

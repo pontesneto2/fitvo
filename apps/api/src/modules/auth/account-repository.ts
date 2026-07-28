@@ -1,4 +1,4 @@
-import type { BrazilianState, DocumentType, Gender } from '@fitvo/database';
+import type { BrazilianState, DocumentType, Gender, MedicalSpecialty } from '@fitvo/database';
 
 /** Projecao minima da conta usada pela autenticacao. */
 export interface AccountRecord {
@@ -84,6 +84,47 @@ export interface CreateProfessionalInput {
 }
 
 /**
+ * Perfil profissional do admin QUE TAMBÉM ATENDE (spec §2 — "Você é?" =
+ * MANAGER_PROVIDER). Ausente = gestor-puro (só membership CLINIC_ADMIN, sem
+ * ProfessionalProfile). `specialtyId` já resolvido do `specialtyCode` pelo
+ * service; `medicalSpecialty` só quando Médico (regra do Zod).
+ */
+export interface ClinicProviderInput {
+  specialtyId: string;
+  councilDocument: string;
+  councilState: BrazilianState;
+  medicalSpecialty?: MedicalSpecialty | undefined;
+}
+
+/**
+ * Cadastro público de CLÍNICA (spec §4.2 · D-139). Empresa (só CNPJ) +
+ * admin (pessoa física, CPF). `tradeName` → `tenant.name` (exibição);
+ * `legalName` → `tenant.legalName` (razão social/fiscal).
+ */
+export interface CreateClinicInput {
+  legalName: string;
+  tradeName: string;
+  cnpj: string;
+  companyEmail: string;
+  companyPhone: string;
+  address: AddressInput;
+  admin: {
+    email: string;
+    passwordHash: string;
+    name: string;
+    socialName?: string | undefined;
+    gender?: Gender | undefined;
+    /** CPF do admin (pessoa física) — normalizado só dígitos, DV validado no Zod. */
+    document: string;
+    whatsapp: string;
+    birthDate: Date;
+  };
+  /** Presente sse o admin marcou "também atende" (MANAGER_PROVIDER). */
+  professional?: ClinicProviderInput | undefined;
+  termsAcceptance: TermsAcceptanceOrigin;
+}
+
+/**
  * Porta de persistencia da identidade (Repository Pattern). O dominio depende
  * desta interface; a infra fornece a implementacao Prisma (ou in-memory nos testes).
  */
@@ -97,6 +138,13 @@ export interface AccountRepository {
    * Tenant sobrevivem (mesma garantia atomica do aceite de convite).
    */
   createProfessional(input: CreateProfessionalInput): Promise<AccountRecord>;
+  /**
+   * Cadastro público de clínica (D-139): cria Tenant(CLINIC) + Account(admin) +
+   * membership CLINIC_ADMIN (+ ProfessionalProfile/ProfessionalSpecialty se
+   * "também atende") + os 2 eventos ACCEPTED de termos, tudo na MESMA
+   * transação. Falha em qualquer etapa → nada órfão.
+   */
+  createClinic(input: CreateClinicInput): Promise<AccountRecord>;
   /** Marca o e-mail como verificado (idempotente) — D-029. */
   markEmailVerified(id: string): Promise<void>;
   /** Atualiza o hash da senha (recuperacao/troca) — D-029. */

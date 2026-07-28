@@ -344,6 +344,368 @@
         }
       }
     },
+    "/v1/auth/register/clinic": {
+      "post": {
+        "summary": "Cadastra uma clínica (cria tenant CLINIC + admin)",
+        "tags": [
+          "auth"
+        ],
+        "description": "Cadastro público de clínica (D-139): cria Tenant(CLINIC) + Account(admin) + membership CLINIC_ADMIN (+ perfil profissional se \"também atende\") e dispara a verificacao de e-mail.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "legalName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Razão social — dado fiscal (tenant.legalName)."
+                  },
+                  "tradeName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Nome fantasia — vira tenant.name (nome de exibição)."
+                  },
+                  "cnpj": {
+                    "type": "string",
+                    "pattern": "^\\d+$",
+                    "description": "CNPJ da empresa — só dígitos + DV real (spec §2)."
+                  },
+                  "companyEmail": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+                    "description": "E-mail da empresa."
+                  },
+                  "companyPhone": {
+                    "type": "string",
+                    "pattern": "^\\d{10,11}$",
+                    "description": "Telefone/WhatsApp da empresa — 10 ou 11 dígitos, só números."
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "cep": {
+                        "type": "string",
+                        "pattern": "^\\d{8}$",
+                        "description": "CEP — 8 dígitos, só números (máscara é UI)."
+                      },
+                      "logradouro": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "numero": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "complemento": {
+                        "type": "string"
+                      },
+                      "bairro": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "cidade": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "AC",
+                          "AL",
+                          "AM",
+                          "AP",
+                          "BA",
+                          "CE",
+                          "DF",
+                          "ES",
+                          "GO",
+                          "MA",
+                          "MG",
+                          "MS",
+                          "MT",
+                          "PA",
+                          "PB",
+                          "PE",
+                          "PI",
+                          "PR",
+                          "RJ",
+                          "RN",
+                          "RO",
+                          "RR",
+                          "RS",
+                          "SC",
+                          "SE",
+                          "SP",
+                          "TO"
+                        ],
+                        "description": "UF do endereço."
+                      },
+                      "country": {
+                        "default": "BR",
+                        "description": "País do endereço (default BR).",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "cep",
+                      "logradouro",
+                      "numero",
+                      "bairro",
+                      "cidade",
+                      "state"
+                    ],
+                    "description": "Endereço do estabelecimento (da empresa, não pessoal)."
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "MANAGER_ONLY",
+                      "MANAGER_PROVIDER"
+                    ],
+                    "description": "\"Você é?\" — só gestor (MANAGER_ONLY) ou gestor que também atende (MANAGER_PROVIDER)."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Nome civil do admin."
+                  },
+                  "socialName": {
+                    "description": "Nome social (exibido no lugar do civil quando preenchido) — spec §3.1.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "document": {
+                    "type": "string",
+                    "pattern": "^\\d+$",
+                    "description": "CPF do admin (pessoa física) — só dígitos + DV real."
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+                    "description": "E-mail de login do admin (único)."
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "allOf": [
+                      {
+                        "type": "string",
+                        "pattern": "[A-Za-z]"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\d"
+                      }
+                    ],
+                    "description": "Senha em claro — mín. 8, ao menos 1 letra e 1 número."
+                  },
+                  "whatsapp": {
+                    "type": "string",
+                    "pattern": "^\\d{11}$",
+                    "description": "WhatsApp — 11 dígitos (DDD + celular), só números (máscara é UI)."
+                  },
+                  "birthDate": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                    "description": "Data de nascimento (YYYY-MM-DD) — maioridade obrigatória (D-044)."
+                  },
+                  "gender": {
+                    "description": "Gênero/identidade do admin — opcional (spec §3.1).",
+                    "type": "string",
+                    "enum": [
+                      "MULHER_CIS",
+                      "HOMEM_CIS",
+                      "MULHER_TRANS",
+                      "HOMEM_TRANS",
+                      "NAO_BINARIO",
+                      "OUTRO",
+                      "PREFIRO_NAO_INFORMAR"
+                    ]
+                  },
+                  "specialtyCode": {
+                    "description": "Profissão de quem atende — obrigatória sse \"também atende\".",
+                    "type": "string",
+                    "enum": [
+                      "TRAINING",
+                      "NUTRITION",
+                      "MEDICINE",
+                      "PERSONAL_TRAINER"
+                    ]
+                  },
+                  "councilDocument": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20,
+                    "pattern": "^[A-Za-z0-9/-]+$",
+                    "description": "Registro no conselho (CREF/CRN/CRM) — validado so em formato (D-138)."
+                  },
+                  "councilState": {
+                    "description": "UF do conselho — obrigatória sse \"também atende\".",
+                    "type": "string",
+                    "enum": [
+                      "AC",
+                      "AL",
+                      "AM",
+                      "AP",
+                      "BA",
+                      "CE",
+                      "DF",
+                      "ES",
+                      "GO",
+                      "MA",
+                      "MG",
+                      "MS",
+                      "MT",
+                      "PA",
+                      "PB",
+                      "PE",
+                      "PI",
+                      "PR",
+                      "RJ",
+                      "RN",
+                      "RO",
+                      "RR",
+                      "RS",
+                      "SC",
+                      "SE",
+                      "SP",
+                      "TO"
+                    ]
+                  },
+                  "medicalSpecialty": {
+                    "description": "Especialidade médica — obrigatória sse Médico que também atende.",
+                    "type": "string",
+                    "enum": [
+                      "NUTROLOGIA",
+                      "ENDOCRINOLOGIA"
+                    ]
+                  },
+                  "acceptedTerms": {
+                    "type": "object",
+                    "properties": {
+                      "termsOfUse": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ],
+                        "description": "Aceite explícito dos Termos de Uso."
+                      },
+                      "privacyPolicy": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ],
+                        "description": "Aceite explícito da Política de Privacidade."
+                      }
+                    },
+                    "required": [
+                      "termsOfUse",
+                      "privacyPolicy"
+                    ],
+                    "description": "Aceite dos termos no cadastro (D-025) — ambos obrigatoriamente `true`."
+                  }
+                },
+                "required": [
+                  "legalName",
+                  "tradeName",
+                  "cnpj",
+                  "companyEmail",
+                  "companyPhone",
+                  "address",
+                  "role",
+                  "name",
+                  "document",
+                  "email",
+                  "password",
+                  "whatsapp",
+                  "birthDate",
+                  "acceptedTerms"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Nome civil — uso fiscal/documento; NÃO exibir quando há nome social."
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "description": "Nome de exibição (socialName ?? name) — spec §3.1."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name",
+                        "displayName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "tokens": {
+                      "type": "object",
+                      "properties": {
+                        "accessToken": {
+                          "type": "string"
+                        },
+                        "refreshToken": {
+                          "type": "string"
+                        },
+                        "accessExpiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        "refreshExpiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        }
+                      },
+                      "required": [
+                        "accessToken",
+                        "refreshToken",
+                        "accessExpiresAt",
+                        "refreshExpiresAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "account",
+                    "tokens"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/auth/login": {
       "post": {
         "summary": "Autentica por e-mail e senha (rate limited)",

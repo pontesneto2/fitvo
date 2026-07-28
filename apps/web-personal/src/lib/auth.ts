@@ -193,6 +193,97 @@ export const registerProfessionalFormSchema = z
 export type RegisterProfessionalFormInput = z.infer<typeof registerProfessionalFormSchema>;
 
 /**
+ * Schema do FORMULÁRIO de cadastro de CLÍNICA (spec §4.2 · D-139). Valida os
+ * valores MASCARADOS do RHF; a normalização para o fio é no `onSubmit`. Inclui
+ * `confirmPassword` (só UI). O contrato real do servidor é o
+ * `registerClinicSchema` de `@fitvo/validation` (usado pelo BFF) — este é a
+ * camada de UX, com mensagens pt-BR e máscara. Empresa é SÓ CNPJ; admin é PF
+ * (CPF); conselho é condicional ao "Você é?".
+ */
+export const registerClinicFormSchema = z
+  .object({
+    // Empresa
+    legalName: z.string().trim().min(1, 'Informe a razao social.'),
+    tradeName: z.string().trim().min(1, 'Informe o nome fantasia.'),
+    cnpj: z
+      .string()
+      .refine((v) => onlyDigits(v).length === 14, { message: 'Informe um CNPJ valido.' }),
+    companyEmail: z.string().email('Informe um e-mail valido.'),
+    companyPhone: z.string().refine((v) => [10, 11].includes(onlyDigits(v).length), {
+      message: 'Informe um telefone valido.',
+    }),
+    address: addressFormSchema,
+    // Admin (pessoa física)
+    role: z.enum(['MANAGER_ONLY', 'MANAGER_PROVIDER'], { message: 'Selecione uma opcao.' }),
+    name: registerName,
+    socialName: z.string().trim().optional(),
+    document: z.string().min(1, 'Informe o CPF.'),
+    email: registerEmail,
+    password: strongRegisterPassword,
+    confirmPassword: z.string().min(1, 'Confirme a senha.'),
+    whatsapp: z
+      .string()
+      .refine((v) => onlyDigits(v).length === 11, { message: 'Informe um WhatsApp valido.' }),
+    birthDate: z
+      .string()
+      .refine(isAtLeastEighteen, { message: 'Voce precisa ter 18 anos ou mais.' }),
+    gender: z.string().optional(),
+    // Condicional (só quando "também atende")
+    specialtyCode: z.string().optional(),
+    councilDocument: z.string().optional(),
+    councilState: z.string().optional(),
+    medicalSpecialty: z.string().optional(),
+    acceptedTerms: acceptedTermsInput,
+  })
+  .superRefine((data, ctx) => {
+    if (!isValidCnpj(onlyDigits(data.cnpj))) {
+      ctx.addIssue({ code: 'custom', path: ['cnpj'], message: 'CNPJ invalido.' });
+    }
+    if (!isValidCpf(onlyDigits(data.document))) {
+      ctx.addIssue({ code: 'custom', path: ['document'], message: 'CPF invalido.' });
+    }
+    if (data.password !== data.confirmPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['confirmPassword'],
+        message: 'As senhas nao coincidem.',
+      });
+    }
+    // Conselho condicional ao "Você é?" — os campos ficam ocultos em gestor-puro,
+    // então só validamos presença quando "também atende".
+    if (data.role === 'MANAGER_PROVIDER') {
+      if (!data.specialtyCode) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['specialtyCode'],
+          message: 'Selecione a profissao.',
+        });
+      }
+      if (!data.councilDocument) {
+        ctx.addIssue({ code: 'custom', path: ['councilDocument'], message: 'Informe o conselho.' });
+      }
+      if (!data.councilState) {
+        ctx.addIssue({ code: 'custom', path: ['councilState'], message: 'Informe a UF.' });
+      }
+      if (data.specialtyCode === 'MEDICINE' && !data.medicalSpecialty) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['medicalSpecialty'],
+          message: 'Selecione a especialidade medica.',
+        });
+      }
+      if (data.specialtyCode && data.specialtyCode !== 'MEDICINE' && data.medicalSpecialty) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['medicalSpecialty'],
+          message: 'Especialidade medica so para Medico.',
+        });
+      }
+    }
+  });
+export type RegisterClinicFormInput = z.infer<typeof registerClinicFormSchema>;
+
+/**
  * Espelha `patientAcceptInviteSchema` da API. Unico caminho de nascimento de
  * conta de paciente (D-135/ADR-0015) — por isso exige o mesmo aceite de
  * termos (D-025) que antes vinha do autocadastro removido.

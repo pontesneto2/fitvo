@@ -9,6 +9,7 @@ import {
   meResultSchema,
   refreshResultSchema,
   refreshSchema,
+  registerClinicSchema,
   registerProfessionalSchema,
   requestEmailVerificationSchema,
   resetPasswordSchema,
@@ -101,6 +102,29 @@ export function authRoutes(service: AuthApplicationService): FastifyPluginAsync 
             }),
           ),
         );
+      },
+    );
+
+    app.post(
+      '/register/clinic',
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'Cadastra uma clínica (cria tenant CLINIC + admin)',
+          description:
+            'Cadastro público de clínica (D-139): cria Tenant(CLINIC) + Account(admin) + membership CLINIC_ADMIN (+ perfil profissional se "também atende") e dispara a verificacao de e-mail.',
+          body: registerClinicSchema,
+          response: { 201: authResultSchema },
+        },
+      },
+      async (request, reply) => {
+        return reply
+          .code(201)
+          .send(
+            toAuthResultDto(
+              await service.registerClinic(request.body, registrationOrigin(request)),
+            ),
+          );
       },
     );
 

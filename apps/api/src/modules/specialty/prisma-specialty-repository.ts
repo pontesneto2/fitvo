@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@fitvo/database';
+import type { PrismaClient, SpecialtyCode } from '@fitvo/database';
 import { prisma as defaultPrisma } from '@fitvo/database';
 
 import type { SpecialtyRecord, SpecialtyRepository } from './specialty-repository';
@@ -22,5 +22,13 @@ export class PrismaSpecialtyRepository implements SpecialtyRepository {
       select: { id: true },
     });
     return specialty !== null;
+  }
+
+  async idByCode(code: SpecialtyCode): Promise<string | null> {
+    const specialty = await this.db.specialty.findUnique({
+      where: { code },
+      select: { id: true },
+    });
+    return specialty?.id ?? null;
   }
 }

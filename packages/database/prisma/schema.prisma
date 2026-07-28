@@ -290,7 +290,11 @@ model PlatformAdmin {
 model Tenant {
   id           String        @id @default(cuid())
   type         TenantType
-  name         String
+  name         String // nome de EXIBICAO: SOLO herda o nome da pessoa; CLINIC/ACADEMIA = nome fantasia
+  /// Razao social (dado formal/fiscal) da empresa — CLINIC/ACADEMIA. Nulavel: o
+  /// SOLO nao tem razao social (a exibicao ja vive em `name`); coluna aditiva
+  /// (spec §4.2). `name` = nome fantasia (exibicao), `legalName` = razao social.
+  legalName    String?
   document     String? // CNPJ da CLINICA mora aqui (D-043); solo herda o da conta
   documentType DocumentType?
 

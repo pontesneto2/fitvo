@@ -7,7 +7,8 @@ import type {
   PasswordHasher,
   VerificationTokenStore,
 } from '@fitvo/auth';
-import type { BrazilianState, DocumentType, Gender } from '@fitvo/database';
+import type { BrazilianState, DocumentType, Gender, SpecialtyCode } from '@fitvo/database';
+import type { RegisterClinicInput } from '@fitvo/validation';
 
 import {
   EmailAlreadyInUseError,
@@ -20,6 +21,7 @@ import {
   type AccountRecord,
   type AccountRepository,
   type AddressInput,
+  type ClinicProviderInput,
   deriveDisplayName,
   type TermsAcceptanceOrigin,
 } from './account-repository';
@@ -33,6 +35,8 @@ import {
  */
 export interface SpecialtyLookup {
   exists(specialtyId: string): Promise<boolean>;
+  /** Resolve o id a partir do SpecialtyCode (cadastro de clínica "também atende"). */
+  idByCode(code: SpecialtyCode): Promise<string | null>;
 }
 
 export interface AuthResult {
@@ -125,6 +129,63 @@ export class AuthApplicationService {
       councilDocument: input.councilDocument,
       councilState: input.councilState,
       termsAcceptance: input.termsAcceptance,
+    });
+    return this.completeRegistration(account);
+  }
+
+  /**
+   * Cadastro público de CLÍNICA (D-139): nasce Tenant(CLINIC) + Account(admin) +
+   * membership CLINIC_ADMIN (+ perfil profissional se "também atende"), tudo na
+   * mesma transação do repositório. Reusa a mesma máquina do autônomo (hash,
+   * verificação de e-mail, sessão, displayName). O `.superRefine` do Zod já
+   * garantiu conselho condicional e DV; aqui só resolvemos code→id e persistimos.
+   */
+  async registerClinic(
+    input: RegisterClinicInput,
+    origin: TermsAcceptanceOrigin,
+  ): Promise<AuthResult> {
+    await this.ensureEmailIsFree(input.email);
+
+    let professional: ClinicProviderInput | undefined;
+    if (input.role === 'MANAGER_PROVIDER') {
+      const { specialtyCode, councilDocument, councilState, medicalSpecialty } = input;
+      // Narrowing: o Zod já garante os três presentes quando MANAGER_PROVIDER
+      // (registerClinicSchema.superRefine) — este guard é só para o compilador.
+      if (
+        specialtyCode === undefined ||
+        councilDocument === undefined ||
+        councilState === undefined
+      ) {
+        throw new NotFoundError('Dados de atuação do gestor ausentes.');
+      }
+      const specialtyId = await this.specialties.idByCode(specialtyCode);
+      if (specialtyId === null) {
+        throw new NotFoundError('Especialidade não encontrada no catálogo.');
+      }
+      professional = { specialtyId, councilDocument, councilState, medicalSpecialty };
+    }
+
+    const passwordHash = await this.hasher.hash(input.password);
+    const account = await this.accounts.createClinic({
+      legalName: input.legalName,
+      tradeName: input.tradeName,
+      cnpj: input.cnpj,
+      companyEmail: input.companyEmail,
+      companyPhone: input.companyPhone,
+      address: input.address,
+      admin: {
+        email: input.email,
+        passwordHash,
+        name: input.name,
+        socialName: input.socialName,
+        gender: input.gender,
+        document: input.document,
+        whatsapp: input.whatsapp,
+        // `YYYY-MM-DD` → Date (UTC midnight) para o boundary Prisma (@db.Date).
+        birthDate: new Date(`${input.birthDate}T00:00:00Z`),
+      },
+      professional,
+      termsAcceptance: origin,
     });
     return this.completeRegistration(account);
   }

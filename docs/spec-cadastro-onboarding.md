@@ -7,6 +7,7 @@
 Fonte única de campos, ordem, obrigatoriedade, máscaras e regras de entrada. Agentes leem daqui; divergência do código = bug a corrigir contra esta spec.
 
 **v2 muda em relação à v1:** papel gestor/atende condicional no cadastro de empresa; RT derivado de profissional com conselho (não do admin); fluxo de paciente menor de idade com autorização de responsável; sexo biológico + gênero + nome social separados.
+**v2.1 (correção):** enum de sexo biológico alinhado ao schema Prisma real (`MALE/FEMALE/INTERSEX`, não português — a divergência foi detectada no #105); sexo biológico confirmado **completo no aceite do paciente** (MVP), não deferido para anamnese.
 
 ---
 
@@ -67,7 +68,7 @@ Regra ampla e segura: o gestor-puro nunca precisa de conselho; quem atende sempr
 
 Área sensível (LGPD) — modelar com cuidado, **três campos distintos**:
 
-- **Sexo biológico** (`biologicalSex`): enum `MASCULINO` / `FEMININO` / `INTERSEXO`. **Obrigatório para paciente** (variável fisiológica — base de cálculo metabólico/dosagem/faixas de referência em nutri e medicina). Não capturado para profissional (não se calcula nada dele).
+- **Sexo biológico** (`biologicalSex`): enum `MALE` / `FEMALE` / `INTERSEX` (valores em inglês, alinhados ao schema Prisma já existente — **não** usar rótulos em português no enum; a tradução pt-BR é só de UI). **Obrigatório para paciente, capturado no aceite do convite** (completo no MVP, não deferido para anamnese) — variável fisiológica, base de cálculo metabólico/dosagem/faixas de referência em nutri e medicina. Não capturado para profissional (não se calcula nada dele).
 - **Gênero / identidade** (`gender`): enum inclusivo — `MULHER_CIS`, `HOMEM_CIS`, `MULHER_TRANS`, `HOMEM_TRANS`, `NAO_BINARIO`, `OUTRO`, `PREFIRO_NAO_INFORMAR`. **Opcional, todos os forms.**
 - **Nome social** (`socialName`): texto livre, **opcional, em TODOS os forms** (Decreto 8.727/2016). **Regra de exibição:** quando preenchido, o app exibe o nome social no lugar do nome civil em toda a interface; nome civil fica restrito a documento/fiscal.
 
@@ -169,7 +170,7 @@ Fase A + B **sem** profissão/conselho/especialidade. Não atende; acesso admini
 | CPF | ● | **exatamente 11** · DV real |
 | WhatsApp | ● | — |
 | Data de nascimento | ● | base de cálculo clínico; **gatilha fluxo de menor (§4.7)** |
-| Sexo biológico | ● | §3.1 (cálculo clínico) |
+| Sexo biológico | ● | §3.1 · enum MALE/FEMALE/INTERSEX · **completo no aceite (MVP), não vai pra anamnese** |
 | Gênero | ○ | §3.1 |
 | Endereço completo | ● | CEP puxa · residencial |
 | Aceite Termos + Política | ● | gravado no aceite (D-135, #97) |

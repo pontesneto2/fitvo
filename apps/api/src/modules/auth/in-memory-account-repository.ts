@@ -5,6 +5,7 @@ import { recordInitialTermsAcceptanceInMemory } from '../terms/initial-terms-acc
 import type {
   AccountRecord,
   AccountRepository,
+  CreateClinicInput,
   CreateProfessionalInput,
   TermsAcceptanceOrigin,
 } from './account-repository';
@@ -57,6 +58,27 @@ export class InMemoryAccountRepository implements AccountRepository {
       councilState: input.councilState,
       verificationStatus: 'PENDING',
     });
+    await this.recordInitialTermsAcceptance(account.id, input.termsAcceptance);
+    return account;
+  }
+
+  async createClinic(input: CreateClinicInput): Promise<AccountRecord> {
+    const account = await this.insert(
+      input.admin.email,
+      input.admin.passwordHash,
+      input.admin.name,
+      input.admin.socialName ?? null,
+    );
+    // "Também atende" (MANAGER_PROVIDER): registra a ProfessionalSpecialty do
+    // admin — espelha a criação atômica da Prisma; gestor-puro não gera nenhuma.
+    if (input.professional) {
+      this.professionalSpecialtiesByAccountId.set(account.id, {
+        specialtyId: input.professional.specialtyId,
+        councilDocument: input.professional.councilDocument,
+        councilState: input.professional.councilState,
+        verificationStatus: 'PENDING',
+      });
+    }
     await this.recordInitialTermsAcceptance(account.id, input.termsAcceptance);
     return account;
   }

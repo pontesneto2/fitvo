@@ -1,3 +1,5 @@
+import type { SpecialtyCode } from '@fitvo/database';
+
 import type { SpecialtyRecord, SpecialtyRepository } from './specialty-repository';
 
 /**
@@ -30,5 +32,10 @@ export class InMemorySpecialtyRepository implements SpecialtyRepository {
 
   exists(specialtyId: string): Promise<boolean> {
     return Promise.resolve(this.bySpecialtyId.has(specialtyId));
+  }
+
+  idByCode(code: SpecialtyCode): Promise<string | null> {
+    const match = [...this.bySpecialtyId.values()].find((s) => s.code === code);
+    return Promise.resolve(match?.id ?? null);
   }
 }

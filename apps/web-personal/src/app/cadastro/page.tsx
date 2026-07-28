@@ -9,30 +9,26 @@ import { Controller, useForm } from 'react-hook-form';
 import { PasswordStrengthMeter } from '@/components/password-strength-meter';
 import { TermsFields } from '@/components/terms-fields';
 import { ThemeToggle } from '@/components/theme-toggle';
-import {
-  BRAZILIAN_STATES,
-  type RegisterProfessionalFormInput,
-  registerProfessionalFormSchema,
-} from '@/lib/auth';
+import { type RegisterProfessionalFormInput, registerProfessionalFormSchema } from '@/lib/auth';
 import { brDateToIso, maskCep, maskDateBr, maskDocument, maskPhone, onlyDigits } from '@/lib/masks';
 import { COUNCIL_LABEL_BY_SPECIALTY_CODE, type Specialty } from '@/lib/specialty';
 import { fetchAddressByCep } from '@/lib/via-cep';
 import { zodResolver } from '@/lib/zod-resolver';
 
+import { ClinicForm } from './clinic-form';
+import { BRAZILIAN_STATE_OPTIONS, GENDER_OPTIONS } from './options';
+
 const acceptedTermsDefaults = { termsOfUse: false, privacyPolicy: false };
 
-const BRAZILIAN_STATE_OPTIONS = BRAZILIAN_STATES.map((uf) => ({ value: uf, label: uf }));
-
-/** Gênero (spec §3.1) — labels legíveis em pt-BR mapeados aos valores do enum. */
-const GENDER_OPTIONS = [
-  { value: 'MULHER_CIS', label: 'Mulher cis' },
-  { value: 'HOMEM_CIS', label: 'Homem cis' },
-  { value: 'MULHER_TRANS', label: 'Mulher trans' },
-  { value: 'HOMEM_TRANS', label: 'Homem trans' },
-  { value: 'NAO_BINARIO', label: 'Não-binário' },
-  { value: 'OUTRO', label: 'Outro' },
-  { value: 'PREFIRO_NAO_INFORMAR', label: 'Prefiro não informar' },
-];
+/**
+ * Caminhos de autocadastro (spec §1). Academia entra num slice próprio; o
+ * seletor já é extensível — basta acrescentar um item aqui e o form respectivo.
+ */
+const CADASTRO_MODES = [
+  { value: 'professional', label: 'Sou profissional autônomo' },
+  { value: 'clinic', label: 'Sou clínica' },
+] as const;
+type CadastroMode = (typeof CADASTRO_MODES)[number]['value'];
 
 /** Carrega o catalogo fixo de especialidades (D-047) para o select do cadastro. */
 function useSpecialties(): { specialties: Specialty[]; loadError: boolean } {
@@ -60,8 +56,7 @@ function useSpecialties(): { specialties: Specialty[]; loadError: boolean } {
   return { specialties, loadError };
 }
 
-function ProfessionalForm(): ReactNode {
-  const router = useRouter();
+function ProfessionalForm({ onSuccess }: { onSuccess: () => void }): ReactNode {
   const [formError, setFormError] = useState<string | null>(null);
   const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notFound'>('idle');
   const { specialties, loadError } = useSpecialties();
@@ -164,8 +159,7 @@ function ProfessionalForm(): ReactNode {
       setFormError(data.error ?? 'Nao foi possivel criar a conta.');
       return;
     }
-    router.replace('/painel');
-    router.refresh();
+    onSuccess();
   });
 
   return (
@@ -455,17 +449,50 @@ function ProfessionalForm(): ReactNode {
 }
 
 export default function CadastroPage(): ReactNode {
+  const router = useRouter();
+  const [mode, setMode] = useState<CadastroMode>('professional');
+
+  const onSuccess = (): void => {
+    router.replace('/painel');
+    router.refresh();
+  };
+
   return (
     <main className="relative flex min-h-screen items-center justify-center p-6">
       <div className="absolute right-4 top-4">
         <ThemeToggle />
       </div>
-      <Card className="flex w-full max-w-sm flex-col gap-6">
+      <Card className="flex w-full max-w-md flex-col gap-6">
         <div className="flex flex-col items-center gap-2 text-center">
           <Logo size={36} />
           <p className="text-small text-fg-muted">Crie sua conta na FITVO</p>
         </div>
-        <ProfessionalForm />
+        {/* Seletor de tipo (spec §1) — extensível (Academia entra depois). */}
+        <div
+          role="radiogroup"
+          aria-label="Tipo de cadastro"
+          className="flex gap-2 rounded-md bg-neutral-100 p-1 dark:bg-neutral-800"
+        >
+          {CADASTRO_MODES.map((m) => (
+            <button
+              key={m.value}
+              type="button"
+              role="radio"
+              aria-checked={mode === m.value}
+              onClick={() => setMode(m.value)}
+              className={`flex-1 rounded px-3 py-2 text-small font-medium transition-colors ${
+                mode === m.value ? 'bg-bg text-fg shadow-sm' : 'text-fg-muted hover:text-fg'
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        {mode === 'professional' ? (
+          <ProfessionalForm onSuccess={onSuccess} />
+        ) : (
+          <ClinicForm onSuccess={onSuccess} />
+        )}
         <p className="text-center text-caption text-fg-subtle">
           Ja tem conta?{' '}
           <Link href="/login" className="underline">

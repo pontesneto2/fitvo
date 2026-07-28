@@ -31,7 +31,7 @@ const oneTimeToken = z.string().min(1).describe('Token de uso único recebido po
  * `password` simples (min 8) segue valendo para login/recuperação, que não são
  * momento de cadastro.
  */
-const strongPassword = z
+export const strongPassword = z
   .string()
   .min(8, 'A senha precisa ter no mínimo 8 caracteres.')
   .regex(/[A-Za-z]/, 'A senha precisa ter ao menos uma letra.')
@@ -39,12 +39,25 @@ const strongPassword = z
   .describe('Senha em claro — mín. 8, ao menos 1 letra e 1 número.');
 
 /**
+ * Nome social (Decreto 8.727/2016 — spec §3.1) — OPCIONAL em todo form de
+ * pessoa. Se vier, não pode ser vazio. Compartilhado entre os cadastros
+ * (autônomo, admin de clínica…) — a regra de exibição `displayName` é derivada
+ * no servidor (ver CLAUDE.md / deriveDisplayName).
+ */
+export const socialName = z
+  .string()
+  .trim()
+  .min(1)
+  .optional()
+  .describe('Nome social (exibido no lugar do civil quando preenchido) — spec §3.1.');
+
+/**
  * WhatsApp da PESSOA — SÓ dígitos no fio (DDD + celular = 11 dígitos). A máscara
  * `(00) 00000-0000` é responsabilidade da UI; o contrato armazena o número
  * normalizado. Não-dígito (máscara) é rejeitado com 400, garantindo storage
  * limpo sem depender de transform (que não é representável no OpenAPI — D-032).
  */
-const whatsapp = z
+export const whatsapp = z
   .string()
   .regex(/^\d{11}$/, 'WhatsApp deve ter 11 dígitos (DDD + celular), só números.')
   .describe('WhatsApp — 11 dígitos (DDD + celular), só números (máscara é UI).');
@@ -55,7 +68,7 @@ const whatsapp = z
  * armazenada (mesma disciplina do IMC — D-132). @db.Date no banco: sem hora,
  * sem fuso (ninguém nasce "às 00h UTC" — evita o deslize do ADR-0012).
  */
-const birthDate = z.iso
+export const birthDate = z.iso
   .date()
   .refine(isAtLeastEighteen, { message: 'É preciso ter 18 anos ou mais para se cadastrar.' })
   .describe('Data de nascimento (YYYY-MM-DD) — maioridade obrigatória (D-044).');
@@ -183,18 +196,7 @@ export const registerProfessionalSchema = z
     email,
     password: strongPassword,
     name: z.string().min(1).describe('Nome civil — deriva tenant.name e uso fiscal/documento.'),
-    /**
-     * Nome social (Decreto 8.727/2016 — spec §3.1) — OPCIONAL. Quando presente,
-     * é o nome EXIBIDO no lugar do civil em toda a interface (derivação
-     * `displayName` no servidor). Se vier, não pode ser vazio; ausente = sem
-     * nome social (usa o civil).
-     */
-    socialName: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe('Nome social (exibido no lugar do civil quando preenchido) — spec §3.1.'),
+    socialName,
     /** Gênero/identidade — OPCIONAL (dado sensível, spec §3.1). */
     gender: genderSchema.optional().describe('Gênero/identidade — opcional (spec §3.1).'),
     /**

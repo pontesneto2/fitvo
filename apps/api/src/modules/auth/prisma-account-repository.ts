@@ -5,6 +5,7 @@ import { recordInitialTermsAcceptance } from '../terms/initial-terms-acceptance'
 import type {
   AccountRecord,
   AccountRepository,
+  CreateClinicInput,
   CreateProfessionalInput,
 } from './account-repository';
 
@@ -78,6 +79,76 @@ export class PrismaAccountRepository implements AccountRepository {
         },
         select: ACCOUNT_PROJECTION,
       });
+      await recordInitialTermsAcceptance(tx, account.id, input.termsAcceptance);
+      return account;
+    });
+  }
+
+  createClinic(input: CreateClinicInput): Promise<AccountRecord> {
+    return this.db.$transaction(async (tx) => {
+      // Tenant CLINIC: name = nome fantasia (exibição), legalName = razão social
+      // (fiscal). Endereço/contato da EMPRESA (colunas inline do Tenant — D-126).
+      const tenant = await tx.tenant.create({
+        data: {
+          type: 'CLINIC',
+          name: input.tradeName,
+          legalName: input.legalName,
+          document: input.cnpj,
+          documentType: 'CNPJ',
+          addressStreet: input.address.logradouro,
+          addressNumber: input.address.numero,
+          addressComplement: input.address.complemento ?? null,
+          addressDistrict: input.address.bairro,
+          addressCity: input.address.cidade,
+          addressState: input.address.state,
+          addressZipCode: input.address.cep,
+          phone: input.companyPhone,
+          email: input.companyEmail,
+        },
+      });
+      // "Também atende" (MANAGER_PROVIDER): perfil profissional + especialidade
+      // NASCEM na MESMA escrita da conta. Gestor-puro → undefined (só a
+      // membership CLINIC_ADMIN abaixo). specialtyId já resolvido do code pelo
+      // service; specialty via connect (FK Restrict): code inexistente reprova a
+      // transação inteira.
+      const professionalProfile = input.professional
+        ? {
+            create: {
+              tenant: { connect: { id: tenant.id } },
+              specialties: {
+                create: {
+                  specialty: { connect: { id: input.professional.specialtyId } },
+                  councilDocument: input.professional.councilDocument,
+                  councilState: input.professional.councilState,
+                  medicalSpecialty: input.professional.medicalSpecialty ?? null,
+                },
+              },
+            },
+          }
+        : undefined;
+      // Admin: pessoa física (CPF). Membership CLINIC_ADMIN SEMPRE; o perfil
+      // profissional só quando "também atende". Tudo aninhado numa escrita.
+      const account = await tx.account.create({
+        data: {
+          email: input.admin.email,
+          passwordHash: input.admin.passwordHash,
+          name: input.admin.name,
+          socialName: input.admin.socialName ?? null,
+          gender: input.admin.gender ?? null,
+          document: input.admin.document,
+          documentType: 'CPF',
+          whatsapp: input.admin.whatsapp,
+          birthDate: input.admin.birthDate,
+          clinicMemberships: {
+            create: { tenant: { connect: { id: tenant.id } }, role: 'CLINIC_ADMIN' },
+          },
+          ...(professionalProfile ? { professionalProfile } : {}),
+        },
+        select: ACCOUNT_PROJECTION,
+      });
+      // Conta NOVA (porta pública de nascimento — D-139): grava o consentimento
+      // inicial (D-025) na MESMA transação. Qualquer falha acima/abaixo reverte
+      // tudo — nem Tenant, nem Account, nem membership, nem specialty sobrevivem.
       await recordInitialTermsAcceptance(tx, account.id, input.termsAcceptance);
       return account;
     });

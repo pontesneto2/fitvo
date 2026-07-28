@@ -17,7 +17,7 @@ export default function PainelPage(): ReactNode {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h2 className="font-heading text-h2 font-semibold text-fg">
-          {isLoading ? <Skeleton variant="text" width={200} /> : `Olá, ${me?.name ?? ''}`}
+          {isLoading ? <Skeleton variant="text" width={200} /> : `Olá, ${me?.displayName ?? ''}`}
         </h2>
         <p className="text-body text-fg-muted">
           Rota protegida no ar — o esqueleto do painel está funcionando.
@@ -33,7 +33,7 @@ export default function PainelPage(): ReactNode {
             <Skeleton variant="text" width={160} />
           ) : (
             <>
-              <span className="text-body text-fg">{me?.name}</span>
+              <span className="text-body text-fg">{me?.displayName}</span>
               <span className="text-small text-fg-subtle">{me?.email}</span>
             </>
           )}

@@ -32,7 +32,10 @@ export interface LoginResult {
 export interface Me {
   readonly id: string;
   readonly email: string;
+  /** Nome civil — uso fiscal/documento. NÃO exibir na UI: usar `displayName`. */
   readonly name: string;
+  /** Nome de exibição (socialName ?? name) — derivado no servidor (spec §3.1). */
+  readonly displayName: string;
   readonly emailVerified: boolean;
 }
 
@@ -149,6 +152,11 @@ export const registerProfessionalFormSchema = z
     documentType: z.enum(['CPF', 'CNPJ'], { message: 'Selecione o tipo de documento.' }),
     document: z.string().min(1, 'Informe o documento.'),
     name: registerName,
+    // Opcionais (spec §3.1). O Select só oferece valores válidos e o socialName
+    // é texto livre — a normalização (vazio → ausente) acontece no onSubmit; o
+    // gate real do gênero é o schema compartilhado do servidor.
+    socialName: z.string().trim().optional(),
+    gender: z.string().optional(),
     email: registerEmail,
     password: strongRegisterPassword,
     confirmPassword: z.string().min(1, 'Confirme a senha.'),

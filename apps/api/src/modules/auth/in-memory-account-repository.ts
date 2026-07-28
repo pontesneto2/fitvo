@@ -45,7 +45,12 @@ export class InMemoryAccountRepository implements AccountRepository {
   }
 
   async createProfessional(input: CreateProfessionalInput): Promise<AccountRecord> {
-    const account = await this.insert(input.email, input.passwordHash, input.name);
+    const account = await this.insert(
+      input.email,
+      input.passwordHash,
+      input.name,
+      input.socialName ?? null,
+    );
     this.professionalSpecialtiesByAccountId.set(account.id, {
       specialtyId: input.specialtyId,
       councilDocument: input.councilDocument,
@@ -70,7 +75,7 @@ export class InMemoryAccountRepository implements AccountRepository {
    * login/verificacao de e-mail (slice `auth`) nunca enxergariam a conta.
    */
   seedAccount(email: string, passwordHash: string, name: string): Promise<AccountRecord> {
-    return this.insert(email, passwordHash, name);
+    return this.insert(email, passwordHash, name, null);
   }
 
   markEmailVerified(id: string): Promise<void> {
@@ -100,13 +105,19 @@ export class InMemoryAccountRepository implements AccountRepository {
     await recordInitialTermsAcceptanceInMemory(this.terms, accountId, origin);
   }
 
-  private insert(email: string, passwordHash: string, name: string): Promise<AccountRecord> {
+  private insert(
+    email: string,
+    passwordHash: string,
+    name: string,
+    socialName: string | null,
+  ): Promise<AccountRecord> {
     this.sequence += 1;
     const account: AccountRecord = {
       id: `acc_${this.sequence}`,
       email,
       passwordHash,
       name,
+      socialName,
       emailVerifiedAt: null,
     };
     this.byId.set(account.id, account);

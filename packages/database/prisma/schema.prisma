@@ -101,6 +101,21 @@ enum BiologicalSex {
   NOT_INFORMED
 }
 
+/// Genero / identidade (spec §3.1 — dado sensivel LGPD). Inclusivo e OPCIONAL em
+/// todos os cadastros. Distinto de BiologicalSex de proposito: identidade
+/// (respeito) vs. sexo biologico (calculo clinico) resolvem problemas
+/// diferentes — um campo so forcaria escolher entre acertar o calculo e
+/// respeitar a pessoa. Nulavel: null = "nao informado" (campo opcional).
+enum Gender {
+  MULHER_CIS
+  HOMEM_CIS
+  MULHER_TRANS
+  HOMEM_TRANS
+  NAO_BINARIO
+  OUTRO
+  PREFIRO_NAO_INFORMAR
+}
+
 enum SpecialtyCode {
   TRAINING // treino / educacao fisica (CREF)
   NUTRITION // nutricao (CRN)
@@ -192,6 +207,13 @@ model Account {
   name              String
   document          String // CPF ou CNPJ da PESSOA (D-043)
   documentType      DocumentType
+  /// Nome social (Decreto 8.727/2016 — spec §3.1). Atributo da PESSOA (D-044).
+  /// Quando preenchido, e o nome EXIBIDO no lugar do civil em toda a interface
+  /// (derivacao displayName no servidor). Nulavel: opcional; null = sem nome
+  /// social. O `name` civil segue para tenant.name/documento/fiscal.
+  socialName        String?
+  /// Genero / identidade (ver enum Gender). Nulavel: opcional (spec §3.1).
+  gender            Gender?
   /// Data de nascimento (D-044: atributo da PESSOA, nao do papel — a mesma conta
   /// acumula profissional + paciente, entao mora aqui com nome e CPF, nao no
   /// perfil). Idade e DERIVADA, nunca armazenada (mesma disciplina do IMC — D-132).

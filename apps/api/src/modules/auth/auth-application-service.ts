@@ -7,7 +7,7 @@ import type {
   PasswordHasher,
   VerificationTokenStore,
 } from '@fitvo/auth';
-import type { BrazilianState, DocumentType } from '@fitvo/database';
+import type { BrazilianState, DocumentType, Gender } from '@fitvo/database';
 
 import {
   EmailAlreadyInUseError,
@@ -16,11 +16,12 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '../../shared/http-errors';
-import type {
-  AccountRecord,
-  AccountRepository,
-  AddressInput,
-  TermsAcceptanceOrigin,
+import {
+  type AccountRecord,
+  type AccountRepository,
+  type AddressInput,
+  deriveDisplayName,
+  type TermsAcceptanceOrigin,
 } from './account-repository';
 
 /**
@@ -35,7 +36,8 @@ export interface SpecialtyLookup {
 }
 
 export interface AuthResult {
-  account: { id: string; email: string; name: string };
+  /** `displayName` derivado no servidor (socialName ?? name) — spec §3.1. */
+  account: { id: string; email: string; name: string; displayName: string };
   tokens: AuthTokens;
 }
 
@@ -43,6 +45,8 @@ export interface MeResult {
   id: string;
   email: string;
   name: string;
+  /** Nome de exibição (socialName ?? name) — derivado no servidor (spec §3.1). */
+  displayName: string;
   emailVerified: boolean;
 }
 
@@ -50,6 +54,10 @@ export interface RegisterProfessionalInput {
   email: string;
   password: string;
   name: string;
+  /** Nome social (spec §3.1) — opcional. */
+  socialName?: string | undefined;
+  /** Gênero/identidade (spec §3.1) — opcional. */
+  gender?: Gender | undefined;
   document: string;
   documentType: DocumentType;
   /** WhatsApp — só dígitos (11), normalizado no contrato (D-044). */
@@ -102,6 +110,8 @@ export class AuthApplicationService {
       email: input.email,
       passwordHash,
       name: input.name,
+      socialName: input.socialName,
+      gender: input.gender,
       document: input.document,
       documentType: input.documentType,
       whatsapp: input.whatsapp,
@@ -152,6 +162,7 @@ export class AuthApplicationService {
       id: account.id,
       email: account.email,
       name: account.name,
+      displayName: deriveDisplayName(account),
       emailVerified: account.emailVerifiedAt !== null,
     };
   }
@@ -243,7 +254,12 @@ export class AuthApplicationService {
     const sessionId = randomUUID();
     const tokens = await this.authCore.issueTokens({ accountId: account.id, sessionId });
     return {
-      account: { id: account.id, email: account.email, name: account.name },
+      account: {
+        id: account.id,
+        email: account.email,
+        name: account.name,
+        displayName: deriveDisplayName(account),
+      },
       tokens,
     };
   }

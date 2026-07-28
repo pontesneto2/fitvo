@@ -61,7 +61,26 @@
                   },
                   "name": {
                     "type": "string",
+                    "minLength": 1,
+                    "description": "Nome civil — deriva tenant.name e uso fiscal/documento."
+                  },
+                  "socialName": {
+                    "description": "Nome social (exibido no lugar do civil quando preenchido) — spec §3.1.",
+                    "type": "string",
                     "minLength": 1
+                  },
+                  "gender": {
+                    "description": "Gênero/identidade — opcional (spec §3.1).",
+                    "type": "string",
+                    "enum": [
+                      "MULHER_CIS",
+                      "HOMEM_CIS",
+                      "MULHER_TRANS",
+                      "HOMEM_TRANS",
+                      "NAO_BINARIO",
+                      "OUTRO",
+                      "PREFIRO_NAO_INFORMAR"
+                    ]
                   },
                   "document": {
                     "type": "string",
@@ -268,13 +287,19 @@
                           "type": "string"
                         },
                         "name": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Nome civil — uso fiscal/documento; NÃO exibir quando há nome social."
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "description": "Nome de exibição (socialName ?? name) — spec §3.1."
                         }
                       },
                       "required": [
                         "id",
                         "email",
-                        "name"
+                        "name",
+                        "displayName"
                       ],
                       "additionalProperties": false
                     },
@@ -370,13 +395,19 @@
                           "type": "string"
                         },
                         "name": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Nome civil — uso fiscal/documento; NÃO exibir quando há nome social."
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "description": "Nome de exibição (socialName ?? name) — spec §3.1."
                         }
                       },
                       "required": [
                         "id",
                         "email",
-                        "name"
+                        "name",
+                        "displayName"
                       ],
                       "additionalProperties": false
                     },
@@ -539,7 +570,12 @@
                       "type": "string"
                     },
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Nome civil — uso fiscal/documento; NÃO exibir quando há nome social."
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "description": "Nome de exibição (socialName ?? name) — spec §3.1."
                     },
                     "emailVerified": {
                       "type": "boolean"
@@ -549,6 +585,7 @@
                     "id",
                     "email",
                     "name",
+                    "displayName",
                     "emailVerified"
                   ],
                   "additionalProperties": false

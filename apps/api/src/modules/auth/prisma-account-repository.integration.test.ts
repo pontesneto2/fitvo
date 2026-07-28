@@ -27,6 +27,8 @@ function input(email: string, specialtyId: string) {
     email,
     passwordHash: 'hash-nao-importa',
     name: `Integracao ${email}`,
+    socialName: 'Nome Social Int',
+    gender: 'MULHER_TRANS' as const,
     document: '52998224725',
     documentType: 'CPF' as const,
     whatsapp: '11987654321',
@@ -77,6 +79,8 @@ describe('PrismaAccountRepository — createProfessional (mapeamento contra Post
       select: {
         whatsapp: true,
         birthDate: true,
+        socialName: true,
+        gender: true,
         addressStreet: true,
         addressNumber: true,
         addressDistrict: true,
@@ -90,6 +94,8 @@ describe('PrismaAccountRepository — createProfessional (mapeamento contra Post
     expect(persisted.whatsapp).toBe('11987654321');
     expect(persisted.birthDate?.toISOString().slice(0, 10)).toBe('1990-01-15');
     expect(persisted).toMatchObject({
+      socialName: 'Nome Social Int',
+      gender: 'MULHER_TRANS',
       addressStreet: 'Avenida Paulista',
       addressNumber: '1000',
       addressDistrict: 'Bela Vista',

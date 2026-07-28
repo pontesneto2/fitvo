@@ -44,7 +44,7 @@ export function AppShell({ children }: { readonly children: ReactNode }): ReactN
           <h1 className="font-heading text-h3 font-medium text-fg">Painel</h1>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            {me ? <Avatar name={me.name} size="sm" /> : null}
+            {me ? <Avatar name={me.displayName} size="sm" /> : null}
             <Button variant="ghost" size="sm" onClick={onLogout}>
               <Icon icon={LogOut} size="sm" />
               Sair

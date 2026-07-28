@@ -143,3 +143,28 @@ describe('registerProfessionalSchema — maioridade (D-044)', () => {
     );
   });
 });
+
+describe('registerProfessionalSchema — nome social e gênero (spec §3.1, opcionais)', () => {
+  it('sem socialName e sem gender → 201 (ambos opcionais)', async () => {
+    const { gender: _g, ...rest } = validProfessionalRegistration;
+    expect(await register({ ...rest, email: 'sem-sn-genero@fitvo.dev' })).toBe(201);
+  });
+
+  it('com socialName e gender válidos → 201', async () => {
+    expect(
+      await register(
+        payload({ email: 'com-sn@fitvo.dev', socialName: 'Lia', gender: 'MULHER_TRANS' }),
+      ),
+    ).toBe(201);
+  });
+
+  it('gender fora do enum → 400', async () => {
+    expect(
+      await register(payload({ email: 'genero-invalido@fitvo.dev', gender: 'OUTRA_COISA' })),
+    ).toBe(400);
+  });
+
+  it('socialName vazio (só espaços) → 400 (se enviado, não pode ser vazio)', async () => {
+    expect(await register(payload({ email: 'sn-vazio@fitvo.dev', socialName: '   ' }))).toBe(400);
+  });
+});

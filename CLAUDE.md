@@ -87,6 +87,26 @@ identificada e aceita nesta mesma revisão.
 Se uma mudança tocar área crítica E não-crítica ao mesmo tempo, trate como
 crítica.
 
+### Banco em DEV/MVP — o que o agente pode rodar sozinho
+
+Enquanto **não houver produção com dado real**, o banco de dev é descartável e
+recriável a partir das migrations. Nesse contexto:
+
+- **PERMITIDO ao agente, sem me chamar:** aplicar migrations **forward** —
+  `prisma migrate deploy` (e `prisma migrate status`) — para validar que a
+  cadeia aplica de verdade e que as colunas novas existem. Uma migration
+  **aditiva** (coluna/enum/índice novos, nada removido nem alterado sobre dado
+  existente) segue a mesma regra das áreas não-críticas: CI verde basta.
+- **CONTINUA exigindo mim, mesmo em dev:** `prisma migrate reset`, `DROP`,
+  `TRUNCATE`, `DELETE` em massa, ou qualquer migration **destrutiva** (remove ou
+  altera coluna com dado existente — ver bullet acima). O agente **nunca** roda
+  isso sozinho.
+
+**Trava temporal:** esta folga vale **só porque o banco de dev não tem dado
+real**. Quando existir produção com dado de terceiro, **religar o bloqueio total
+de banco para o agente** — qualquer operação de schema volta a exigir minha
+autorização explícita, forward inclusive.
+
 ---
 
 ## Missão

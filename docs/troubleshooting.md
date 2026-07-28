@@ -120,6 +120,14 @@ pnpm exec prisma migrate dev
 
 Ou os scripts do package: `pnpm --filter @fitvo/database db:migrate`.
 
+> **Quem roda migração em dev.** Enquanto não houver produção com dado real, o
+> agente PODE aplicar migrations **forward** sozinho (`prisma migrate deploy` /
+> `migrate status`) para provar que a cadeia aplica. `migrate reset`, `DROP`,
+> `TRUNCATE`, `DELETE` em massa e qualquer migration **destrutiva** continuam
+> exigindo o responsável, **mesmo em dev**. Quando existir produção com dado
+> real, religar o bloqueio total de banco para o agente (ver `CLAUDE.md`,
+> "Banco em DEV/MVP").
+
 ---
 
 ## 4. CI verde **não** prova que a migração aplica

@@ -21,6 +21,22 @@ const TAGS = ['clinic'];
 const bearerAuth = [{ bearerAuth: [] }];
 
 /**
+ * Origem da requisicao do aceite de convite (D-025) — IP/UA vem SEMPRE da
+ * requisicao, nunca do corpo enviado pelo cliente (mesmo padrao de
+ * `inviteAcceptOrigin` em `patient-routes.ts` e `registrationOrigin` em auth).
+ */
+function inviteAcceptOrigin(request: {
+  ip: string;
+  headers: Record<string, string | string[] | undefined>;
+}): { ipAddress: string; userAgent: string } {
+  const userAgent = request.headers['user-agent'];
+  return {
+    ipAddress: request.ip,
+    userAgent: (Array.isArray(userAgent) ? userAgent[0] : userAgent) ?? 'unknown',
+  };
+}
+
+/**
  * Vertical slice de clinica (D-034: versao na URL /v1). Convites
  * admin->profissional (D-014/D-048/D-049): criar, listar (operacional — D-015),
  * revogar e aceitar. As rotas administrativas exigem CLINIC_ADMIN do tenant
@@ -121,7 +137,16 @@ export function clinicRoutes(service: ClinicApplicationService): FastifyPluginAs
         config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
       },
       async (request, reply) => {
-        return reply.code(201).send(await service.acceptInvite(request.body));
+        return reply.code(201).send(
+          await service.acceptInvite({
+            token: request.body.token,
+            password: request.body.password,
+            name: request.body.name,
+            document: request.body.document,
+            documentType: request.body.documentType,
+            origin: inviteAcceptOrigin(request),
+          }),
+        );
       },
     );
   };

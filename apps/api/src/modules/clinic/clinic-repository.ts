@@ -1,4 +1,13 @@
-import type { ClinicRole, DocumentType, InviteStatus } from '@fitvo/database';
+import type {
+  BrazilianState,
+  ClinicRole,
+  DocumentType,
+  InviteStatus,
+  MedicalSpecialty,
+  SpecialtyCode,
+} from '@fitvo/database';
+
+import type { RequestOrigin } from '../terms/terms-repository';
 
 /** Projecao do convite de profissional usada pela slice de clinica. */
 export interface ProfessionalInviteRecord {
@@ -31,6 +40,18 @@ export interface CreateInviteInput {
   /** Hash do token de uso unico — o segredo em claro nunca chega ao repositorio. */
   tokenHash: string;
   expiresAt: Date;
+  /**
+   * Especialidade do convite por CODE (nao id): a clinica escolhe a profissao
+   * (ADR-0015/D-137). O repositorio resolve code->Specialty.id (catalogo fixo,
+   * D-047) e persiste o id — a FK Restrict guarda contra id fora do catalogo.
+   */
+  specialtyCode: SpecialtyCode;
+  /** Registro no conselho (formato — D-138); a clinica preenche no convite. */
+  councilDocument: string;
+  /** UF do conselho (D-126). */
+  councilState: BrazilianState;
+  /** Especialidade medica — presente sse `specialtyCode === 'MEDICINE'` (regra no Zod). */
+  medicalSpecialty?: MedicalSpecialty | undefined;
 }
 
 /** Dados para criar a conta do profissional quando o e-mail ainda e novo. */
@@ -84,8 +105,15 @@ export interface ClinicRepository {
    * Aceita o convite pelo hash do token, de forma ATOMICA e de USO UNICO
    * (D-048): valida PENDING + nao expirado, cria a conta (se o e-mail e novo)
    * OU vincula o perfil a conta existente, e marca o convite ACCEPTED — tudo
-   * numa transacao. NAO cria tenant SOLO: o profissional entra na clinica do
-   * convite (a unica porta de entrada numa clinica — D-048).
+   * numa transacao. Na MESMA transacao cria a ProfessionalSpecialty (especialidade
+   * + conselho + medicalSpecialty lidos DO CONVITE, PENDING) e, SO quando a conta
+   * e nova, grava o aceite inicial dos termos (D-025 — LGPD) a partir do `origin`.
+   * NAO cria tenant SOLO: o profissional entra na clinica do convite (a unica
+   * porta de entrada numa clinica — D-048).
    */
-  acceptInvite(tokenHash: string, account: NewProfessionalAccount): Promise<AcceptInviteOutcome>;
+  acceptInvite(
+    tokenHash: string,
+    account: NewProfessionalAccount,
+    origin: RequestOrigin,
+  ): Promise<AcceptInviteOutcome>;
 }

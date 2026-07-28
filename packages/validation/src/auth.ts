@@ -60,7 +60,7 @@ export const brazilianStateSchema = z.enum([
  * "verificado" é palavra de força do ADR-0015 (D-138): não apertar esta regex
  * para simular uma verificação que não existe.
  */
-const councilDocument = z
+export const councilDocument = z
   .string()
   .trim()
   .min(1)

@@ -2,28 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import { buildTestHarness } from '../../testing/build-test-app';
 import { createPatientViaInvite } from '../../testing/patient-invite-fixture';
+import { validProfessionalRegistration } from '../../testing/professional-registration-fixture';
 
-const acceptedTerms = { termsOfUse: true, privacyPolicy: true } as const;
-
-const professional = {
-  email: 'leo@fitvo.dev',
-  password: 'senha-forte-123',
-  name: 'Leo',
-  document: '12345678901',
-  documentType: 'CPF',
-  tenantName: 'Leo Personal',
-  specialtyId: 'spec_training',
-  councilDocument: 'CREF-123456',
-  councilState: 'SP',
-  acceptedTerms,
-};
+const professional = { ...validProfessionalRegistration, email: 'leo@fitvo.dev', name: 'Leo' };
 
 const patient = {
   email: 'ana@fitvo.dev',
   password: 'senha-forte-123',
   name: 'Ana',
   document: '12345678901',
-  acceptedTerms,
+  acceptedTerms: { termsOfUse: true, privacyPolicy: true },
 };
 
 describe('verificacao de e-mail (E2E via inject)', () => {
@@ -136,9 +124,19 @@ describe('verificacao de e-mail (E2E via inject)', () => {
       email: 'expirado@fitvo.dev',
       passwordHash: 'hash-nao-importa',
       name: 'Expirado',
-      document: '12345678901',
+      document: '52998224725',
       documentType: 'CPF',
-      tenantName: 'Tenant Expirado',
+      whatsapp: '11987654321',
+      birthDate: new Date('1990-01-15T00:00:00Z'),
+      address: {
+        cep: '01310930',
+        logradouro: 'Avenida Paulista',
+        numero: '1000',
+        bairro: 'Bela Vista',
+        cidade: 'Sao Paulo',
+        state: 'SP',
+        country: 'BR',
+      },
       specialtyId: 'spec_training',
       councilDocument: 'CREF-123456',
       councilState: 'SP',

@@ -1,19 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildTestHarness } from '../../testing/build-test-app';
+import { validProfessionalRegistration } from '../../testing/professional-registration-fixture';
 
-const professional = {
-  email: 'leo@fitvo.dev',
-  password: 'senha-forte-123',
-  name: 'Leo',
-  document: '12345678901',
-  documentType: 'CPF',
-  tenantName: 'Leo Personal',
-  specialtyId: 'spec_training',
-  councilDocument: 'CREF-123456',
-  councilState: 'SP',
-  acceptedTerms: { termsOfUse: true, privacyPolicy: true },
-};
+const professional = { ...validProfessionalRegistration, email: 'leo@fitvo.dev', name: 'Leo' };
 
 async function register(app: Awaited<ReturnType<typeof buildTestHarness>>['app']): Promise<string> {
   const response = await app.inject({

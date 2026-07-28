@@ -124,6 +124,9 @@ importers:
       '@fitvo/ui-web':
         specifier: workspace:*
         version: link:../../packages/ui-web
+      '@fitvo/validation':
+        specifier: workspace:*
+        version: link:../../packages/validation
       '@tanstack/react-query':
         specifier: ^5.101.4
         version: 5.101.4(react@18.3.1)

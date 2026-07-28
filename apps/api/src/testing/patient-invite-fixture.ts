@@ -1,20 +1,10 @@
 import type { TestHarness } from './build-test-app';
+import { validProfessionalRegistration } from './professional-registration-fixture';
 
 const FIXTURE_TENANT = 'pro_tenant_patient_fixture';
 const FIXTURE_SPECIALTY = 'spec_patient_fixture';
 
-const proPayload = {
-  email: 'fixture-pro@fitvo.dev',
-  password: 'senha-forte-123',
-  name: 'Profissional Fixture',
-  document: '11122233344',
-  documentType: 'CPF',
-  tenantName: 'Fixture Solo',
-  specialtyId: 'spec_training',
-  councilDocument: 'CREF-123456',
-  councilState: 'SP',
-  acceptedTerms: { termsOfUse: true, privacyPolicy: true },
-};
+const proPayload = validProfessionalRegistration;
 
 /**
  * Cria uma conta de paciente pelo UNICO caminho de nascimento (aceite de

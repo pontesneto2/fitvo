@@ -203,6 +203,23 @@ model Account {
   /// JA E o estado "desconhecido", entao nulavel criaria DUAS representacoes do
   /// mesmo estado (null e NOT_INFORMED) — o anti-padrao que o projeto evita (D-103).
   biologicalSex     BiologicalSex @default(NOT_INFORMED)
+  /// WhatsApp da PESSOA — SO digitos (11: DDD + celular). Atributo da pessoa
+  /// (D-044), como nome/CPF/nascimento. Nulavel: coluna aditiva e conta antiga
+  /// nao tem. A obrigatoriedade no cadastro e da app/Zod, nao do banco.
+  whatsapp          String?
+  /// Endereco da PESSOA (D-044) — colunas inline, espelhando o precedente do
+  /// Tenant (addressStreet..addressZipCode). addressNumber/addressZipCode sao
+  /// String, nao Int: "123-A"/"s/n" e o CEP com zero a esquerda nao sao numeros.
+  /// Todas nulaveis: migracao aditiva + conta antiga sem endereco; a
+  /// obrigatoriedade no cadastro do autonomo e imposta pelo Zod (ADR-0015).
+  addressStreet     String?
+  addressNumber     String?
+  addressComplement String?
+  addressDistrict   String?
+  addressCity       String?
+  addressState      BrazilianState?
+  addressZipCode    String?
+  addressCountry    String?
   emailVerifiedAt   DateTime?     @db.Timestamptz(3)
   preferredLocale   String        @default("pt-BR") // i18n (D-066)
   preferredTimezone String        @default("America/Sao_Paulo") // exibicao (D-067)

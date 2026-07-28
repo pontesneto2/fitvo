@@ -6,14 +6,17 @@ import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
+import { PasswordStrengthMeter } from '@/components/password-strength-meter';
 import { TermsFields } from '@/components/terms-fields';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
   BRAZILIAN_STATES,
-  type RegisterProfessionalInput,
-  registerProfessionalInputSchema,
+  type RegisterProfessionalFormInput,
+  registerProfessionalFormSchema,
 } from '@/lib/auth';
+import { brDateToIso, maskCep, maskDateBr, maskDocument, maskPhone, onlyDigits } from '@/lib/masks';
 import { COUNCIL_LABEL_BY_SPECIALTY_CODE, type Specialty } from '@/lib/specialty';
+import { fetchAddressByCep } from '@/lib/via-cep';
 import { zodResolver } from '@/lib/zod-resolver';
 
 const acceptedTermsDefaults = { termsOfUse: false, privacyPolicy: false };
@@ -49,28 +52,35 @@ function useSpecialties(): { specialties: Specialty[]; loadError: boolean } {
 function ProfessionalForm(): ReactNode {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
+  const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notFound'>('idle');
   const { specialties, loadError } = useSpecialties();
   const {
     register,
     handleSubmit,
     control,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterProfessionalInput>({
-    resolver: zodResolver(registerProfessionalInputSchema),
+  } = useForm<RegisterProfessionalFormInput>({
+    resolver: zodResolver(registerProfessionalFormSchema),
     defaultValues: {
-      email: '',
-      password: '',
-      name: '',
-      documentType: 'CPF',
-      document: '',
-      tenantName: '',
       specialtyId: '',
       councilDocument: '',
+      documentType: 'CPF',
+      document: '',
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      whatsapp: '',
+      birthDate: '',
+      address: { cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '' },
       acceptedTerms: acceptedTermsDefaults,
     },
   });
 
+  const documentType = watch('documentType');
+  const password = watch('password');
   const selectedSpecialty = specialties.find((s) => s.id === watch('specialtyId'));
   const councilLabel = selectedSpecialty
     ? COUNCIL_LABEL_BY_SPECIALTY_CODE[selectedSpecialty.code]
@@ -80,12 +90,58 @@ function ProfessionalForm(): ReactNode {
     label: `${s.name} (${COUNCIL_LABEL_BY_SPECIALTY_CODE[s.code]})`,
   }));
 
+  /** Puxa o endereco pelo CEP no blur; CEP invalido/nao encontrado NAO trava (preenche manual). */
+  async function handleCepBlur(cep: string): Promise<void> {
+    if (onlyDigits(cep).length !== 8) {
+      return;
+    }
+    setCepStatus('loading');
+    const result = await fetchAddressByCep(onlyDigits(cep));
+    if (!result) {
+      setCepStatus('notFound');
+      return;
+    }
+    setCepStatus('idle');
+    // shouldValidate: limpa o erro dos campos recem-preenchidos.
+    setValue('address.logradouro', result.logradouro, { shouldValidate: true });
+    setValue('address.bairro', result.bairro, { shouldValidate: true });
+    setValue('address.cidade', result.cidade, { shouldValidate: true });
+    if (result.uf) {
+      setValue('address.state', result.uf, { shouldValidate: true });
+    }
+  }
+
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
+    // Normaliza para o FIO (só dígitos + ISO na data). O contrato do servidor
+    // (@fitvo/validation via BFF) exige dígitos; confirmPassword é só UI.
+    const payload = {
+      specialtyId: values.specialtyId,
+      councilDocument: values.councilDocument,
+      councilState: values.councilState,
+      documentType: values.documentType,
+      document: onlyDigits(values.document),
+      name: values.name,
+      email: values.email,
+      password: values.password,
+      whatsapp: onlyDigits(values.whatsapp),
+      birthDate: brDateToIso(values.birthDate),
+      address: {
+        cep: onlyDigits(values.address.cep),
+        logradouro: values.address.logradouro,
+        numero: values.address.numero,
+        complemento: values.address.complemento || undefined,
+        bairro: values.address.bairro,
+        cidade: values.address.cidade,
+        state: values.address.state,
+        country: 'BR',
+      },
+      acceptedTerms: values.acceptedTerms,
+    };
     const res = await fetch('/api/auth/register/professional', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(values),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -98,47 +154,7 @@ function ProfessionalForm(): ReactNode {
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-      <Field label="Nome completo" error={errors.name?.message}>
-        <Input autoComplete="name" placeholder="Seu nome" {...register('name')} />
-      </Field>
-      <Field label="Nome do consultorio/clinica" error={errors.tenantName?.message}>
-        <Input placeholder="Ex.: Consultorio Ana Silva" {...register('tenantName')} />
-      </Field>
-      <Field label="E-mail" error={errors.email?.message}>
-        <Input
-          type="email"
-          autoComplete="email"
-          placeholder="voce@exemplo.com"
-          {...register('email')}
-        />
-      </Field>
-      <Field label="Senha" error={errors.password?.message}>
-        <Input
-          type="password"
-          autoComplete="new-password"
-          placeholder="Minimo 8 caracteres"
-          {...register('password')}
-        />
-      </Field>
-      <div className="flex flex-col gap-2">
-        <span className="text-small font-medium text-fg-muted">Tipo de documento</span>
-        <div className="flex gap-4">
-          <Radio value="CPF" {...register('documentType')}>
-            CPF
-          </Radio>
-          <Radio value="CNPJ" {...register('documentType')}>
-            CNPJ
-          </Radio>
-        </div>
-        {errors.documentType?.message ? (
-          <p role="alert" className="text-caption text-danger-700 dark:text-danger-400">
-            {errors.documentType.message}
-          </p>
-        ) : null}
-      </div>
-      <Field label="CPF ou CNPJ" error={errors.document?.message}>
-        <Input placeholder="Somente numeros" {...register('document')} />
-      </Field>
+      {/* (1) Profissao */}
       <Field label="Profissao" error={errors.specialtyId?.message}>
         <Controller
           control={control}
@@ -156,26 +172,226 @@ function ProfessionalForm(): ReactNode {
           )}
         />
       </Field>
-      <Field label={`Registro no ${councilLabel}`} error={errors.councilDocument?.message}>
-        <Input placeholder="Numero do registro" {...register('councilDocument')} />
-      </Field>
-      <Field label="UF do conselho" error={errors.councilState?.message}>
+
+      {/* (2) Numero do conselho + UF */}
+      <div className="flex gap-3">
+        <Field
+          label={`Registro no ${councilLabel}`}
+          error={errors.councilDocument?.message}
+          className="flex-1"
+        >
+          <Input placeholder="Numero do registro" {...register('councilDocument')} />
+        </Field>
+        <Field label="UF" error={errors.councilState?.message} className="w-24">
+          <Controller
+            control={control}
+            name="councilState"
+            render={({ field }) => (
+              <Select
+                name={field.name}
+                value={field.value}
+                onValueChange={field.onChange}
+                options={BRAZILIAN_STATE_OPTIONS}
+                placeholder="UF"
+                searchable
+                status={errors.councilState ? 'error' : 'default'}
+              />
+            )}
+          />
+        </Field>
+      </div>
+
+      {/* (3) Tipo de documento + numero */}
+      <div className="flex flex-col gap-2">
+        <span className="text-small font-medium text-fg-muted">Tipo de documento</span>
+        <div className="flex gap-4">
+          <Radio value="CPF" {...register('documentType')}>
+            CPF
+          </Radio>
+          <Radio value="CNPJ" {...register('documentType')}>
+            CNPJ
+          </Radio>
+        </div>
+        {errors.documentType?.message ? (
+          <p role="alert" className="text-caption text-danger-700 dark:text-danger-400">
+            {errors.documentType.message}
+          </p>
+        ) : null}
+      </div>
+      <Field label={documentType === 'CNPJ' ? 'CNPJ' : 'CPF'} error={errors.document?.message}>
         <Controller
           control={control}
-          name="councilState"
+          name="document"
           render={({ field }) => (
-            <Select
-              name={field.name}
+            <Input
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder={documentType === 'CNPJ' ? '00.000.000/0000-00' : '000.000.000-00'}
               value={field.value}
-              onValueChange={field.onChange}
-              options={BRAZILIAN_STATE_OPTIONS}
-              placeholder="Selecione a UF"
-              searchable
-              status={errors.councilState ? 'error' : 'default'}
+              onBlur={field.onBlur}
+              onChange={(e) => field.onChange(maskDocument(e.target.value, documentType))}
+              status={errors.document ? 'error' : 'default'}
             />
           )}
         />
       </Field>
+
+      {/* (4) Nome */}
+      <Field label="Nome completo" error={errors.name?.message}>
+        <Input autoComplete="name" placeholder="Seu nome" {...register('name')} />
+      </Field>
+
+      {/* (5) E-mail */}
+      <Field label="E-mail" error={errors.email?.message}>
+        <Input
+          type="email"
+          autoComplete="email"
+          placeholder="voce@exemplo.com"
+          {...register('email')}
+        />
+      </Field>
+
+      {/* (6) Senha + confirmacao + medidor */}
+      <Field label="Senha" error={errors.password?.message}>
+        <Input
+          type="password"
+          autoComplete="new-password"
+          placeholder="Minimo 8 caracteres"
+          {...register('password')}
+        />
+      </Field>
+      <PasswordStrengthMeter password={password} />
+      <Field label="Confirmar senha" error={errors.confirmPassword?.message}>
+        <Input
+          type="password"
+          autoComplete="new-password"
+          placeholder="Repita a senha"
+          {...register('confirmPassword')}
+        />
+      </Field>
+
+      {/* (7) WhatsApp */}
+      <Field label="WhatsApp" error={errors.whatsapp?.message}>
+        <Controller
+          control={control}
+          name="whatsapp"
+          render={({ field }) => (
+            <Input
+              inputMode="numeric"
+              autoComplete="tel-national"
+              placeholder="(00) 00000-0000"
+              value={field.value}
+              onBlur={field.onBlur}
+              onChange={(e) => field.onChange(maskPhone(e.target.value))}
+              status={errors.whatsapp ? 'error' : 'default'}
+            />
+          )}
+        />
+      </Field>
+
+      {/* (8) Nascimento */}
+      <Field label="Data de nascimento" error={errors.birthDate?.message}>
+        <Controller
+          control={control}
+          name="birthDate"
+          render={({ field }) => (
+            <Input
+              inputMode="numeric"
+              autoComplete="bday"
+              placeholder="00/00/0000"
+              value={field.value}
+              onBlur={field.onBlur}
+              onChange={(e) => field.onChange(maskDateBr(e.target.value))}
+              status={errors.birthDate ? 'error' : 'default'}
+            />
+          )}
+        />
+      </Field>
+
+      {/* (9) Endereco (CEP puxa) */}
+      <fieldset className="flex flex-col gap-4 rounded-md border border-line p-4">
+        <legend className="px-1 text-small font-medium text-fg-muted">Endereco</legend>
+        <Field
+          label="CEP"
+          error={errors.address?.cep?.message}
+          description={
+            cepStatus === 'loading'
+              ? 'Buscando endereco...'
+              : cepStatus === 'notFound'
+                ? 'CEP nao encontrado — preencha manualmente.'
+                : undefined
+          }
+        >
+          <Controller
+            control={control}
+            name="address.cep"
+            render={({ field }) => (
+              <Input
+                inputMode="numeric"
+                autoComplete="postal-code"
+                placeholder="00000-000"
+                value={field.value}
+                onChange={(e) => field.onChange(maskCep(e.target.value))}
+                onBlur={(e) => {
+                  field.onBlur();
+                  void handleCepBlur(e.target.value);
+                }}
+                status={errors.address?.cep ? 'error' : 'default'}
+              />
+            )}
+          />
+        </Field>
+        <Field label="Logradouro" error={errors.address?.logradouro?.message}>
+          <Input
+            autoComplete="address-line1"
+            placeholder="Rua, avenida..."
+            {...register('address.logradouro')}
+          />
+        </Field>
+        <div className="flex gap-3">
+          <Field label="Numero" error={errors.address?.numero?.message} className="w-28">
+            <Input inputMode="numeric" placeholder="Numero" {...register('address.numero')} />
+          </Field>
+          <Field
+            label="Complemento (opcional)"
+            error={errors.address?.complemento?.message}
+            className="flex-1"
+          >
+            <Input
+              autoComplete="address-line2"
+              placeholder="Apto, bloco..."
+              {...register('address.complemento')}
+            />
+          </Field>
+        </div>
+        <Field label="Bairro" error={errors.address?.bairro?.message}>
+          <Input placeholder="Bairro" {...register('address.bairro')} />
+        </Field>
+        <div className="flex gap-3">
+          <Field label="Cidade" error={errors.address?.cidade?.message} className="flex-1">
+            <Input placeholder="Cidade" {...register('address.cidade')} />
+          </Field>
+          <Field label="UF" error={errors.address?.state?.message} className="w-24">
+            <Controller
+              control={control}
+              name="address.state"
+              render={({ field }) => (
+                <Select
+                  name={field.name}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={BRAZILIAN_STATE_OPTIONS}
+                  placeholder="UF"
+                  searchable
+                  status={errors.address?.state ? 'error' : 'default'}
+                />
+              )}
+            />
+          </Field>
+        </div>
+      </fieldset>
+
+      {/* (10) Termos + Politica */}
       <TermsFields
         errors={{
           termsOfUse: errors.acceptedTerms?.termsOfUse,

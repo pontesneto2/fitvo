@@ -1,4 +1,7 @@
+import { isValidCnpj, isValidCpf } from '@fitvo/validation';
 import { z } from 'zod';
+
+import { isAtLeastEighteen, onlyDigits } from './masks';
 
 /**
  * DTOs de auth do cliente web. LOCAIS de proposito: `@fitvo/contracts` ainda esta
@@ -59,6 +62,18 @@ const registerPassword = z.string().min(8, 'A senha precisa ter no minimo 8 cara
 const registerName = z.string().min(1, 'Informe o nome completo.');
 const cpf = z.string().min(11, 'Informe um CPF valido.').max(14, 'Informe um CPF valido.');
 
+/**
+ * Gate MÍNIMO de força de senha no cadastro — espelha `strongPassword` da API
+ * (min 8 + 1 letra + 1 número). O medidor visual incentiva mais (maiúscula/
+ * símbolo), mas o gate obrigatório é este. Maiúscula/símbolo NÃO são exigidos
+ * (evita fricção e senha pior).
+ */
+const strongRegisterPassword = z
+  .string()
+  .min(8, 'A senha precisa ter no minimo 8 caracteres.')
+  .regex(/[A-Za-z]/, 'A senha precisa ter ao menos uma letra.')
+  .regex(/\d/, 'A senha precisa ter ao menos um numero.');
+
 /** Mirror das 27 UFs (mesmo enum `BrazilianState` do Prisma) — conselho profissional (D-126). */
 export const BRAZILIAN_STATES = [
   'AC',
@@ -104,20 +119,70 @@ const councilDocumentInput = z
   .max(20, 'Registro invalido.')
   .regex(/^[A-Za-z0-9/-]+$/, 'Formato de registro no conselho invalido.');
 
-/** Espelha `registerProfessionalSchema` da API. */
-export const registerProfessionalInputSchema = z.object({
-  email: registerEmail,
-  password: registerPassword,
-  name: registerName,
-  documentType: z.enum(['CPF', 'CNPJ'], { message: 'Selecione o tipo de documento.' }),
-  document: z.string().min(11, 'Informe um CPF ou CNPJ valido.').max(18, 'Documento invalido.'),
-  tenantName: z.string().min(1, 'Informe o nome do consultorio/clinica.'),
-  specialtyId: z.string().min(1, 'Selecione uma especialidade.'),
-  councilDocument: councilDocumentInput,
-  councilState: brazilianStateInput,
-  acceptedTerms: acceptedTermsInput,
+/**
+ * Endereço do formulário (ADR-0015). Os campos textuais vêm do ViaCEP ou do
+ * usuário; `cep` é validado por CONTAGEM de dígitos (a máscara é UI). `country`
+ * não é campo: fixado 'BR' na normalização de envio (lançamento pt-BR).
+ */
+const addressFormSchema = z.object({
+  cep: z.string().refine((v) => onlyDigits(v).length === 8, { message: 'Informe um CEP valido.' }),
+  logradouro: z.string().trim().min(1, 'Informe o logradouro.'),
+  numero: z.string().trim().min(1, 'Informe o numero.'),
+  complemento: z.string().trim().optional(),
+  bairro: z.string().trim().min(1, 'Informe o bairro.'),
+  cidade: z.string().trim().min(1, 'Informe a cidade.'),
+  state: brazilianStateInput,
 });
-export type RegisterProfessionalInput = z.infer<typeof registerProfessionalInputSchema>;
+
+/**
+ * Schema do FORMULÁRIO de cadastro (ADR-0015). Valida os valores MASCARADOS que
+ * o RHF guarda (a normalização para o fio acontece no `onSubmit`) e inclui o
+ * `confirmPassword`, que é SÓ da UI — não vai no payload. O contrato real do
+ * servidor é o `registerProfessionalSchema` de `@fitvo/validation` (usado pelo
+ * BFF): este aqui é a camada de UX, com mensagens pt-BR e máscara.
+ */
+export const registerProfessionalFormSchema = z
+  .object({
+    specialtyId: z.string().min(1, 'Selecione uma profissao.'),
+    councilDocument: councilDocumentInput,
+    councilState: brazilianStateInput,
+    documentType: z.enum(['CPF', 'CNPJ'], { message: 'Selecione o tipo de documento.' }),
+    document: z.string().min(1, 'Informe o documento.'),
+    name: registerName,
+    email: registerEmail,
+    password: strongRegisterPassword,
+    confirmPassword: z.string().min(1, 'Confirme a senha.'),
+    whatsapp: z
+      .string()
+      .refine((v) => onlyDigits(v).length === 11, { message: 'Informe um WhatsApp valido.' }),
+    birthDate: z
+      .string()
+      .refine(isAtLeastEighteen, { message: 'Voce precisa ter 18 anos ou mais.' }),
+    address: addressFormSchema,
+    acceptedTerms: acceptedTermsInput,
+  })
+  .superRefine((data, ctx) => {
+    // Documento: dígito verificador REAL conforme o tipo (mesma regra do
+    // servidor — reusa os validadores de `@fitvo/validation`, sem duplicar).
+    const digits = onlyDigits(data.document);
+    const valid = data.documentType === 'CPF' ? isValidCpf(digits) : isValidCnpj(digits);
+    if (!valid) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['document'],
+        message: data.documentType === 'CPF' ? 'CPF invalido.' : 'CNPJ invalido.',
+      });
+    }
+    // Confirmação de senha — só UI, mas o erro precisa aparecer no campo certo.
+    if (data.password !== data.confirmPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['confirmPassword'],
+        message: 'As senhas nao coincidem.',
+      });
+    }
+  });
+export type RegisterProfessionalFormInput = z.infer<typeof registerProfessionalFormSchema>;
 
 /**
  * Espelha `patientAcceptInviteSchema` da API. Unico caminho de nascimento de

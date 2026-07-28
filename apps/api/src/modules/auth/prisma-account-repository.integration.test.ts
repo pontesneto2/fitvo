@@ -26,10 +26,20 @@ function input(email: string, specialtyId: string) {
   return {
     email,
     passwordHash: 'hash-nao-importa',
-    name: 'Integracao',
-    document: '12345678901',
+    name: `Integracao ${email}`,
+    document: '52998224725',
     documentType: 'CPF' as const,
-    tenantName: `Tenant ${email}`,
+    whatsapp: '11987654321',
+    birthDate: new Date('1990-01-15T00:00:00Z'),
+    address: {
+      cep: '01310930',
+      logradouro: 'Avenida Paulista',
+      numero: '1000',
+      bairro: 'Bela Vista',
+      cidade: 'Sao Paulo',
+      state: 'SP' as const,
+      country: 'BR',
+    },
     specialtyId,
     councilDocument: 'CREF-123456',
     councilState: 'SP' as const,
@@ -57,6 +67,44 @@ describe('PrismaAccountRepository — createProfessional (mapeamento contra Post
     });
   });
 
+  it('ADR-0015: grava whatsapp/nascimento/endereco na Account e deriva o nome do Tenant SOLO', async () => {
+    const email = `campos-${randomUUID().slice(0, 8)}@int.dev`;
+    const account = await repo.createProfessional(input(email, 'spec_training'));
+
+    // Campos novos vieram do BANCO — a propagacao coluna-a-coluna e o que esta sob teste.
+    const persisted = await prisma.account.findUniqueOrThrow({
+      where: { id: account.id },
+      select: {
+        whatsapp: true,
+        birthDate: true,
+        addressStreet: true,
+        addressNumber: true,
+        addressDistrict: true,
+        addressCity: true,
+        addressState: true,
+        addressZipCode: true,
+        addressCountry: true,
+        professionalProfile: { select: { tenant: { select: { name: true, type: true } } } },
+      },
+    });
+    expect(persisted.whatsapp).toBe('11987654321');
+    expect(persisted.birthDate?.toISOString().slice(0, 10)).toBe('1990-01-15');
+    expect(persisted).toMatchObject({
+      addressStreet: 'Avenida Paulista',
+      addressNumber: '1000',
+      addressDistrict: 'Bela Vista',
+      addressCity: 'Sao Paulo',
+      addressState: 'SP',
+      addressZipCode: '01310930',
+      addressCountry: 'BR',
+    });
+    // Tenant SOLO nasce com o NOME do profissional (nao ha mais tenantName).
+    expect(persisted.professionalProfile?.tenant).toMatchObject({
+      type: 'SOLO',
+      name: `Integracao ${email}`,
+    });
+  });
+
   it('rollback: specialtyId inexistente nao deixa Account nem Tenant orfaos', async () => {
     const email = `rollback-${randomUUID().slice(0, 8)}@int.dev`;
 
@@ -65,7 +113,7 @@ describe('PrismaAccountRepository — createProfessional (mapeamento contra Post
     // Nem a conta, nem o tenant que a transacao teria criado sobrevivem.
     const account = await prisma.account.findUnique({ where: { email } });
     expect(account).toBeNull();
-    const tenant = await prisma.tenant.findFirst({ where: { name: `Tenant ${email}` } });
+    const tenant = await prisma.tenant.findFirst({ where: { name: `Integracao ${email}` } });
     expect(tenant).toBeNull();
   });
 });

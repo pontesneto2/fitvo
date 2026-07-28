@@ -2,21 +2,15 @@ import type { FastifyInstance } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
 import { buildTestHarness, type TestHarness } from '../../testing/build-test-app';
+import { validProfessionalRegistration } from '../../testing/professional-registration-fixture';
 import { hashInviteToken } from './invite-token';
 
 const CLINIC_TENANT = 'clinic_test_1';
 
 const adminPayload = {
+  ...validProfessionalRegistration,
   email: 'admin@fitvo.dev',
-  password: 'senha-forte-123',
   name: 'Admin Clinica',
-  document: '12345678901',
-  documentType: 'CPF',
-  tenantName: 'Clinica Vida (solo do admin)',
-  specialtyId: 'spec_training',
-  councilDocument: 'CREF-123456',
-  councilState: 'SP',
-  acceptedTerms: { termsOfUse: true, privacyPolicy: true },
 };
 
 /**
@@ -119,7 +113,7 @@ describe('fluxo de clinica e convites (E2E via inject)', () => {
     const outsider = await harness.app.inject({
       method: 'POST',
       url: '/v1/auth/register/professional',
-      payload: { ...adminPayload, email: 'outro@fitvo.dev', tenantName: 'Outro Solo' },
+      payload: { ...adminPayload, email: 'outro@fitvo.dev' },
     });
     const outsiderToken = outsider.json().tokens.accessToken;
 

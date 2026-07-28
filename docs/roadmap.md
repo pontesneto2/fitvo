@@ -215,6 +215,34 @@ vínculo nasce (`prisma-intern-repository.ts`, no `acceptInvite`).
 terceiro — é **ordem de construção**. Sai sozinho assim que o domínio de treino
 estiver de pé.
 
+### Estagiário em clínica — expansão do seat (pós-MVP)
+
+Hoje o seat de estagiário exige `Tenant.type === ACADEMIA` (D-142). Isso é
+**restrição de MVP, não regra permanente**: estagiário de clínica é caso real
+(estudante de nutrição ou medicina sob supervisão).
+
+A expansão é generalizar de "academia/CREF" para **"estagiário em EMPRESA, com
+supervisor do conselho APROPRIADO à especialidade"** — o par
+`vertical do tenant → conselhos que supervisionam` vira tabela, no lugar do par
+fixo de hoje. **Não muda** o essencial: responsável obrigatório, `NOT NULL`, com
+capacidade derivada dele.
+
+**Ponto único de mudança:** `eligibleSupervisorWhere` em
+`apps/api/src/modules/intern/prisma-intern-repository.ts` (há `TODO` no local).
+
+### Corrigir DV do documento no aceite de convite de profissional (#102)
+
+`clinicAcceptInviteSchema` valida o documento só por **comprimento**
+(`min(11).max(18)`), sem dígito verificador e sem o xor CPF/CNPJ — enquanto a
+spec §3 exige **"CPF-xor-CNPJ + dígito verificador (`.superRefine`)"** e todos os
+outros cadastros já cumprem (autônomo, empresa, e o aceite de estagiário de
+D-142). Um profissional de clínica entra hoje com documento mal formado.
+
+**Correção:** aplicar em `clinicAcceptInviteSchema` o mesmo `.superRefine` de
+`registerProfessionalSchema`/`internAcceptInviteSchema`. Slice próprio — é
+mudança de contrato numa porta de nascimento de conta (área crítica), não
+carona em slice alheio.
+
 ### UI do estagiário — slice próprio
 
 O seat de estagiário entregou **API + contrato** (D-142). Falta a UI: (a) tela

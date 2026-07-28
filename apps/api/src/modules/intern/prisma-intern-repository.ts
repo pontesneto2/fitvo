@@ -38,10 +38,18 @@ const SUPERVISOR_SPECIALTY_CODES: readonly SpecialtyCode[] = ['TRAINING', 'PERSO
  * conjunto que o convite aceita; duas copias poderiam divergir e oferecer na
  * tela alguem que o POST recusa.
  *
- * O `type: 'ACADEMIA'` e o que ancora o seat na vertical: estagiario e seat de
- * ACADEMIA (spec §1/§6 — D-142). Numa clinica nao ha responsavel elegivel, logo
- * nao ha convite de estagiario. Se um dia clinica passar a comportar estagiario,
- * e ESTE predicado que muda — em um lugar so.
+ * O `type: 'ACADEMIA'` e o que ancora o seat na vertical hoje: estagiario e seat
+ * de ACADEMIA (spec §1/§6 — D-142). Numa clinica nao ha responsavel elegivel,
+ * logo nao ha convite de estagiario.
+ *
+ * TODO(estagiario-em-clinica): `ACADEMIA` aqui e restricao de **MVP, NAO regra
+ * permanente**. Estagiario de clinica e um caso REAL e previsto (estudante de
+ * nutricao ou medicina sob supervisao) — a expansao e generalizar para
+ * "estagiario em EMPRESA, com supervisor do conselho APROPRIADO a especialidade":
+ * o par (vertical do tenant -> conselhos que supervisionam) vira a tabela, no
+ * lugar do par fixo ACADEMIA/CREF de hoje. O que NAO muda na expansao e o
+ * essencial: responsavel obrigatorio, NOT NULL, com capacidade derivada dele.
+ * Este predicado e o unico ponto de mudanca — de proposito.
  *
  * "Conselho preenchido" e o maximo que da para exigir hoje: verificacao de
  * registro ATIVO no conselho segue deferida (D-138/TODO(D-010)).

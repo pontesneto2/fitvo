@@ -1,5 +1,8 @@
-import type { ClinicRole, InviteStatus } from '@fitvo/database';
+import type { BrazilianState, ClinicRole, InviteStatus, MedicalSpecialty } from '@fitvo/database';
 
+import type { SpecialtyRepository } from '../specialty/specialty-repository';
+import { recordInitialTermsAcceptanceInMemory } from '../terms/initial-terms-acceptance';
+import type { RequestOrigin, TermsRepository } from '../terms/terms-repository';
 import type {
   AcceptInviteOutcome,
   ClinicProfessionalRecord,
@@ -17,6 +20,11 @@ interface StoredInvite {
   tokenHash: string;
   expiresAt: Date;
   createdAt: Date;
+  /** Espelha o convite migrado (ADR-0015): especialidade + conselho fixados no convite. */
+  specialtyId: string | null;
+  councilDocument: string | null;
+  councilState: BrazilianState | null;
+  medicalSpecialty: MedicalSpecialty | null;
 }
 
 interface StoredAccount {
@@ -34,6 +42,16 @@ interface StoredProfile {
   createdAt: Date;
 }
 
+/** ProfessionalSpecialty espelhada (ADR-0015) — para asserts nos testes. */
+export interface StoredProfessionalSpecialty {
+  professionalProfileId: string;
+  specialtyId: string;
+  councilDocument: string | null;
+  councilState: BrazilianState | null;
+  medicalSpecialty: MedicalSpecialty | null;
+  verificationStatus: 'PENDING';
+}
+
 export interface SeedAccountInput {
   email: string;
   name: string;
@@ -42,9 +60,10 @@ export interface SeedAccountInput {
 /**
  * Implementacao em memoria para testes e desenvolvimento local. Espelha a
  * logica da implementacao Prisma sobre Maps (o loop de eventos single-thread do
- * Node torna cada operacao efetivamente atomica). Os helpers `seed*` arranjam o
- * mundo nos testes — nesta fase nao ha endpoint de criacao de clinica/admin, o
- * onboarding de clinica e uma fatia futura (D-012).
+ * Node torna cada operacao efetivamente atomica). Recebe o repositorio de termos
+ * (como o de account/patient) para gravar o aceite INICIAL (D-025) SO quando a
+ * conta e nova, e o catalogo de especialidades (D-047) para resolver code->id no
+ * convite. Os helpers `seed*` arranjam o mundo nos testes.
  */
 export class InMemoryClinicRepository implements ClinicRepository {
   private readonly invites = new Map<string, StoredInvite>();
@@ -52,7 +71,13 @@ export class InMemoryClinicRepository implements ClinicRepository {
   private readonly accountIdByEmail = new Map<string, string>();
   private readonly profiles = new Map<string, StoredProfile>();
   private readonly memberships = new Map<string, ClinicRole>();
+  private readonly professionalSpecialties: StoredProfessionalSpecialty[] = [];
   private sequence = 0;
+
+  constructor(
+    private readonly terms: TermsRepository,
+    private readonly specialties: SpecialtyRepository,
+  ) {}
 
   // --- Seed helpers (testes/dev; fora da interface de producao) ---
 
@@ -74,6 +99,14 @@ export class InMemoryClinicRepository implements ClinicRepository {
     return id;
   }
 
+  /** Leitura das ProfessionalSpecialty criadas — para asserts nos testes. */
+  listProfessionalSpecialties(professionalProfileId?: string): StoredProfessionalSpecialty[] {
+    return this.professionalSpecialties.filter(
+      (s) =>
+        professionalProfileId === undefined || s.professionalProfileId === professionalProfileId,
+    );
+  }
+
   // --- ClinicRepository ---
 
   findMembership(accountId: string, tenantId: string): Promise<{ role: ClinicRole } | null> {
@@ -81,7 +114,8 @@ export class InMemoryClinicRepository implements ClinicRepository {
     return Promise.resolve(role ? { role } : null);
   }
 
-  createInvite(input: CreateInviteInput): Promise<ProfessionalInviteRecord> {
+  async createInvite(input: CreateInviteInput): Promise<ProfessionalInviteRecord> {
+    const specialtyId = await this.resolveSpecialtyId(input.specialtyCode);
     const invite: StoredInvite = {
       id: this.nextId('inv'),
       tenantId: input.tenantId,
@@ -90,9 +124,13 @@ export class InMemoryClinicRepository implements ClinicRepository {
       tokenHash: input.tokenHash,
       expiresAt: input.expiresAt,
       createdAt: new Date(),
+      specialtyId,
+      councilDocument: input.councilDocument,
+      councilState: input.councilState,
+      medicalSpecialty: input.medicalSpecialty ?? null,
     };
     this.invites.set(invite.id, invite);
-    return Promise.resolve(this.toInviteRecord(invite));
+    return this.toInviteRecord(invite);
   }
 
   findPendingInviteByEmail(
@@ -142,27 +180,38 @@ export class InMemoryClinicRepository implements ClinicRepository {
     return Promise.resolve(true);
   }
 
-  acceptInvite(tokenHash: string, account: NewProfessionalAccount): Promise<AcceptInviteOutcome> {
+  async acceptInvite(
+    tokenHash: string,
+    account: NewProfessionalAccount,
+    origin: RequestOrigin,
+  ): Promise<AcceptInviteOutcome> {
     const invite = this.findByTokenHash(tokenHash);
     if (!invite || invite.status !== 'PENDING' || invite.expiresAt.getTime() <= Date.now()) {
-      return Promise.resolve({ status: 'invalid' });
+      return { status: 'invalid' };
+    }
+    // Convite LEGADO (pre-ADR-0015): sem specialtyId -> invalido (guarda defensiva).
+    if (!invite.specialtyId) {
+      return { status: 'invalid' };
     }
 
     const existingId = this.accountIdByEmail.get(invite.email);
     const existing = existingId ? this.accountsById.get(existingId) : undefined;
     if (existing?.professionalProfileId) {
-      return Promise.resolve({ status: 'conflict' });
+      return { status: 'conflict' };
     }
 
     invite.status = 'ACCEPTED';
     if (existing) {
-      existing.professionalProfileId = this.attachProfile(existing.id, invite.tenantId);
-      return Promise.resolve({
+      // Conta ja existe (multi-papel — D-041): NAO regrava termos.
+      const profileId = this.attachProfile(existing.id, invite.tenantId);
+      this.attachSpecialty(profileId, invite);
+      existing.professionalProfileId = profileId;
+      return {
         status: 'accepted',
         tenantId: invite.tenantId,
         accountId: existing.id,
         created: false,
-      });
+      };
     }
 
     const stored: StoredAccount = {
@@ -173,16 +222,30 @@ export class InMemoryClinicRepository implements ClinicRepository {
     };
     this.accountsById.set(stored.id, stored);
     this.accountIdByEmail.set(invite.email, stored.id);
-    stored.professionalProfileId = this.attachProfile(stored.id, invite.tenantId);
-    return Promise.resolve({
+    const profileId = this.attachProfile(stored.id, invite.tenantId);
+    this.attachSpecialty(profileId, invite);
+    stored.professionalProfileId = profileId;
+    // Conta NOVA: grava o aceite inicial dos termos (D-025), como o aceite de
+    // paciente/o cadastro de auth. Mesma regra que a Prisma.
+    await recordInitialTermsAcceptanceInMemory(this.terms, stored.id, origin);
+    return {
       status: 'accepted',
       tenantId: invite.tenantId,
       accountId: stored.id,
       created: true,
-    });
+    };
   }
 
   // --- helpers privados ---
+
+  private async resolveSpecialtyId(code: CreateInviteInput['specialtyCode']): Promise<string> {
+    const catalog = await this.specialties.list();
+    const found = catalog.find((s) => s.code === code);
+    if (!found) {
+      throw new Error(`Especialidade ${code} inexistente no catalogo (D-047).`);
+    }
+    return found.id;
+  }
 
   private attachProfile(accountId: string, tenantId: string): string {
     const profile: StoredProfile = {
@@ -194,6 +257,17 @@ export class InMemoryClinicRepository implements ClinicRepository {
     };
     this.profiles.set(profile.id, profile);
     return profile.id;
+  }
+
+  private attachSpecialty(professionalProfileId: string, invite: StoredInvite): void {
+    this.professionalSpecialties.push({
+      professionalProfileId,
+      specialtyId: invite.specialtyId!,
+      councilDocument: invite.councilDocument,
+      councilState: invite.councilState,
+      medicalSpecialty: invite.medicalSpecialty,
+      verificationStatus: 'PENDING',
+    });
   }
 
   private findByTokenHash(tokenHash: string): StoredInvite | undefined {

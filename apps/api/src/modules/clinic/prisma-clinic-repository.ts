@@ -1,6 +1,8 @@
 import type { PrismaClient } from '@fitvo/database';
 import { prisma as defaultPrisma } from '@fitvo/database';
 
+import { recordInitialTermsAcceptance } from '../terms/initial-terms-acceptance';
+import type { RequestOrigin } from '../terms/terms-repository';
 import type {
   AcceptInviteOutcome,
   ClinicProfessionalRecord,
@@ -30,13 +32,23 @@ export class PrismaClinicRepository implements ClinicRepository {
     });
   }
 
-  createInvite(input: CreateInviteInput): Promise<ProfessionalInviteRecord> {
+  async createInvite(input: CreateInviteInput): Promise<ProfessionalInviteRecord> {
+    // Resolve code->id no catalogo fixo (D-047). Se o code nao existe, a
+    // criacao falha aqui (findUniqueOrThrow) — a FK Restrict e a segunda guarda.
+    const specialty = await this.db.specialty.findUniqueOrThrow({
+      where: { code: input.specialtyCode },
+      select: { id: true },
+    });
     return this.db.professionalInvite.create({
       data: {
         tenantId: input.tenantId,
         email: input.email,
         tokenHash: input.tokenHash,
         expiresAt: input.expiresAt,
+        specialtyId: specialty.id,
+        councilDocument: input.councilDocument,
+        councilState: input.councilState,
+        medicalSpecialty: input.medicalSpecialty ?? null,
       },
       select: INVITE_PROJECTION,
     });
@@ -90,13 +102,33 @@ export class PrismaClinicRepository implements ClinicRepository {
     return result.count > 0;
   }
 
-  acceptInvite(tokenHash: string, account: NewProfessionalAccount): Promise<AcceptInviteOutcome> {
+  acceptInvite(
+    tokenHash: string,
+    account: NewProfessionalAccount,
+    origin: RequestOrigin,
+  ): Promise<AcceptInviteOutcome> {
     return this.db.$transaction(async (tx) => {
       const invite = await tx.professionalInvite.findUnique({
         where: { tokenHash },
-        select: { id: true, tenantId: true, email: true, status: true, expiresAt: true },
+        select: {
+          id: true,
+          tenantId: true,
+          email: true,
+          status: true,
+          expiresAt: true,
+          specialtyId: true,
+          councilDocument: true,
+          councilState: true,
+          medicalSpecialty: true,
+        },
       });
       if (!invite || invite.status !== 'PENDING' || invite.expiresAt.getTime() <= Date.now()) {
+        return { status: 'invalid' };
+      }
+      // Convite LEGADO (pre-ADR-0015): sem specialtyId nao ha como nascer a
+      // ProfessionalSpecialty exigida pelo gate (D-140). Nao existe convite legado
+      // real no banco de dev (0 pendentes conferidos) — guarda defensiva.
+      if (!invite.specialtyId) {
         return { status: 'invalid' };
       }
 
@@ -117,9 +149,28 @@ export class PrismaClinicRepository implements ClinicRepository {
         return { status: 'invalid' };
       }
 
+      // A especialidade + conselho (+ medicalSpecialty quando medico) NASCEM do
+      // convite (ADR-0015/D-137/D-138), na MESMA transacao do perfil — nunca um
+      // profissional de clinica sem especialidade reivindicada. PENDING e o
+      // default de verificationStatus (D-010 segue deferido).
+      const professionalSpecialty = {
+        create: {
+          specialty: { connect: { id: invite.specialtyId } },
+          councilDocument: invite.councilDocument,
+          councilState: invite.councilState,
+          medicalSpecialty: invite.medicalSpecialty,
+        },
+      };
+
       if (existing) {
+        // Conta ja existe (multi-papel — D-041): ja aceitou termos no proprio
+        // cadastro; NAO regrava. So cria o perfil + especialidade que faltavam.
         await tx.professionalProfile.create({
-          data: { accountId: existing.id, tenantId: invite.tenantId },
+          data: {
+            accountId: existing.id,
+            tenantId: invite.tenantId,
+            specialties: professionalSpecialty,
+          },
         });
         return {
           status: 'accepted',
@@ -136,10 +187,19 @@ export class PrismaClinicRepository implements ClinicRepository {
           name: account.name,
           document: account.document,
           documentType: account.documentType,
-          professionalProfile: { create: { tenant: { connect: { id: invite.tenantId } } } },
+          professionalProfile: {
+            create: {
+              tenant: { connect: { id: invite.tenantId } },
+              specialties: professionalSpecialty,
+            },
+          },
         },
         select: { id: true },
       });
+      // Conta NOVA: esta e a porta de nascimento da Account (como o aceite de
+      // paciente — D-135) — precisa gravar o consentimento inicial (D-025) na
+      // MESMA transacao. Se qualquer parte acima/abaixo falhar, tudo reverte.
+      await recordInitialTermsAcceptance(tx, created.id, origin);
       return {
         status: 'accepted',
         tenantId: invite.tenantId,

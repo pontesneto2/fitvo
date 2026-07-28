@@ -116,7 +116,10 @@ export function buildTestDependencies(): TestDependencies {
     { emailVerificationTtlSeconds: 3600, passwordResetTtlSeconds: 3600 },
     specialty,
   );
-  const clinic = new InMemoryClinicRepository();
+  // Recebe `terms` para gravar o aceite inicial (D-025) SO em conta nova, e
+  // `specialty` (catalogo D-047) para resolver o SpecialtyCode do convite -> id
+  // — mesma regra da PrismaClinicRepository (ADR-0015).
+  const clinic = new InMemoryClinicRepository(terms, specialty);
   const clinicService = new ClinicApplicationService(
     clinic,
     hasher,

@@ -1,5 +1,11 @@
 import type { PasswordHasher } from '@fitvo/auth';
-import type { DocumentType, InviteStatus } from '@fitvo/database';
+import type {
+  BrazilianState,
+  DocumentType,
+  InviteStatus,
+  MedicalSpecialty,
+  SpecialtyCode,
+} from '@fitvo/database';
 
 import type {
   AccessTokenVerifier,
@@ -19,6 +25,7 @@ import {
   NotFoundError,
   ProfessionalProfileConflictError,
 } from '../../shared/http-errors';
+import type { RequestOrigin } from '../terms/terms-repository';
 import type {
   ClinicProfessionalRecord,
   ClinicRepository,
@@ -60,12 +67,24 @@ export interface ClinicRosterResult {
   pendingInvites: InviteView[];
 }
 
+/** Payload do convite (a clinica fixa especialidade + conselho — ADR-0015/D-137/D-138). */
+export interface CreateInviteBody {
+  email: string;
+  specialtyCode: SpecialtyCode;
+  councilDocument: string;
+  councilState: BrazilianState;
+  /** Presente sse `specialtyCode === 'MEDICINE'` (garantido pelo Zod — superRefine). */
+  medicalSpecialty?: MedicalSpecialty | undefined;
+}
+
 export interface AcceptInviteInput {
   token: string;
   password: string;
   name: string;
   document: string;
   documentType: DocumentType;
+  /** Origem (IP/UA) da requisicao — grava o aceite inicial dos termos (D-025). */
+  origin: RequestOrigin;
 }
 
 export interface AcceptInviteResult {
@@ -123,7 +142,7 @@ export class ClinicApplicationService {
   async createInvite(
     authorization: string | undefined,
     tenantId: string,
-    input: { email: string },
+    input: CreateInviteBody,
   ): Promise<CreateInviteResult> {
     const ctx = await this.requireClinicAdmin(authorization, tenantId);
     await requireVerifiedEmail(this.emailVerification, ctx.accountId);
@@ -140,6 +159,10 @@ export class ClinicApplicationService {
       email: input.email,
       tokenHash: hashInviteToken(token),
       expiresAt,
+      specialtyCode: input.specialtyCode,
+      councilDocument: input.councilDocument,
+      councilState: input.councilState,
+      medicalSpecialty: input.medicalSpecialty,
     });
     return { invite: toInviteView(invite), token };
   }
@@ -180,12 +203,16 @@ export class ClinicApplicationService {
    */
   async acceptInvite(input: AcceptInviteInput): Promise<AcceptInviteResult> {
     const passwordHash = await this.hasher.hash(input.password);
-    const outcome = await this.clinic.acceptInvite(hashInviteToken(input.token), {
-      passwordHash,
-      name: input.name,
-      document: input.document,
-      documentType: input.documentType,
-    });
+    const outcome = await this.clinic.acceptInvite(
+      hashInviteToken(input.token),
+      {
+        passwordHash,
+        name: input.name,
+        document: input.document,
+        documentType: input.documentType,
+      },
+      input.origin,
+    );
     if (outcome.status === 'invalid') {
       throw new InvalidInviteTokenError();
     }

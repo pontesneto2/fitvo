@@ -203,6 +203,10 @@ sempre da interface do package de abstração.
   exibição. Regra inegociável.
 - **Datas:** SEMPRE UTC no banco; conversão para o fuso do usuário só na
   exibição.
+- **Nome social:** `displayName = socialName ?? name` é derivado UMA VEZ no
+  servidor (`deriveDisplayName`), exposto via `/me` e account summary. Toda
+  superfície (web/mobile/admin) consome `me.displayName` — NUNCA derivar por
+  conta própria. Nome civil fica restrito a `tenant.name`/documento/fiscal.
 - **i18n:** textos externalizados desde já; lançamento em pt-BR.
 - **Logging:** estruturado (JSON), com request ID e correlation ID desde o dia 1.
 - **Testes:** pirâmide com foco no core de risco (unit + integração) e E2E nos

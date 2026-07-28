@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { hashInviteToken } from '../../shared/invite-token';
 import { InMemorySpecialtyRepository } from '../specialty/in-memory-specialty-repository';
 import { InMemoryTermsRepository } from '../terms/in-memory-terms-repository';
 import type { NewProfessionalAccount } from './clinic-repository';
 import { InMemoryClinicRepository } from './in-memory-clinic-repository';
-import { hashInviteToken } from './invite-token';
 
 const TENANT = 'clinic_a';
 const OTHER_TENANT = 'clinic_b';

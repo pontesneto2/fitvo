@@ -25,13 +25,13 @@ import {
   NotFoundError,
   ProfessionalProfileConflictError,
 } from '../../shared/http-errors';
+import { generateInviteToken, hashInviteToken } from '../../shared/invite-token';
 import type { RequestOrigin } from '../terms/terms-repository';
 import type {
   ClinicProfessionalRecord,
   ClinicRepository,
   ProfessionalInviteRecord,
 } from './clinic-repository';
-import { generateInviteToken, hashInviteToken } from './invite-token';
 
 /** Projecao do convite exposta na API (datas em ISO UTC — D-067). */
 export interface InviteView {

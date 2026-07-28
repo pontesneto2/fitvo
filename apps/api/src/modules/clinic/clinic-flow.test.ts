@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
+import { hashInviteToken } from '../../shared/invite-token';
 import { buildTestHarness, type TestHarness } from '../../testing/build-test-app';
 import { validProfessionalRegistration } from '../../testing/professional-registration-fixture';
-import { hashInviteToken } from './invite-token';
 
 const CLINIC_TENANT = 'clinic_test_1';
 

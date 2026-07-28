@@ -1,7 +1,7 @@
 import type { CareModality } from '@fitvo/database';
 import { describe, expect, it } from 'vitest';
 
-import { hashInviteToken } from '../clinic/invite-token';
+import { hashInviteToken } from '../../shared/invite-token';
 import { InMemoryPatientRepository } from './in-memory-patient-repository';
 import type { CreatePatientInviteInput, NewPatientAccount } from './patient-repository';
 

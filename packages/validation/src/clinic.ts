@@ -1,37 +1,29 @@
 import { z } from 'zod';
 
+import { acceptedTerms, brazilianStateSchema, councilDocument } from './auth';
 import {
-  acceptedTerms,
-  addressSchema,
-  birthDate,
-  brazilianStateSchema,
-  councilDocument,
-  genderSchema,
-  socialName,
-  strongPassword,
-  whatsapp,
-} from './auth';
-import { isValidCnpj, isValidCpf } from './document';
-import { specialtyCodeSchema } from './specialty';
+  companyAdminRoleSchema,
+  companyRegistrationRefine,
+  companyRegistrationShape,
+  medicalSpecialtySchema,
+} from './company-registration';
+import { type SpecialtyCode, specialtyCodeSchema } from './specialty';
 
 /**
  * Contrato da clínica (D-014/D-048/D-032) — fonte única. Nomes prefixados com
  * `clinic` porque o barrel de `@fitvo/validation` é flat e `tenantParams`/
  * `invite*` colidiriam com o slice de paciente. O service já entrega timestamps
  * como ISO string (sem ponte Date→ISO aqui).
+ *
+ * O cadastro PÚBLICO da empresa (`registerClinicSchema`) é montado sobre a base
+ * compartilhada de `company-registration.ts` — clínica e academia têm o MESMO
+ * cadastro (spec §4.2/§4.3) e diferem só na vertical. Ver `academy.ts`.
  */
 
-/**
- * Especialidade MÉDICA (mirror do enum `MedicalSpecialty` do Prisma). Escopo
- * DELIBERADAMENTE mínimo — só as duas especialidades médicas que o produto
- * atende hoje. NÃO reusa `rqe` (aquele é o registro genérico do CRM); esta é a
- * qualificação de especialista dentro da Medicina, e é uma coluna própria em
- * `ProfessionalSpecialty`. A regra "só quando MEDICINE" é do `.superRefine`
- * abaixo (e da aplicação), nunca da coluna (nulável no banco).
- */
-export const medicalSpecialtySchema = z
-  .enum(['NUTROLOGIA', 'ENDOCRINOLOGIA'])
-  .describe('Especialidade médica (apenas Nutrologia/Endocrinologia).');
+// Reexportados: nasceram no contrato de clínica, hoje são compartilhados com a
+// academia e vivem na base comum. Mantidos aqui para não quebrar o import de
+// quem já os consome por este módulo.
+export { companyAdminRoleSchema, medicalSpecialtySchema };
 
 // ---- Params / Request ----
 export const clinicTenantParamsSchema = z.object({
@@ -98,170 +90,28 @@ export const clinicAcceptInviteSchema = z.object({
 });
 
 /**
- * "Você é?" no cadastro público da empresa (spec §2/§4.2) — REQUEST-ONLY, não é
- * enum de banco: a membership do admin é sempre `CLINIC_ADMIN`; "também atende"
- * NÃO é uma role nova, é a PRESENÇA de um `ProfessionalProfile`+
- * `ProfessionalSpecialty` para a mesma conta. Gestor-puro nunca informa conselho;
- * quem atende sempre informa (regra ampla e segura — spec §2).
- */
-export const clinicAdminRoleSchema = z
-  .enum(['MANAGER_ONLY', 'MANAGER_PROVIDER'])
-  .describe('"Você é?" — só gestor (MANAGER_ONLY) ou gestor que também atende (MANAGER_PROVIDER).');
-
-/**
  * Cadastro PÚBLICO de CLÍNICA (spec §1/§2/§4.2 · ADR-0015/D-139) — nasce
  * `Tenant(CLINIC)` + `Account`(admin) + membership `CLINIC_ADMIN` (+ perfil
  * profissional se "também atende"). Área crítica (LGPD + cria tenant + vínculo).
  *
- * Empresa: **só CNPJ** (spec §2) com DV real. `tradeName` (nome fantasia) vira
- * `tenant.name` (exibição, como o SOLO usa o nome da pessoa); `legalName` (razão
- * social) é o dado fiscal (coluna própria). Admin: pessoa física com CPF
- * obrigatório (DV real) — a empresa é CNPJ, o gestor-pessoa é CPF.
- *
- * `.superRefine` cobre três regras cross-field: (1) DV do CNPJ da empresa e do
- * CPF do admin; (2) conselho obrigatório sse `MANAGER_PROVIDER` e proibido em
- * `MANAGER_ONLY` (gestor-puro não tem conselho — spec §2); (3) especialidade
- * médica obrigatória sse Médico e proibida nas demais (mesma regra do convite
- * #102). Estados inválidos irrepresentáveis: gestor-puro com conselho, ou
- * gestor-que-atende sem conselho, o Zod rejeita com 400 antes de tocar o banco.
- *
- * OUT (spec §4.2, itens 7-8, deferidos): "Nº de profissionais previsto" cortado
- * (dado comercial sem uso funcional no MVP). "Especialidades oferecidas" NÃO é
- * campo manual — quando implementado, DERIVA das especialidades dos
- * profissionais do tenant (a clínica oferece o que seus profissionais fazem);
- * nunca virar multi-select. TODO(onboarding): derivar de ProfessionalSpecialty.
+ * Campos e regras cross-field vêm INTEIROS da base de empresa
+ * (`company-registration.ts`) — clínica e academia são o mesmo cadastro (spec
+ * §4.2/§4.3). O que a clínica define é só a VERTICAL: comporta o catálogo
+ * inteiro de profissões, medicina inclusive (e portanto a especialidade médica).
  */
-export const registerClinicSchema = z
-  .object({
-    // --- Empresa (CNPJ obrigatório — spec §2) ---
-    legalName: z.string().trim().min(1).describe('Razão social — dado fiscal (tenant.legalName).'),
-    tradeName: z
-      .string()
-      .trim()
-      .min(1)
-      .describe('Nome fantasia — vira tenant.name (nome de exibição).'),
-    cnpj: z
-      .string()
-      .regex(/^\d+$/, 'CNPJ deve conter apenas dígitos.')
-      .describe('CNPJ da empresa — só dígitos + DV real (spec §2).'),
-    companyEmail: z.string().email().describe('E-mail da empresa.'),
-    companyPhone: z
-      .string()
-      .regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos, só números.')
-      .describe('Telefone/WhatsApp da empresa — 10 ou 11 dígitos, só números.'),
-    address: addressSchema.describe('Endereço do estabelecimento (da empresa, não pessoal).'),
-    // --- Admin (pessoa física — CPF obrigatório, D1) ---
-    role: clinicAdminRoleSchema,
-    name: z.string().min(1).describe('Nome civil do admin.'),
-    socialName,
-    document: z
-      .string()
-      .regex(/^\d+$/, 'Documento deve conter apenas dígitos.')
-      .describe('CPF do admin (pessoa física) — só dígitos + DV real.'),
-    email: z.string().email().describe('E-mail de login do admin (único).'),
-    password: strongPassword,
-    whatsapp,
-    birthDate,
-    gender: genderSchema.optional().describe('Gênero/identidade do admin — opcional (spec §3.1).'),
-    // --- Condicional: só quando MANAGER_PROVIDER (abre com "também atende") ---
-    specialtyCode: specialtyCodeSchema
-      .optional()
-      .describe('Profissão de quem atende — obrigatória sse "também atende".'),
-    councilDocument: councilDocument.optional(),
-    councilState: brazilianStateSchema
-      .optional()
-      .describe('UF do conselho — obrigatória sse "também atende".'),
-    medicalSpecialty: medicalSpecialtySchema
-      .optional()
-      .describe('Especialidade médica — obrigatória sse Médico que também atende.'),
-    acceptedTerms,
-  })
-  .superRefine((data, ctx) => {
-    // (1) Dígito verificador REAL. Empresa é SÓ CNPJ; admin-pessoa é SÓ CPF.
-    if (!isValidCnpj(data.cnpj)) {
-      ctx.addIssue({ code: 'custom', path: ['cnpj'], message: 'CNPJ inválido (14 dígitos + DV).' });
-    }
-    if (!isValidCpf(data.document)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['document'],
-        message: 'CPF do gestor inválido (11 dígitos + DV).',
-      });
-    }
+export const CLINIC_SPECIALTY_CODES: readonly SpecialtyCode[] = [
+  'MEDICINE',
+  'NUTRITION',
+  'TRAINING',
+  'PERSONAL_TRAINER',
+];
 
-    // (2)+(3) Conselho condicional ao "Você é?" + regra da especialidade médica.
-    if (data.role === 'MANAGER_PROVIDER') {
-      if (data.specialtyCode === undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['specialtyCode'],
-          message: 'Informe a profissão de quem também atende.',
-        });
-      }
-      if (data.councilDocument === undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['councilDocument'],
-          message: 'Conselho é obrigatório para quem também atende.',
-        });
-      }
-      if (data.councilState === undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['councilState'],
-          message: 'UF do conselho é obrigatória para quem também atende.',
-        });
-      }
-      if (data.specialtyCode === 'MEDICINE' && data.medicalSpecialty === undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['medicalSpecialty'],
-          message: 'Especialidade médica é obrigatória para Médico.',
-        });
-      }
-      if (
-        data.specialtyCode !== undefined &&
-        data.specialtyCode !== 'MEDICINE' &&
-        data.medicalSpecialty !== undefined
-      ) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['medicalSpecialty'],
-          message: 'Especialidade médica só é permitida para Médico.',
-        });
-      }
-    } else {
-      // MANAGER_ONLY (gestor-puro): conselho/especialidade PROIBIDOS (spec §2).
-      if (data.specialtyCode !== undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['specialtyCode'],
-          message: 'Gestor-puro não informa profissão.',
-        });
-      }
-      if (data.councilDocument !== undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['councilDocument'],
-          message: 'Gestor-puro não informa conselho.',
-        });
-      }
-      if (data.councilState !== undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['councilState'],
-          message: 'Gestor-puro não informa UF de conselho.',
-        });
-      }
-      if (data.medicalSpecialty !== undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['medicalSpecialty'],
-          message: 'Gestor-puro não informa especialidade médica.',
-        });
-      }
-    }
-  });
+export const registerClinicSchema = z.object(companyRegistrationShape).superRefine(
+  companyRegistrationRefine({
+    allowedSpecialtyCodes: CLINIC_SPECIALTY_CODES,
+    specialtyOutOfVerticalMessage: 'Profissão fora do catálogo da clínica.',
+  }),
+);
 
 // ---- Response ----
 export const clinicInviteViewSchema = z.object({
@@ -302,7 +152,7 @@ export type ClinicTenantParams = z.infer<typeof clinicTenantParamsSchema>;
 export type ClinicInviteParams = z.infer<typeof clinicInviteParamsSchema>;
 export type ClinicCreateInviteInput = z.infer<typeof clinicCreateInviteSchema>;
 export type ClinicAcceptInviteInput = z.infer<typeof clinicAcceptInviteSchema>;
-export type ClinicAdminRole = z.infer<typeof clinicAdminRoleSchema>;
+export type ClinicAdminRole = z.infer<typeof companyAdminRoleSchema>;
 export type RegisterClinicInput = z.infer<typeof registerClinicSchema>;
 export type ClinicInviteView = z.infer<typeof clinicInviteViewSchema>;
 export type ClinicProfessionalView = z.infer<typeof clinicProfessionalViewSchema>;

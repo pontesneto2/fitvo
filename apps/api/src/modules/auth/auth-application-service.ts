@@ -8,7 +8,7 @@ import type {
   VerificationTokenStore,
 } from '@fitvo/auth';
 import type { BrazilianState, DocumentType, Gender, SpecialtyCode } from '@fitvo/database';
-import type { RegisterClinicInput } from '@fitvo/validation';
+import type { RegisterAcademyInput, RegisterClinicInput } from '@fitvo/validation';
 
 import {
   EmailAlreadyInUseError,
@@ -22,9 +22,18 @@ import {
   type AccountRepository,
   type AddressInput,
   type ClinicProviderInput,
+  type CompanyTenantType,
   deriveDisplayName,
   type TermsAcceptanceOrigin,
 } from './account-repository';
+
+/**
+ * Entrada do tronco comum do cadastro de empresa. Clínica e academia partilham o
+ * MESMO shape (spec §4.2/§4.3) — divergem só nas regras cross-field do Zod, que
+ * já rodaram na borda. Os dois tipos são estruturalmente idênticos; declarar a
+ * união deixa explícito que o tronco atende as duas verticais.
+ */
+type RegisterCompanyInput = RegisterClinicInput | RegisterAcademyInput;
 
 /**
  * Guard minimo: a especialidade reivindicada no signup (D-137) precisa
@@ -135,13 +144,36 @@ export class AuthApplicationService {
 
   /**
    * Cadastro público de CLÍNICA (D-139): nasce Tenant(CLINIC) + Account(admin) +
-   * membership CLINIC_ADMIN (+ perfil profissional se "também atende"), tudo na
-   * mesma transação do repositório. Reusa a mesma máquina do autônomo (hash,
-   * verificação de e-mail, sessão, displayName). O `.superRefine` do Zod já
-   * garantiu conselho condicional e DV; aqui só resolvemos code→id e persistimos.
+   * membership CLINIC_ADMIN (+ perfil profissional se "também atende").
    */
-  async registerClinic(
-    input: RegisterClinicInput,
+  registerClinic(input: RegisterClinicInput, origin: TermsAcceptanceOrigin): Promise<AuthResult> {
+    return this.registerCompany('CLINIC', input, origin);
+  }
+
+  /**
+   * Cadastro público de ACADEMIA (D-141): nasce Tenant(ACADEMIA) + Account(admin)
+   * + membership CLINIC_ADMIN (+ perfil profissional se "também atende").
+   *
+   * Mesmo fluxo da clínica — a restrição da vertical (só CREF; médico e
+   * nutricionista PROIBIDOS) é do CONTRATO (`registerAcademySchema`), resolvida
+   * com 400 na borda HTTP antes de chegar aqui. O service NÃO reimplementa a
+   * regra: uma segunda cópia dela poderia divergir do Zod, e aí a borda e o
+   * núcleo discordariam sobre quem pode existir numa academia.
+   */
+  registerAcademy(input: RegisterAcademyInput, origin: TermsAcceptanceOrigin): Promise<AuthResult> {
+    return this.registerCompany('ACADEMIA', input, origin);
+  }
+
+  /**
+   * Tronco comum do cadastro de empresa (D-139/D-141) — clínica e academia têm o
+   * MESMO cadastro (spec §4.2/§4.3) e a mesma transação; só a vertical muda.
+   * Reusa a máquina do autônomo (hash, verificação de e-mail, sessão,
+   * displayName). O `.superRefine` do Zod já garantiu conselho condicional, DV e
+   * profissão dentro da vertical; aqui só resolvemos code→id e persistimos.
+   */
+  private async registerCompany(
+    tenantType: CompanyTenantType,
+    input: RegisterCompanyInput,
     origin: TermsAcceptanceOrigin,
   ): Promise<AuthResult> {
     await this.ensureEmailIsFree(input.email);
@@ -150,7 +182,7 @@ export class AuthApplicationService {
     if (input.role === 'MANAGER_PROVIDER') {
       const { specialtyCode, councilDocument, councilState, medicalSpecialty } = input;
       // Narrowing: o Zod já garante os três presentes quando MANAGER_PROVIDER
-      // (registerClinicSchema.superRefine) — este guard é só para o compilador.
+      // (companyRegistrationRefine) — este guard é só para o compilador.
       if (
         specialtyCode === undefined ||
         councilDocument === undefined ||
@@ -166,7 +198,8 @@ export class AuthApplicationService {
     }
 
     const passwordHash = await this.hasher.hash(input.password);
-    const account = await this.accounts.createClinic({
+    const account = await this.accounts.createCompany({
+      tenantType,
       legalName: input.legalName,
       tradeName: input.tradeName,
       cnpj: input.cnpj,

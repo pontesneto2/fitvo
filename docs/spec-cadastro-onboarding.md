@@ -192,13 +192,66 @@ Se `birthDate` < 18 no aceite, o fluxo **DEVE** capturar e **armazenar como prov
 **Armazenamento:** evento **append-only, imutável**, com timestamp + IP + user-agent (mesmo padrão probatório do `TermsAcceptanceEvent`) — a autorização fica registrada e recuperável no sistema. Menor **não** consente sozinho; o consentimento válido é o do responsável.
 *(Implementação = slice próprio do fluxo de paciente; não é o slice de cadastro de profissional em curso.)*
 
+### 4.8 Estagiário — seat supervisionado, por convite (D-142)
+
+**NUNCA** aparece em seletor: estagiário **não se autocadastra** (§1/§6). É
+pré-cadastrado pela academia, no mesmo molde de duas fases do §4.4, com duas
+diferenças que são a regra legal inteira:
+
+1. **NÃO informa conselho** — é estudante; não tem CREF. Não existe o campo.
+2. **Responsável OBRIGATÓRIO** — sempre vinculado a um profissional de **CREF**
+   (Educador Físico ou Personal Trainer) **do próprio tenant**, incluindo o
+   admin-que-atende da academia.
+
+**Fase A — a academia pré-cadastra:**
+
+| Campo | Obrig. | Nota |
+|---|---|---|
+| E-mail | ● | destino do convite |
+| **Responsável** | ● | seleciona entre os CREF da academia; **sem ele não há convite** |
+| Nome | ○ | facilita o convite; o civil vem no aceite |
+| Profissão / conselho / especialidade | ✗ | **não existem** para estagiário |
+
+**Fase B — o estagiário aceita e completa:**
+
+| Campo | Obrig. | Nota |
+|---|---|---|
+| Senha | ● | 8+letra+número |
+| Nome civil + nome social(○) | ● | §3.1 |
+| Documento (CPF/CNPJ) | ● | DV real + xor |
+| Data de nascimento | ● | — |
+| Gênero | ○ | §3.1 |
+| Endereço completo | ● | CEP puxa |
+| WhatsApp | ● | — |
+| Aceite Termos + Política | ● | `literal(true)` ×2, gravado **só** em conta nova |
+| **Responsável** | ✗ | vem do CONVITE — o estagiário **não escolhe** quem o supervisiona |
+
+**Cria:** `InternProfile`(tenant da academia + responsável) + `Account` se nova
++ 2× `TermsAcceptanceEvent` (só nova). **NÃO** cria `ProfessionalProfile`:
+estagiário não é profissional.
+
+**Estado inválido irrepresentável:** o responsável é **NOT NULL** no convite e
+no seat, com FK `Restrict` — não há caminho, nem pelo código nem por SQL direto,
+que produza um estagiário solto. **Sem coluna `seatType`**: a existência da linha
+já é o fato; o rótulo `STUDENT_INTERN` vive no DTO.
+
+**Derivação congelada:** a capacidade do estagiário **DERIVA** do conselho ativo
+do responsável, **em leitura** — responsável sai, estagiário perde capacidade.
+Nunca materializada, nunca por job.
+
+> **Fora desta spec — o FLUXO DE VALIDAÇÃO do trabalho do estagiário**
+> (produz → envia → pendente → supervisor revisa/ajusta/valida → chega ao aluno)
+> depende do domínio de **treino/prescrição**, que ainda não existe. Este slice
+> entrega **identidade + vínculo**; a validação engancha no vínculo depois. Ver
+> `docs/roadmap.md`.
+
 ---
 
 ## 5. Gate de completar-perfil (pós-login)
 
 **Vê o gate:** **apenas** pré-cadastrados por terceiro com dados faltando — **profissional de clínica/academia** e **recepção**. Ao logar, se faltar `birthDate`/endereço/WhatsApp, a primeira tela é completar dados, com o app **bloqueado** até completar.
 
-**NÃO vê o gate (entram completos):** autônomo, admin de clínica/academia, paciente/aluno.
+**NÃO vê o gate (entram completos):** autônomo, admin de clínica/academia, paciente/aluno e **estagiário** (§4.8 — preenche nascimento/endereço/WhatsApp no próprio aceite).
 
 Gate estreito (só convidados-por-terceiro). FITVO **trava** (garante dado antes do uso); iClinic apenas sinaliza — escolha consciente pela trava.
 
@@ -207,7 +260,8 @@ Gate estreito (só convidados-por-terceiro). FITVO **trava** (garante dado antes
 ## 6. Log de decisões (palavras de força)
 
 - **NUNCA** autocadastro de paciente — só convite (D-135).
-- **NUNCA** estagiário por autocadastro — seat supervisionado; capacidade **deriva** do conselho ativo do supervisor.
+- **NUNCA** estagiário por autocadastro — seat supervisionado; capacidade **deriva** do conselho ativo do supervisor. Responsável é **NOT NULL** no schema: estagiário solto é irrepresentável, não "validado" (D-142, §4.8).
+- Academia **SEMPRE** só profissões de **CREF** — Médico e Nutricionista **PROIBIDOS**; sem Médico, **nunca** há especialidade médica (D-141).
 - **SEMPRE** gravar consentimento (D-025) na mesma transação, só no ramo de conta nova.
 - Clínica/academia **SEMPRE** CNPJ. Autônomo CPF ou CNPJ.
 - Admin de empresa: campo **"Você é?"** — gestor-puro **NÃO** informa conselho; "também atende" abre conselho condicionalmente.
@@ -231,8 +285,10 @@ Gate estreito (só convidados-por-terceiro). FITVO **trava** (garante dado antes
 | Clínica: convite/aceite com termos + especialidade + `medicalSpecialty` | ✅ #102 |
 | Autônomo: campos completos (WhatsApp, nascimento, endereço, senha, CPF-xor-CNPJ, remover tenantName) | 🔄 em implementação |
 | Nome social / gênero / sexo biológico (nos forms) | ⬜ incluir nos slices respectivos |
-| Cadastro público de clínica (seletor + "Você é?" + tenant CLINIC) | ⬜ próximo slice |
-| Cadastro público de academia (reusa clínica) | ⬜ |
+| Cadastro público de clínica (seletor + "Você é?" + tenant CLINIC) | ✅ #108 |
+| Cadastro público de academia (reusa clínica; só CREF) | ✅ D-141 |
+| Estagiário: seat supervisionado + vínculo obrigatório ao responsável | ✅ D-142 (API/contrato; UI em slice próprio) |
+| Fluxo de validação do trabalho do estagiário | ⏸ bloqueado no domínio de treino |
 | Gate de completar-perfil | ⬜ depois de clínica |
 | Recepção (seat administrativo por convite) | ⬜ MVP |
 | Paciente menor + autorização de responsável | ⬜ slice do fluxo de paciente |

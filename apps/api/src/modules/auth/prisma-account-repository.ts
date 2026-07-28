@@ -5,7 +5,7 @@ import { recordInitialTermsAcceptance } from '../terms/initial-terms-acceptance'
 import type {
   AccountRecord,
   AccountRepository,
-  CreateClinicInput,
+  CreateCompanyInput,
   CreateProfessionalInput,
 } from './account-repository';
 
@@ -84,13 +84,14 @@ export class PrismaAccountRepository implements AccountRepository {
     });
   }
 
-  createClinic(input: CreateClinicInput): Promise<AccountRecord> {
+  createCompany(input: CreateCompanyInput): Promise<AccountRecord> {
     return this.db.$transaction(async (tx) => {
-      // Tenant CLINIC: name = nome fantasia (exibição), legalName = razão social
-      // (fiscal). Endereço/contato da EMPRESA (colunas inline do Tenant — D-126).
+      // Tenant de empresa (CLINIC ou ACADEMIA — a vertical vem do input, a
+      // transação é a mesma): name = nome fantasia (exibição), legalName = razão
+      // social (fiscal). Endereço/contato da EMPRESA (colunas inline — D-126).
       const tenant = await tx.tenant.create({
         data: {
-          type: 'CLINIC',
+          type: input.tenantType,
           name: input.tradeName,
           legalName: input.legalName,
           document: input.cnpj,
@@ -146,9 +147,10 @@ export class PrismaAccountRepository implements AccountRepository {
         },
         select: ACCOUNT_PROJECTION,
       });
-      // Conta NOVA (porta pública de nascimento — D-139): grava o consentimento
-      // inicial (D-025) na MESMA transação. Qualquer falha acima/abaixo reverte
-      // tudo — nem Tenant, nem Account, nem membership, nem specialty sobrevivem.
+      // Conta NOVA (porta pública de nascimento — D-139/D-141): grava o
+      // consentimento inicial (D-025) na MESMA transação. Qualquer falha
+      // acima/abaixo reverte tudo — nem Tenant, nem Account, nem membership,
+      // nem specialty sobrevivem.
       await recordInitialTermsAcceptance(tx, account.id, input.termsAcceptance);
       return account;
     });

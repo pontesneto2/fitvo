@@ -98,8 +98,81 @@ exigir conselho **ativo/verificado** é trabalho futuro (TODO(D-010)/D-051) —
 registrada aqui como consequência conhecida, não como requisito do gate
 atual.
 
+### D-141 — Academia: mesma porta pública da clínica, vertical só de CREF
+
+O cadastro público do tipo **ACADEMIA** cria um `Tenant` com `type: ACADEMIA`
++ o primeiro admin, pela **mesma porta** e com os **mesmos campos** do cadastro
+de clínica (D-139): empresa com **CNPJ obrigatório**, admin pessoa física com
+CPF, e o campo "Você é?" (gestor-puro / gestor que também atende). A spec de
+cadastro já registrava que clínica e academia são o **mesmo cadastro de
+empresa**; este ADR fixa a consequência arquitetural: **um** contrato, **uma**
+transação, **um** formulário — parametrizados pela vertical.
+
+O que a vertical decide é **quais profissões o estabelecimento comporta**:
+
+- **Clínica:** o catálogo inteiro (Médico, Nutricionista, Educador Físico,
+  Personal Trainer), e portanto a especialidade médica (D-137).
+- **Academia:** **SOMENTE CREF** — Educador Físico e Personal Trainer. Médico e
+  Nutricionista são **PROIBIDOS**; sem Médico, não há especialidade médica.
+
+**Palavra de força:** a restrição é do **contrato** (`.superRefine`), rejeitada
+com 400 na borda HTTP **antes** de qualquer escrita. Ela **NUNCA** deve ser
+reimplementada no serviço ou no repositório: uma segunda cópia da regra pode
+divergir do Zod, e aí a borda e o núcleo passariam a discordar sobre quem pode
+existir numa academia.
+
+### D-142 — Estagiário: seat supervisionado, com responsável obrigatório
+
+O **estagiário** é um seat próprio, **distinto do profissional**: é estudante,
+**não tem conselho**, e **NUNCA** se autocadastra (não aparece em seletor
+algum). Entra **só por convite** da academia, no mesmo molde de duas fases do
+convite de profissional (D-014/D-048), com duas diferenças que são a regra
+inteira:
+
+1. **Não informa conselho** — nem no convite, nem no aceite. Não existe o campo.
+2. **Responsável OBRIGATÓRIO** — todo estagiário está vinculado a um
+   profissional de **CREF** (Educador Físico ou Personal Trainer) **do próprio
+   tenant**, incluindo o admin-que-atende da academia.
+
+**Estado inválido irrepresentável:** "estagiário sem responsável" **não é**
+regra de aplicação — é impedido pelo **schema**. A coluna
+`supervisorProfessionalProfileId` é **NOT NULL** tanto no convite quanto no
+seat, com FK `onDelete: Restrict`: o responsável não pode ser apagado por baixo
+de um estagiário. O motivo é legal, não estético — estagiário atuando solto é
+exercício ilegal da profissão (art. 47, DL 3.688/1941).
+
+**Sem coluna `seatType`.** A existência da linha `intern_profile` **já é** o
+fato "este seat é STUDENT_INTERN"; uma coluna de valor único criaria **duas
+representações do mesmo estado** — o anti-padrão que o schema já evita em
+`biologicalSex` (D-103). O rótulo `STUDENT_INTERN` vive no **DTO** da API, onde
+serve para quem consome distinguir seats.
+
+**Derivação congelada:** a capacidade do estagiário **DERIVA** do conselho ativo
+do responsável — não há capacidade própria, nem cópia do CREF no seat. Se o
+responsável sai ou perde o vínculo, o estagiário **perde a capacidade**. A
+derivação é feita **em LEITURA** (seguindo a relação), **nunca** materializada e
+**nunca** por job: materializar reintroduziria exatamente a divergência que a FK
+evita. "Ativo" hoje é **conselho preenchido em formato** (D-138) — a verificação
+de registro ativo de verdade segue deferida (TODO(D-010)).
+
+**Fora deste ADR — dependência de domínio:** o **fluxo de validação do trabalho
+do estagiário** (produz → envia → pendente → supervisor revisa/ajusta/valida →
+chega ao aluno) **não é decidido aqui**. Ele depende do domínio de
+treino/prescrição, que ainda não existe. O que este ADR entrega é a
+**IDENTIDADE** e o **VÍNCULO**; a validação **engancha nesse vínculo** quando o
+treino for construído (ver `docs/roadmap.md`).
+
 ## Alternativas consideradas
 
+- **Estagiário como `ProfessionalProfile` com flag + supervisor nulável:**
+  rejeitada. Um supervisor nulável torna "estagiário solto" representável no
+  banco, e a regra passaria a depender de todo caminho de escrita lembrar de
+  checá-la. Modelo próprio com FK NOT NULL move a garantia para o schema.
+- **Coluna `seatType` em `InternProfile`:** rejeitada — valor único por tabela,
+  duas representações do mesmo fato (ver D-142 e D-103).
+- **Contrato separado para o cadastro de academia:** rejeitada — duplicaria
+  regra de DV, conselho condicional e aceite de termos em dois lugares que
+  precisariam ser corrigidos juntos para sempre (D-141).
 - **Exigir conselho `VERIFIED` já no cadastro:** rejeitada por ora — não há
   mecanismo de verificação (integração com os conselhos profissionais ou
   processo manual equivalente) e bloquearia o lançamento à espera dele.
@@ -120,3 +193,13 @@ atual.
 - **Débito conhecido, mantido explícito:** verificação de conselho
   ativo/verificado (TODO(D-010)/D-051) segue não implementada. O gate atual
   (D-140) é deliberadamente mais fraco que a promessa final do produto.
+- **Estagiário (D-142) herda esse mesmo débito, e com mais consequência:** a
+  capacidade dele deriva de um conselho que hoje só é verificado em FORMATO.
+  Enquanto TODO(D-010) não existir, "responsável com CREF ativo" significa, na
+  prática, "responsável com CREF preenchido".
+- **Fluxo de validação do trabalho do estagiário:** pendente, bloqueado pelo
+  domínio de treino/prescrição. Registrado em `docs/roadmap.md`; o ponto de
+  engate é a relação `InternProfile.supervisor`.
+- **Clínica com estagiário:** hoje **não** existe — o critério de elegibilidade
+  do responsável exige `Tenant.type === ACADEMIA`. Se um dia clínica passar a
+  comportar estagiário, é esse único predicado que muda.

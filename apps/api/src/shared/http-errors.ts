@@ -145,6 +145,36 @@ export class ProfessionalProfileConflictError extends AppError {
 }
 
 /**
+ * A conta ja possui um seat de estagiario (1:1 conta<->seat — D-142).
+ */
+export class InternProfileConflictError extends AppError {
+  readonly status = 409;
+  readonly problemType = 'https://fitvo.dev/problems/intern-exists';
+  readonly title = 'Conta ja e estagiaria';
+  constructor() {
+    super('Esta conta ja possui um seat de estagiario.');
+    this.name = 'InternProfileConflictError';
+  }
+}
+
+/**
+ * O responsavel indicado nao pode supervisionar estagiario NESTE tenant (D-142):
+ * nao e do tenant, nao tem CREF (TRAINING/PERSONAL_TRAINER) ou esta sem conselho
+ * preenchido. Estagiario sem responsavel valido nao existe — o convite nao nasce.
+ */
+export class IneligibleSupervisorError extends AppError {
+  readonly status = 422;
+  readonly problemType = 'https://fitvo.dev/problems/ineligible-supervisor';
+  readonly title = 'Responsavel inelegivel';
+  constructor() {
+    super(
+      'O responsavel deve ser um profissional de CREF (Educador Fisico ou Personal Trainer) desta academia, com conselho preenchido.',
+    );
+    this.name = 'IneligibleSupervisorError';
+  }
+}
+
+/**
  * Ja existe um vinculo para a tripla paciente+profissional+especialidade
  * (unica — ADR-0001/D-052). O aceite do convite nao reabre um vinculo existente.
  */

@@ -19,7 +19,7 @@ import {
   InvitePendingConflictError,
   NotFoundError,
 } from '../../shared/http-errors';
-import { generateInviteToken, hashInviteToken } from '../clinic/invite-token';
+import { generateInviteToken, hashInviteToken } from '../../shared/invite-token';
 import type { RequestOrigin } from '../terms/terms-repository';
 import type { BondRecord, PatientInviteRecord, PatientRepository } from './patient-repository';
 

@@ -9,6 +9,7 @@ import {
   meResultSchema,
   refreshResultSchema,
   refreshSchema,
+  registerAcademySchema,
   registerClinicSchema,
   registerProfessionalSchema,
   requestEmailVerificationSchema,
@@ -123,6 +124,29 @@ export function authRoutes(service: AuthApplicationService): FastifyPluginAsync 
           .send(
             toAuthResultDto(
               await service.registerClinic(request.body, registrationOrigin(request)),
+            ),
+          );
+      },
+    );
+
+    app.post(
+      '/register/academy',
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'Cadastra uma academia (cria tenant ACADEMIA + admin)',
+          description:
+            'Cadastro público de academia (D-141): MESMO cadastro da clínica (spec §4.2/§4.3) — cria Tenant(ACADEMIA) + Account(admin) + membership CLINIC_ADMIN (+ perfil profissional se "também atende") e dispara a verificacao de e-mail. Profissões: SÓ CREF (Educador Físico / Personal Trainer); Médico e Nutricionista são rejeitados com 400 na borda.',
+          body: registerAcademySchema,
+          response: { 201: authResultSchema },
+        },
+      },
+      async (request, reply) => {
+        return reply
+          .code(201)
+          .send(
+            toAuthResultDto(
+              await service.registerAcademy(request.body, registrationOrigin(request)),
             ),
           );
       },

@@ -190,6 +190,68 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
 14. **Deploy** (Vercel + Railway) — infraestrutura de deploy ainda não
     configurada; requer credenciais + ordem explícita de publicação.
 
+### Fluxo de validação do trabalho do estagiário — BLOQUEADO no domínio de treino
+
+**O que é:** o estagiário produz um treino/prescrição → **envia** → fica
+**pendente** → o **supervisor revisa/ajusta/valida** → só então **chega ao
+aluno**. Estagiário **nunca** entrega direto ao aluno: a validação do
+responsável é o que torna o trabalho dele legítimo (D-142; art. 47, DL
+3.688/1941).
+
+**Por que está parado:** depende do **domínio de treino/prescrição**, que ainda
+**não existe**. Não há o que submeter a validação enquanto não houver o objeto
+"treino prescrito". Adiantar isso seria construir uma fila de aprovação sem
+nada para aprovar.
+
+**Onde engata (já pronto):** a relação
+`ProfessionalProfile.supervisedInterns` ⇄ `InternProfile.supervisor` — vínculo
+`NOT NULL` criado no slice de identidade do estagiário (D-142). Quando o treino
+existir, o fluxo pendura **nesse vínculo**: quem valida é o supervisor daquele
+estagiário, e ele já está gravado. Há `TODO(treino)` no schema Prisma
+(`ProfessionalProfile.supervisedInterns`) e no ponto do repositório onde o
+vínculo nasce (`prisma-intern-repository.ts`, no `acceptInvite`).
+
+**O que este item NÃO é:** não é decisão pendente do responsável nem bloqueio de
+terceiro — é **ordem de construção**. Sai sozinho assim que o domínio de treino
+estiver de pé.
+
+### Estagiário em clínica — expansão do seat (pós-MVP)
+
+Hoje o seat de estagiário exige `Tenant.type === ACADEMIA` (D-142). Isso é
+**restrição de MVP, não regra permanente**: estagiário de clínica é caso real
+(estudante de nutrição ou medicina sob supervisão).
+
+A expansão é generalizar de "academia/CREF" para **"estagiário em EMPRESA, com
+supervisor do conselho APROPRIADO à especialidade"** — o par
+`vertical do tenant → conselhos que supervisionam` vira tabela, no lugar do par
+fixo de hoje. **Não muda** o essencial: responsável obrigatório, `NOT NULL`, com
+capacidade derivada dele.
+
+**Ponto único de mudança:** `eligibleSupervisorWhere` em
+`apps/api/src/modules/intern/prisma-intern-repository.ts` (há `TODO` no local).
+
+### Corrigir DV do documento no aceite de convite de profissional (#102)
+
+`clinicAcceptInviteSchema` valida o documento só por **comprimento**
+(`min(11).max(18)`), sem dígito verificador e sem o xor CPF/CNPJ — enquanto a
+spec §3 exige **"CPF-xor-CNPJ + dígito verificador (`.superRefine`)"** e todos os
+outros cadastros já cumprem (autônomo, empresa, e o aceite de estagiário de
+D-142). Um profissional de clínica entra hoje com documento mal formado.
+
+**Correção:** aplicar em `clinicAcceptInviteSchema` o mesmo `.superRefine` de
+`registerProfessionalSchema`/`internAcceptInviteSchema`. Slice próprio — é
+mudança de contrato numa porta de nascimento de conta (área crítica), não
+carona em slice alheio.
+
+### UI do estagiário — slice próprio
+
+O seat de estagiário entregou **API + contrato** (D-142). Falta a UI: (a) tela
+da academia para pré-cadastrar (Fase A, com o select de responsáveis vindo de
+`GET /v1/interns/:tenantId/supervisors`); (b) aceite do estagiário (Fase B). A
+página `/convite/aceitar` hoje é fechada no formato do convite de profissional —
+a UI do estagiário precisa **resolver o tipo do token antes de renderizar**, que
+é o trabalho de fato deste slice.
+
 ## BLOQUEADO — RESPONSÁVEL (decisão que só você pode tomar)
 
 - **⚠️ ISOLAMENTO DE TENANT SISTÊMICO — pré-requisito ANTES de qualquer cliente

@@ -11,6 +11,7 @@ export * from './billing';
 export * from './clinic';
 export * from './consent';
 export * from './errors';
+export * from './nutrition';
 export * from './patient';
 export * from './specialty';
 export * from './terms';

@@ -4,6 +4,7 @@ import {
   internCreateInviteResultSchema,
   internCreateInviteSchema,
   internSupervisorListResultSchema,
+  internSupervisorQuerySchema,
   internTenantParamsSchema,
   problemDetailsSchema,
 } from '@fitvo/validation';
@@ -35,11 +36,11 @@ function inviteAcceptOrigin(request: {
 }
 
 /**
- * Vertical slice do seat de ESTAGIARIO (D-142 · D-034: versao na URL /v1).
- * Convite academia->estagiario em duas fases: a academia pre-cadastra (Fase A,
+ * Vertical slice do seat de ESTAGIARIO (D-142/D-143 · D-034: versao na URL /v1).
+ * Convite empresa->estagiario em duas fases: a empresa pre-cadastra (Fase A,
  * exige CLINIC_ADMIN do tenant) e o estagiario aceita por token (Fase B,
  * publico). NAO ha rota de autocadastro — nao existe caminho pelo qual um
- * estagiario nasca sem convite e sem responsavel (spec §1/§6).
+ * estagiario nasca sem convite, sem area e sem responsavel (spec §1/§6).
  *
  * D-032: schemas Zod de `@fitvo/validation` sao a fonte unica.
  */
@@ -54,13 +55,15 @@ export function internRoutes(service: InternApplicationService): FastifyPluginAs
       {
         schema: {
           tags: TAGS,
-          summary: 'Lista responsaveis elegiveis a supervisionar estagiario (admin)',
+          summary: 'Lista responsaveis elegiveis a supervisionar estagiario NA AREA (admin)',
           description:
-            'Profissionais de CREF (Educador Fisico / Personal Trainer) da academia, com ' +
-            'conselho preenchido (D-142). E a lista da Fase A — exatamente o conjunto que o ' +
-            'convite aceita. Dado OPERACIONAL (D-015). Requer CLINIC_ADMIN do tenant.',
+            'Profissionais da empresa com o conselho DA AREA consultada e conselho preenchido ' +
+            '(D-143): EDUCACAO_FISICA->CREF, NUTRICAO->CRN, MEDICINA->CRM. E a lista da Fase A ' +
+            '— exatamente o conjunto que o convite aceita. A `area` e obrigatoria: sem ela a ' +
+            'lista nao significa nada. Dado OPERACIONAL (D-015). Requer CLINIC_ADMIN do tenant.',
           security: bearerAuth,
           params: internTenantParamsSchema,
+          querystring: internSupervisorQuerySchema,
           response: { 200: internSupervisorListResultSchema, 403: problemDetailsSchema },
         },
       },
@@ -69,6 +72,7 @@ export function internRoutes(service: InternApplicationService): FastifyPluginAs
           await service.listEligibleSupervisors(
             request.headers.authorization,
             request.params.tenantId,
+            request.query.area,
           ),
         );
       },
@@ -81,11 +85,12 @@ export function internRoutes(service: InternApplicationService): FastifyPluginAs
           tags: TAGS,
           summary: 'Pre-cadastra um estagiario (Fase A — admin)',
           description:
-            'Cria um convite de uso unico com RESPONSAVEL obrigatorio (D-142): estagiario ' +
-            'sem responsavel nao existe. O responsavel deve ser elegivel neste tenant ' +
-            '(CREF da academia) — 422 caso contrario. Requer CLINIC_ADMIN do tenant e ' +
-            'e-mail verificado (D-029). Devolve o token em claro UMA vez; o banco guarda ' +
-            'apenas o hash.',
+            'Cria um convite de uso unico com AREA e RESPONSAVEL obrigatorios (D-142/D-143): ' +
+            'estagiario sem responsavel nao existe, e a area decide qual conselho o ' +
+            'responsavel precisa ter. O responsavel deve ser elegivel neste tenant PARA ESTA ' +
+            'AREA — 422 caso contrario (requisicao bem formada que falha em regra semantica ' +
+            'contra o banco). Requer CLINIC_ADMIN do tenant e e-mail verificado (D-029). ' +
+            'Devolve o token em claro UMA vez; o banco guarda apenas o hash.',
           security: bearerAuth,
           params: internTenantParamsSchema,
           body: internCreateInviteSchema,

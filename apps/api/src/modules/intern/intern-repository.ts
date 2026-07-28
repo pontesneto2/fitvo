@@ -2,6 +2,7 @@ import type {
   BrazilianState,
   DocumentType,
   Gender,
+  InternArea,
   InviteStatus,
   SpecialtyCode,
 } from '@fitvo/database';
@@ -15,6 +16,8 @@ export interface InternInviteRecord {
   tenantId: string;
   email: string;
   name: string | null;
+  /** Area de estagio fixada pela empresa no convite (D-143). */
+  area: InternArea;
   status: InviteStatus;
   /** Responsavel fixado no convite — NUNCA nulo (regra legal, D-142). */
   supervisorProfessionalProfileId: string;
@@ -24,11 +27,11 @@ export interface InternInviteRecord {
 }
 
 /**
- * Profissional ELEGIVEL a supervisionar estagiario (D-142): perfil do PROPRIO
- * tenant, com especialidade de CREF (TRAINING/PERSONAL_TRAINER) e conselho
- * preenchido. SO dado OPERACIONAL (D-015). "Conselho preenchido" e o criterio de
- * "ativo" possivel hoje — a verificacao de registro ativo de verdade segue
- * deferida (D-138/TODO(D-010)).
+ * Profissional ELEGIVEL a supervisionar estagiario (D-142/D-143): perfil do
+ * PROPRIO tenant, com o conselho DA AREA consultada e conselho preenchido. SO
+ * dado OPERACIONAL (D-015). "Conselho preenchido" e o criterio de "ativo"
+ * possivel hoje — a verificacao de registro ativo de verdade segue deferida
+ * (D-138/TODO(D-010)).
  */
 export interface InternSupervisorRecord {
   professionalProfileId: string;
@@ -42,6 +45,8 @@ export interface InternSupervisorRecord {
 export interface CreateInternInviteInput {
   tenantId: string;
   email: string;
+  /** Area de estagio — decide qual conselho o responsavel precisa ter (D-143). */
+  area: InternArea;
   name?: string | undefined;
   /** Hash do token de uso unico — o segredo em claro nunca chega ao repositorio. */
   tokenHash: string;
@@ -73,6 +78,7 @@ export type AcceptInternInviteOutcome =
       status: 'accepted';
       tenantId: string;
       accountId: string;
+      area: InternArea;
       supervisorProfessionalProfileId: string;
       created: boolean;
     }
@@ -87,19 +93,27 @@ export type AcceptInternInviteOutcome =
  */
 export interface InternRepository {
   /**
-   * Profissionais do tenant elegiveis a supervisionar (D-142). E a MESMA consulta
-   * que valida o responsavel na criacao do convite — um criterio so, num lugar
-   * so: a lista que a academia ve e exatamente o conjunto que o convite aceita.
+   * Profissionais do tenant elegiveis a supervisionar NAQUELA AREA (D-143). E a
+   * MESMA consulta que valida o responsavel na criacao do convite — um criterio
+   * so, num lugar so: a lista que a empresa ve e exatamente o conjunto que o
+   * convite aceita. A area e obrigatoria: sem ela a lista nao significa nada,
+   * porque quem supervisiona nutricao nao supervisiona medicina.
    */
-  listEligibleSupervisors(tenantId: string): Promise<InternSupervisorRecord[]>;
+  listEligibleSupervisors(tenantId: string, area: InternArea): Promise<InternSupervisorRecord[]>;
 
   /**
-   * O responsavel indicado e elegivel NESTE tenant? Guard do convite (D-142):
-   * impede apontar para profissional de outro tenant (vazamento entre tenants),
-   * para quem nao tem CREF (medico/nutricionista nao supervisiona estagiario de
-   * educacao fisica) ou para quem esta sem conselho preenchido.
+   * O responsavel indicado e elegivel NESTE tenant, PARA ESTA AREA? Guard do
+   * convite (D-142/D-143): impede apontar para profissional de outro tenant
+   * (vazamento entre tenants), para quem tem o conselho de OUTRA area (um CREF
+   * nao supervisiona estagiario de nutricao) ou para quem esta sem conselho
+   * preenchido. E dado de OUTRO registro — por isso a checagem e aqui, contra o
+   * banco, e nao no Zod.
    */
-  isEligibleSupervisor(tenantId: string, professionalProfileId: string): Promise<boolean>;
+  isEligibleSupervisor(
+    tenantId: string,
+    area: InternArea,
+    professionalProfileId: string,
+  ): Promise<boolean>;
 
   /** Cria o convite (token ja hasheado), escopado ao tenant da academia. */
   createInvite(input: CreateInternInviteInput): Promise<InternInviteRecord>;

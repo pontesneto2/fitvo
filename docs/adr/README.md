@@ -50,9 +50,9 @@ sem repetir o número. **A tabela é a autoridade sobre a cobertura**, não o `g
 | D-106 – D-111 | [0012](0012-agenda.md) | Agenda |
 | D-112 – D-121, **D-133 – D-134** | [0013](0013-dominio-nutricao.md) | Domínio de nutrição (D-133/D-134: adendos de concorrência) |
 | D-122 – D-132 | [0014](0014-dominio-medicina.md) | Domínio de medicina (nutrologia esportiva) |
-| D-135 – D-142 | [0015](0015-cadastro-convites-e-vinculo.md) | Cadastro, convite e vínculo (D-141: academia; D-142: seat de estagiário) |
+| D-135 – D-143 | [0015](0015-cadastro-convites-e-vinculo.md) | Cadastro, convite e vínculo (D-141: academia; D-142/D-143: seat de estagiário, multi-área) |
 
-**Cobertura:** D-001 a D-142, sem lacunas. **D-133 e D-134 são adendos de
+**Cobertura:** D-001 a D-143, sem lacunas. **D-133 e D-134 são adendos de
 concorrência ao domínio de nutrição (ADR-0013)** numerados **depois** de medicina
 (D-122–D-132) porque nasceram depois — a numeração é cronológica, não temática, e
 por isso a linha do 0013 não é contígua. Algumas decisões aparecem em dois ADRs

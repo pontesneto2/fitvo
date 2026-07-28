@@ -192,23 +192,36 @@ Se `birthDate` < 18 no aceite, o fluxo **DEVE** capturar e **armazenar como prov
 **Armazenamento:** evento **append-only, imutável**, com timestamp + IP + user-agent (mesmo padrão probatório do `TermsAcceptanceEvent`) — a autorização fica registrada e recuperável no sistema. Menor **não** consente sozinho; o consentimento válido é o do responsável.
 *(Implementação = slice próprio do fluxo de paciente; não é o slice de cadastro de profissional em curso.)*
 
-### 4.8 Estagiário — seat supervisionado, por convite (D-142)
+### 4.8 Estagiário — seat supervisionado, por convite (D-142/D-143)
 
 **NUNCA** aparece em seletor: estagiário **não se autocadastra** (§1/§6). É
-pré-cadastrado pela academia, no mesmo molde de duas fases do §4.4, com duas
-diferenças que são a regra legal inteira:
+pré-cadastrado pela empresa (clínica **ou** academia), no mesmo molde de duas
+fases do §4.4, com três diferenças que são a regra legal inteira:
 
-1. **NÃO informa conselho** — é estudante; não tem CREF. Não existe o campo.
-2. **Responsável OBRIGATÓRIO** — sempre vinculado a um profissional de **CREF**
-   (Educador Físico ou Personal Trainer) **do próprio tenant**, incluindo o
-   admin-que-atende da academia.
+1. **NÃO informa conselho** — é estudante, em **qualquer** área. Não há campo.
+2. **Declara uma ÁREA**, definida pela empresa: `EDUCACAO_FISICA` | `NUTRICAO` |
+   `MEDICINA`. A área determina **qual conselho o responsável precisa ter**.
+3. **Responsável OBRIGATÓRIO** — profissional **do próprio tenant** cujo conselho
+   corresponde à área, incluindo o admin-que-atende.
+
+| Área | Conselho exigido do responsável |
+|---|---|
+| `EDUCACAO_FISICA` | **CREF** (Educador Físico ou Personal Trainer) |
+| `NUTRICAO` | **CRN** (Nutricionista) |
+| `MEDICINA` | **CRM** (Médico) |
+
+**A vertical do tenant NÃO decide** (D-143) — quem decide é o conselho do
+responsável. Uma **clínica** com um CREF no quadro pode ter estagiário de
+educação física; uma **academia** com um CRN, de nutrição. Só `SOLO` fica de
+fora: estagiário é seat de **empresa**.
 
 **Fase A — a academia pré-cadastra:**
 
 | Campo | Obrig. | Nota |
 |---|---|---|
 | E-mail | ● | destino do convite |
-| **Responsável** | ● | seleciona entre os CREF da academia; **sem ele não há convite** |
+| **Área** | ● | `EDUCACAO_FISICA` \| `NUTRICAO` \| `MEDICINA`; define o conselho exigido |
+| **Responsável** | ● | seleciona entre os elegíveis **daquela área** no tenant; **sem ele não há convite** |
 | Nome | ○ | facilita o convite; o civil vem no aceite |
 | Profissão / conselho / especialidade | ✗ | **não existem** para estagiário |
 
@@ -224,15 +237,18 @@ diferenças que são a regra legal inteira:
 | Endereço completo | ● | CEP puxa |
 | WhatsApp | ● | — |
 | Aceite Termos + Política | ● | `literal(true)` ×2, gravado **só** em conta nova |
-| **Responsável** | ✗ | vem do CONVITE — o estagiário **não escolhe** quem o supervisiona |
+| **Área e Responsável** | ✗ | vêm do CONVITE — o estagiário **não escolhe** nem a área nem quem o supervisiona |
 
-**Cria:** `InternProfile`(tenant da academia + responsável) + `Account` se nova
+**Cria:** `InternProfile`(tenant da empresa + área + responsável) + `Account` se nova
 + 2× `TermsAcceptanceEvent` (só nova). **NÃO** cria `ProfessionalProfile`:
 estagiário não é profissional.
 
 **Estado inválido irrepresentável:** o responsável é **NOT NULL** no convite e
 no seat, com FK `Restrict` — não há caminho, nem pelo código nem por SQL direto,
-que produza um estagiário solto. **Sem coluna `seatType`**: a existência da linha
+que produza um estagiário solto. A **área** também é `NOT NULL`, sem default: um
+INSERT que a esquecesse falharia, em vez de gravar uma área errada em silêncio.
+A coerência **área × conselho do responsável** é checada no servidor **contra o
+banco** (é dado de outro registro) e responde **422**, não 400. **Sem coluna `seatType`**: a existência da linha
 já é o fato; o rótulo `STUDENT_INTERN` vive no DTO.
 
 **Derivação congelada:** a capacidade do estagiário **DERIVA** do conselho ativo
@@ -261,6 +277,7 @@ Gate estreito (só convidados-por-terceiro). FITVO **trava** (garante dado antes
 
 - **NUNCA** autocadastro de paciente — só convite (D-135).
 - **NUNCA** estagiário por autocadastro — seat supervisionado; capacidade **deriva** do conselho ativo do supervisor. Responsável é **NOT NULL** no schema: estagiário solto é irrepresentável, não "validado" (D-142, §4.8).
+- Estagiário **NUNCA** tem conselho próprio, em **NENHUMA** área — declara uma **ÁREA**, e a área define o conselho exigido do responsável (D-143). O mapa área→conselho é **UM só**, no contrato.
 - Academia **SEMPRE** só profissões de **CREF** — Médico e Nutricionista **PROIBIDOS**; sem Médico, **nunca** há especialidade médica (D-141).
 - **SEMPRE** gravar consentimento (D-025) na mesma transação, só no ramo de conta nova.
 - Clínica/academia **SEMPRE** CNPJ. Autônomo CPF ou CNPJ.
@@ -288,6 +305,7 @@ Gate estreito (só convidados-por-terceiro). FITVO **trava** (garante dado antes
 | Cadastro público de clínica (seletor + "Você é?" + tenant CLINIC) | ✅ #108 |
 | Cadastro público de academia (reusa clínica; só CREF) | ✅ D-141 |
 | Estagiário: seat supervisionado + vínculo obrigatório ao responsável | ✅ D-142 (API/contrato; UI em slice próprio) |
+| Estagiário multi-área (ed. física / nutrição / medicina), em clínica ou academia | ✅ D-143 |
 | Fluxo de validação do trabalho do estagiário | ⏸ bloqueado no domínio de treino |
 | Gate de completar-perfil | ⬜ depois de clínica |
 | Recepção (seat administrativo por convite) | ⬜ MVP |

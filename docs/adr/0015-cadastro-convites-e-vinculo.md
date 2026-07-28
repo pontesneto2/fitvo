@@ -155,12 +155,58 @@ derivação é feita **em LEITURA** (seguindo a relação), **nunca** materializ
 evita. "Ativo" hoje é **conselho preenchido em formato** (D-138) — a verificação
 de registro ativo de verdade segue deferida (TODO(D-010)).
 
+> **Superado em parte por D-143:** a restrição "seat de ACADEMIA / supervisor
+> CREF" abaixo valeu enquanto o produto só tinha estagiário de educação física.
+> **D-143 generaliza**: o seat existe em qualquer tenant-empresa, e quem decide
+> é o conselho do supervisor bater com a **área** do estagiário. Tudo o mais
+> deste D-142 — responsável obrigatório NOT NULL, `onDelete: Restrict`, ausência
+> de `seatType`, derivação congelada, base legal — **continua valendo integralmente**.
+
 **Fora deste ADR — dependência de domínio:** o **fluxo de validação do trabalho
 do estagiário** (produz → envia → pendente → supervisor revisa/ajusta/valida →
 chega ao aluno) **não é decidido aqui**. Ele depende do domínio de
 treino/prescrição, que ainda não existe. O que este ADR entrega é a
 **IDENTIDADE** e o **VÍNCULO**; a validação **engancha nesse vínculo** quando o
 treino for construído (ver `docs/roadmap.md`).
+
+### D-143 — Estagiário multi-área: a área define o conselho do supervisor
+
+O seat de estagiário (D-142) deixa de ser exclusivo de educação física em
+academia e passa a valer para as **três áreas** que o produto atende. O
+estagiário **continua sem conselho próprio em área nenhuma** — é estudante — e
+passa a declarar uma **ÁREA**, definida **pela empresa no convite**:
+
+| Área | Conselho exigido do responsável |
+|---|---|
+| `EDUCACAO_FISICA` | CREF — `TRAINING` ou `PERSONAL_TRAINER` |
+| `NUTRICAO` | CRN — `NUTRITION` |
+| `MEDICINA` | CRM — `MEDICINE` |
+
+**A vertical do tenant deixa de decidir.** Quem decide é o **conselho do
+responsável** bater com a área do estagiário, no **mesmo tenant**. Consequência
+aceita e desejada: uma **clínica** com um CREF no quadro pode ter estagiário de
+educação física; uma **academia** com um CRN, de nutrição. O tipo do tenant só
+exclui `SOLO` — estagiário é seat de EMPRESA.
+
+**Palavra de força:** o mapa área→conselhos é **UM só**, no contrato
+(`SUPERVISOR_SPECIALTY_CODES_BY_AREA` em `@fitvo/validation`), porque tem dois
+consumidores que **DEVEM** concordar: o servidor, que recusa supervisor fora da
+área, e a UI, que só deve **oferecer** supervisores da área. Duas cópias
+divergiriam, e a divergência aqui significa oferecer na tela alguém que o POST
+recusa. **NUNCA** redeclarar esse mapa no repositório, no serviço ou no front.
+
+**Onde a regra é verificada:** o Zod garante que a área veio e é válida; **não**
+alcança se aquele responsável tem o conselho daquela área — isso é dado de
+**outro registro**, e a checagem é no serviço **contra o banco**. Falha ali é
+**422**, não 400: a requisição está bem formada e falha numa regra semântica.
+Distinguir os dois importa — um 400 tornaria o erro de regra indistinguível de
+erro de schema.
+
+**Nada de D-142 regride:** responsável obrigatório (`NOT NULL` no convite e no
+seat), `onDelete: Restrict`, ausência de coluna `seatType`, capacidade **derivada
+em leitura** (nunca materializada, nunca por job), sem autocadastro, base legal
+do art. 47. A área **acompanha** o responsável: os dois são decisão da empresa,
+viajam no convite, e o estagiário não escolhe nenhum dos dois.
 
 ## Alternativas consideradas
 
@@ -170,6 +216,14 @@ treino for construído (ver `docs/roadmap.md`).
   checá-la. Modelo próprio com FK NOT NULL move a garantia para o schema.
 - **Coluna `seatType` em `InternProfile`:** rejeitada — valor único por tabela,
   duas representações do mesmo fato (ver D-142 e D-103).
+- **Amarrar a área à vertical do tenant** (academia⇒educação física,
+  clínica⇒nutrição/medicina): rejeitada em D-143. Erraria os dois casos reais —
+  clínica com educador físico no quadro, academia com nutricionista — e
+  duplicaria a regra de supervisão em dois eixos que teriam de ser mantidos
+  coerentes. O conselho do supervisor já é a informação suficiente.
+- **Derivar a área do conselho do supervisor, sem coluna:** rejeitada. Um mesmo
+  profissional pode ter dois conselhos (CREF + CRN), e aí a área do estagiário
+  ficaria ambígua. A área é decisão da empresa, e decisão se registra.
 - **Contrato separado para o cadastro de academia:** rejeitada — duplicaria
   regra de DV, conselho condicional e aceite de termos em dois lugares que
   precisariam ser corrigidos juntos para sempre (D-141).
@@ -200,6 +254,8 @@ treino for construído (ver `docs/roadmap.md`).
 - **Fluxo de validação do trabalho do estagiário:** pendente, bloqueado pelo
   domínio de treino/prescrição. Registrado em `docs/roadmap.md`; o ponto de
   engate é a relação `InternProfile.supervisor`.
-- **Clínica com estagiário:** hoje **não** existe — o critério de elegibilidade
-  do responsável exige `Tenant.type === ACADEMIA`. Se um dia clínica passar a
-  comportar estagiário, é esse único predicado que muda.
+- **Clínica com estagiário:** passou a existir em **D-143** — foi exatamente o
+  predicado único de elegibilidade que mudou, como previsto.
+- **Áreas futuras** (fisioterapia/CREFITO, psicologia/CRP...): entram
+  acrescentando uma linha ao enum `InternArea` e uma ao mapa área→conselhos.
+  Nenhuma outra parte do seat precisa mudar — é o que a forma escolhida compra.

@@ -215,21 +215,6 @@ vínculo nasce (`prisma-intern-repository.ts`, no `acceptInvite`).
 terceiro — é **ordem de construção**. Sai sozinho assim que o domínio de treino
 estiver de pé.
 
-### Estagiário em clínica — expansão do seat (pós-MVP)
-
-Hoje o seat de estagiário exige `Tenant.type === ACADEMIA` (D-142). Isso é
-**restrição de MVP, não regra permanente**: estagiário de clínica é caso real
-(estudante de nutrição ou medicina sob supervisão).
-
-A expansão é generalizar de "academia/CREF" para **"estagiário em EMPRESA, com
-supervisor do conselho APROPRIADO à especialidade"** — o par
-`vertical do tenant → conselhos que supervisionam` vira tabela, no lugar do par
-fixo de hoje. **Não muda** o essencial: responsável obrigatório, `NOT NULL`, com
-capacidade derivada dele.
-
-**Ponto único de mudança:** `eligibleSupervisorWhere` em
-`apps/api/src/modules/intern/prisma-intern-repository.ts` (há `TODO` no local).
-
 ### Corrigir DV do documento no aceite de convite de profissional (#102)
 
 `clinicAcceptInviteSchema` valida o documento só por **comprimento**

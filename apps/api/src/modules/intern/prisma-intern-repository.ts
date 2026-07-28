@@ -1,5 +1,6 @@
-import type { PrismaClient, SpecialtyCode } from '@fitvo/database';
+import type { InternArea, PrismaClient, SpecialtyCode, TenantType } from '@fitvo/database';
 import { prisma as defaultPrisma } from '@fitvo/database';
+import { SUPERVISOR_SPECIALTY_CODES_BY_AREA } from '@fitvo/validation';
 
 import { recordInitialTermsAcceptance } from '../terms/initial-terms-acceptance';
 import type { RequestOrigin } from '../terms/terms-repository';
@@ -17,6 +18,7 @@ const INVITE_PROJECTION = {
   tenantId: true,
   email: true,
   name: true,
+  area: true,
   status: true,
   supervisorProfessionalProfileId: true,
   expiresAt: true,
@@ -24,45 +26,50 @@ const INVITE_PROJECTION = {
 } as const;
 
 /**
- * Conselhos que supervisionam estagiario de educacao fisica (D-142). CREF, e so:
- * medico e nutricionista nao supervisionam estagiario de educacao fisica — nem
- * existem numa academia (D-141).
+ * Conselhos que supervisionam cada AREA (D-143). NAO redeclarado aqui: vem do
+ * CONTRATO (`@fitvo/validation`), que e a fonte unica compartilhada com a UI —
+ * uma copia local poderia divergir e o servidor passaria a recusar exatamente
+ * quem a tela oferece. O cast e so a ponte de nominalidade entre o mirror do
+ * contrato e o enum do Prisma (os valores sao os mesmos, garantidos pelo
+ * `satisfies` do lado do contrato).
  */
-const SUPERVISOR_SPECIALTY_CODES: readonly SpecialtyCode[] = ['TRAINING', 'PERSONAL_TRAINER'];
+function supervisorSpecialtyCodes(area: InternArea): SpecialtyCode[] {
+  return [...SUPERVISOR_SPECIALTY_CODES_BY_AREA[area]] as SpecialtyCode[];
+}
 
 /**
- * Criterio UNICO de elegibilidade do responsavel (D-142), usado tanto pela
- * listagem quanto pelo guard do convite: perfil do PROPRIO tenant, o tenant e
- * uma ACADEMIA, e o profissional tem especialidade de CREF com conselho
- * PREENCHIDO. Um so predicado — a lista que a academia ve e exatamente o
- * conjunto que o convite aceita; duas copias poderiam divergir e oferecer na
- * tela alguem que o POST recusa.
+ * Tenants que comportam seat de estagiario: as EMPRESAS. `SOLO` fica de fora —
+ * tenant de uma pessoa so nao tem quadro nem admin que convide (o guard de
+ * CLINIC_ADMIN ja o excluiria; aqui e explicito).
+ */
+const COMPANY_TENANT_TYPES: TenantType[] = ['CLINIC', 'ACADEMIA'];
+
+/**
+ * Criterio UNICO de elegibilidade do responsavel (D-142/D-143), usado tanto pela
+ * listagem quanto pelo guard do convite: perfil do PROPRIO tenant, o tenant e uma
+ * EMPRESA, e o profissional tem o conselho DA AREA do estagiario, PREENCHIDO. Um
+ * so predicado — a lista que a empresa ve e exatamente o conjunto que o convite
+ * aceita; duas copias poderiam divergir e oferecer na tela alguem que o POST
+ * recusa.
  *
- * O `type: 'ACADEMIA'` e o que ancora o seat na vertical hoje: estagiario e seat
- * de ACADEMIA (spec §1/§6 — D-142). Numa clinica nao ha responsavel elegivel,
- * logo nao ha convite de estagiario.
- *
- * TODO(estagiario-em-clinica): `ACADEMIA` aqui e restricao de **MVP, NAO regra
- * permanente**. Estagiario de clinica e um caso REAL e previsto (estudante de
- * nutricao ou medicina sob supervisao) — a expansao e generalizar para
- * "estagiario em EMPRESA, com supervisor do conselho APROPRIADO a especialidade":
- * o par (vertical do tenant -> conselhos que supervisionam) vira a tabela, no
- * lugar do par fixo ACADEMIA/CREF de hoje. O que NAO muda na expansao e o
- * essencial: responsavel obrigatorio, NOT NULL, com capacidade derivada dele.
- * Este predicado e o unico ponto de mudanca — de proposito.
+ * **Quem decide e o CONSELHO do supervisor, nao a vertical do tenant** (D-143).
+ * Uma CLINICA com um CREF no quadro pode ter estagiario de educacao fisica; uma
+ * ACADEMIA com um CRN, de nutricao. O `type` so exclui `SOLO`: estagiario e seat
+ * de EMPRESA — tenant de uma pessoa so nao tem quadro nem admin que convide (e
+ * o guard de CLINIC_ADMIN ja o excluiria; aqui fica explicito).
  *
  * "Conselho preenchido" e o maximo que da para exigir hoje: verificacao de
  * registro ATIVO no conselho segue deferida (D-138/TODO(D-010)).
  */
-function eligibleSupervisorWhere(tenantId: string) {
+function eligibleSupervisorWhere(tenantId: string, area: InternArea) {
   return {
     tenantId,
-    tenant: { type: 'ACADEMIA' as const },
+    tenant: { type: { in: COMPANY_TENANT_TYPES } },
     specialties: {
       some: {
         councilDocument: { not: null },
         councilState: { not: null },
-        specialty: { code: { in: [...SUPERVISOR_SPECIALTY_CODES] } },
+        specialty: { code: { in: supervisorSpecialtyCodes(area) } },
       },
     },
   };
@@ -72,19 +79,26 @@ function eligibleSupervisorWhere(tenantId: string) {
 export class PrismaInternRepository implements InternRepository {
   constructor(private readonly db: PrismaClient = defaultPrisma) {}
 
-  async listEligibleSupervisors(tenantId: string): Promise<InternSupervisorRecord[]> {
+  async listEligibleSupervisors(
+    tenantId: string,
+    area: InternArea,
+  ): Promise<InternSupervisorRecord[]> {
     const rows = await this.db.professionalProfile.findMany({
-      where: eligibleSupervisorWhere(tenantId),
+      where: eligibleSupervisorWhere(tenantId, area),
       select: {
         id: true,
         accountId: true,
         displayName: true,
         account: { select: { name: true, socialName: true } },
         specialties: {
+          // MESMO filtro do `where` de fora: a credencial projetada tem de ser a
+          // que TORNA o profissional elegivel para esta area. Sem isto, um
+          // profissional com dois conselhos poderia aparecer na lista de nutricao
+          // exibindo o CREF.
           where: {
             councilDocument: { not: null },
             councilState: { not: null },
-            specialty: { code: { in: [...SUPERVISOR_SPECIALTY_CODES] } },
+            specialty: { code: { in: supervisorSpecialtyCodes(area) } },
           },
           select: {
             councilDocument: true,
@@ -120,9 +134,13 @@ export class PrismaInternRepository implements InternRepository {
     });
   }
 
-  async isEligibleSupervisor(tenantId: string, professionalProfileId: string): Promise<boolean> {
+  async isEligibleSupervisor(
+    tenantId: string,
+    area: InternArea,
+    professionalProfileId: string,
+  ): Promise<boolean> {
     const found = await this.db.professionalProfile.findFirst({
-      where: { id: professionalProfileId, ...eligibleSupervisorWhere(tenantId) },
+      where: { id: professionalProfileId, ...eligibleSupervisorWhere(tenantId, area) },
       select: { id: true },
     });
     return found !== null;
@@ -134,6 +152,9 @@ export class PrismaInternRepository implements InternRepository {
         tenantId: input.tenantId,
         email: input.email,
         name: input.name ?? null,
+        // Area definida pela EMPRESA (D-143) — viaja no convite junto do
+        // responsavel; o estagiario nao escolhe nenhum dos dois.
+        area: input.area,
         tokenHash: input.tokenHash,
         expiresAt: input.expiresAt,
         // Responsavel NOT NULL na coluna: mesmo que o guard da aplicacao falhasse,
@@ -165,6 +186,7 @@ export class PrismaInternRepository implements InternRepository {
           email: true,
           status: true,
           expiresAt: true,
+          area: true,
           supervisorProfessionalProfileId: true,
         },
       });
@@ -202,6 +224,8 @@ export class PrismaInternRepository implements InternRepository {
       // IDENTIDADE e o VINCULO; a validacao se pluga no supervisor daqui.
       const internProfile = {
         tenant: { connect: { id: invite.tenantId } },
+        // Area e responsavel vem AMBOS do convite — nao do corpo do aceite.
+        area: invite.area,
         supervisor: { connect: { id: invite.supervisorProfessionalProfileId } },
       };
 
@@ -215,6 +239,7 @@ export class PrismaInternRepository implements InternRepository {
           status: 'accepted',
           tenantId: invite.tenantId,
           accountId: existing.id,
+          area: invite.area,
           supervisorProfessionalProfileId: invite.supervisorProfessionalProfileId,
           created: false,
         };
@@ -251,6 +276,7 @@ export class PrismaInternRepository implements InternRepository {
         status: 'accepted',
         tenantId: invite.tenantId,
         accountId: created.id,
+        area: invite.area,
         supervisorProfessionalProfileId: invite.supervisorProfessionalProfileId,
         created: true,
       };

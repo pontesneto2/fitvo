@@ -34,6 +34,11 @@ async function setupAdmin(harness: TestHarness): Promise<{ accountId: string; to
   return { accountId: body.account.id, token: body.tokens.accessToken };
 }
 
+/**
+ * Convite da Fase A. `area` entra por padrão (EDUCACAO_FISICA — o caso do D-142)
+ * para que os testes de OUTRA coisa não precisem repeti-la; os testes de área
+ * sobrescrevem explicitamente.
+ */
 function createInvite(
   app: FastifyInstance,
   token: string,
@@ -44,7 +49,7 @@ function createInvite(
     method: 'POST',
     url: `/v1/interns/${tenantId}/invites`,
     headers: { authorization: `Bearer ${token}` },
-    payload,
+    payload: { area: 'EDUCACAO_FISICA', ...payload },
   });
 }
 
@@ -144,6 +149,7 @@ describe('estagiário — vínculo com responsável é OBRIGATÓRIO (D-142)', ()
       expect(res.json().invite).toMatchObject({
         email: 'estagiario@fitvo.dev',
         name: 'Estagiario Pre',
+        area: 'EDUCACAO_FISICA',
         status: 'PENDING',
         supervisorProfessionalProfileId: supervisor,
       });
@@ -172,6 +178,7 @@ describe('estagiário — aceite (Fase B)', () => {
         intern: {
           tenantId: ACADEMY_TENANT,
           seatType: 'STUDENT_INTERN',
+          area: 'EDUCACAO_FISICA',
           supervisorProfessionalProfileId: supervisor,
         },
         created: true,
@@ -289,6 +296,161 @@ describe('estagiário — aceite (Fase B)', () => {
   });
 });
 
+describe('estagiário — ÁREA obrigatória e coerente com o conselho (D-143)', () => {
+  it('convite SEM área → 400 (a área não é opcional)', async () => {
+    const harness = await buildTestHarness();
+    try {
+      const { token } = await setupAdmin(harness);
+      const supervisor = harness.intern.seedSupervisor({ tenantId: ACADEMY_TENANT });
+      const res = await harness.app.inject({
+        method: 'POST',
+        url: `/v1/interns/${ACADEMY_TENANT}/invites`,
+        headers: { authorization: `Bearer ${token}` },
+        payload: { email: 'sem-area@fitvo.dev', supervisorProfessionalProfileId: supervisor },
+      });
+      expect(res.statusCode).toBe(400);
+    } finally {
+      await harness.app.close();
+    }
+  });
+
+  it('área fora do enum → 400', async () => {
+    const harness = await buildTestHarness();
+    try {
+      const { token } = await setupAdmin(harness);
+      const supervisor = harness.intern.seedSupervisor({ tenantId: ACADEMY_TENANT });
+      const res = await createInvite(harness.app, token, {
+        email: 'area-invalida@fitvo.dev',
+        area: 'FISIOTERAPIA',
+        supervisorProfessionalProfileId: supervisor,
+      });
+      expect(res.statusCode).toBe(400);
+    } finally {
+      await harness.app.close();
+    }
+  });
+
+  it('NUTRICAO com supervisor CREF → 422 (regra semântica, não erro de schema)', async () => {
+    const harness = await buildTestHarness();
+    try {
+      const { token } = await setupAdmin(harness);
+      const cref = harness.intern.seedSupervisor({
+        tenantId: ACADEMY_TENANT,
+        specialtyCode: 'TRAINING',
+      });
+      const res = await createInvite(harness.app, token, {
+        email: 'nutri-com-cref@fitvo.dev',
+        area: 'NUTRICAO',
+        supervisorProfessionalProfileId: cref,
+      });
+      // 422, não 400: o corpo está bem formado (área válida, supervisor existe)
+      // — o que falha é a regra contra o banco. O `type` é o que distingue este
+      // 4xx de um erro de schema; só o status não provaria nada.
+      expect(res.statusCode).toBe(422);
+      expect(res.json().type).toBe('https://fitvo.dev/problems/ineligible-supervisor');
+      expect(harness.intern.listInternProfiles()).toHaveLength(0);
+    } finally {
+      await harness.app.close();
+    }
+  });
+
+  it('NUTRICAO com supervisor CRN → 201 e o seat nasce com a área', async () => {
+    const harness = await buildTestHarness();
+    try {
+      const { token } = await setupAdmin(harness);
+      const crn = harness.intern.seedSupervisor({
+        tenantId: ACADEMY_TENANT,
+        specialtyCode: 'NUTRITION',
+        councilDocument: 'CRN-123456',
+      });
+      const created = await createInvite(harness.app, token, {
+        email: 'nutri-ok@fitvo.dev',
+        area: 'NUTRICAO',
+        supervisorProfessionalProfileId: crn,
+      });
+      expect(created.statusCode).toBe(201);
+
+      const res = await accept(harness.app, created.json().token);
+      expect(res.statusCode).toBe(201);
+      expect(res.json().intern).toMatchObject({
+        area: 'NUTRICAO',
+        supervisorProfessionalProfileId: crn,
+      });
+      expect(harness.intern.listInternProfiles()[0]).toMatchObject({ area: 'NUTRICAO' });
+    } finally {
+      await harness.app.close();
+    }
+  });
+
+  it('MEDICINA com supervisor CRM → 201', async () => {
+    const harness = await buildTestHarness();
+    try {
+      const { token } = await setupAdmin(harness);
+      const crm = harness.intern.seedSupervisor({
+        tenantId: ACADEMY_TENANT,
+        specialtyCode: 'MEDICINE',
+        councilDocument: 'CRM-123456',
+      });
+      const res = await createInvite(harness.app, token, {
+        email: 'medicina-ok@fitvo.dev',
+        area: 'MEDICINA',
+        supervisorProfessionalProfileId: crm,
+      });
+      expect(res.statusCode).toBe(201);
+      expect(res.json().invite.area).toBe('MEDICINA');
+    } finally {
+      await harness.app.close();
+    }
+  });
+
+  it('a lista de responsáveis é filtrada pela área consultada', async () => {
+    const harness = await buildTestHarness();
+    try {
+      const { token } = await setupAdmin(harness);
+      const cref = harness.intern.seedSupervisor({
+        tenantId: ACADEMY_TENANT,
+        specialtyCode: 'TRAINING',
+        displayName: 'Professor CREF',
+      });
+      const crn = harness.intern.seedSupervisor({
+        tenantId: ACADEMY_TENANT,
+        specialtyCode: 'NUTRITION',
+        displayName: 'Nutri CRN',
+      });
+
+      const list = async (area: string) =>
+        (
+          await harness.app.inject({
+            method: 'GET',
+            url: `/v1/interns/${ACADEMY_TENANT}/supervisors?area=${area}`,
+            headers: { authorization: `Bearer ${token}` },
+          })
+        ).json().supervisors;
+
+      expect(await list('EDUCACAO_FISICA')).toMatchObject([{ professionalProfileId: cref }]);
+      expect(await list('NUTRICAO')).toMatchObject([{ professionalProfileId: crn }]);
+      expect(await list('MEDICINA')).toHaveLength(0);
+    } finally {
+      await harness.app.close();
+    }
+  });
+
+  it('listagem SEM área → 400 (a lista não significa nada sem área)', async () => {
+    const harness = await buildTestHarness();
+    try {
+      const { token } = await setupAdmin(harness);
+      const res = await harness.app.inject({
+        method: 'GET',
+        url: `/v1/interns/${ACADEMY_TENANT}/supervisors`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(res.statusCode).toBe(400);
+    } finally {
+      await harness.app.close();
+    }
+  });
+});
+
 describe('estagiário — guards administrativos (D-013/D-002)', () => {
   it('sem Bearer → 401 (payload VÁLIDO: o que falta é só a credencial)', async () => {
     const harness = await buildTestHarness();
@@ -299,6 +461,7 @@ describe('estagiário — guards administrativos (D-013/D-002)', () => {
         url: `/v1/interns/${ACADEMY_TENANT}/invites`,
         payload: {
           email: 'sem-bearer@fitvo.dev',
+          area: 'EDUCACAO_FISICA',
           supervisorProfessionalProfileId: supervisor,
         },
       });
@@ -337,7 +500,7 @@ describe('estagiário — guards administrativos (D-013/D-002)', () => {
 
       const res = await harness.app.inject({
         method: 'GET',
-        url: `/v1/interns/${ACADEMY_TENANT}/supervisors`,
+        url: `/v1/interns/${ACADEMY_TENANT}/supervisors?area=EDUCACAO_FISICA`,
         headers: { authorization: `Bearer ${token}` },
       });
       expect(res.statusCode).toBe(200);

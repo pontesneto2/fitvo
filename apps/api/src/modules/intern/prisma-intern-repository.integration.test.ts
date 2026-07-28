@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { PrismaClient } from '@fitvo/database';
+import { type InternArea, PrismaClient } from '@fitvo/database';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { hashInviteToken } from '../../shared/invite-token';
@@ -25,6 +25,7 @@ const ORIGIN = { ipAddress: '127.0.0.1', userAgent: 'vitest-integration' };
 
 let trainingSpecialtyId = '';
 let nutritionSpecialtyId = '';
+let medicineSpecialtyId = '';
 
 beforeAll(async () => {
   trainingSpecialtyId = (await prisma.specialty.findUniqueOrThrow({ where: { code: 'TRAINING' } }))
@@ -32,6 +33,8 @@ beforeAll(async () => {
   nutritionSpecialtyId = (
     await prisma.specialty.findUniqueOrThrow({ where: { code: 'NUTRITION' } })
   ).id;
+  medicineSpecialtyId = (await prisma.specialty.findUniqueOrThrow({ where: { code: 'MEDICINE' } }))
+    .id;
 });
 
 afterAll(async () => {
@@ -127,11 +130,13 @@ async function createInvite(
   tenantId: string,
   supervisorProfessionalProfileId: string,
   email = `estagiario-${randomUUID().slice(0, 8)}@int.dev`,
+  area: InternArea = 'EDUCACAO_FISICA',
 ): Promise<{ token: string; email: string }> {
   const token = randomUUID();
   await repo.createInvite({
     tenantId,
     email,
+    area,
     name: 'Estagiario Pre',
     tokenHash: hashInviteToken(token),
     expiresAt: new Date(Date.now() + 3_600_000),
@@ -161,8 +166,8 @@ describe('InternProfile — estagiário SEM responsável é irrepresentável (sc
     // apenas "não construível pelo nosso código".
     await expect(
       prisma.$executeRawUnsafe(
-        `INSERT INTO "intern_profile" ("id","accountId","tenantId","updatedAt")
-         VALUES ($1,$2,$3,now())`,
+        `INSERT INTO "intern_profile" ("id","accountId","tenantId","area","updatedAt")
+         VALUES ($1,$2,$3,'EDUCACAO_FISICA',now())`,
         `ip_${randomUUID().slice(0, 8)}`,
         account.id,
         tenantId,
@@ -191,6 +196,7 @@ describe('InternProfile — estagiário SEM responsável é irrepresentável (sc
         data: {
           account: { connect: { id: account.id } },
           tenant: { connect: { id: tenantId } },
+          area: 'EDUCACAO_FISICA',
           supervisor: { connect: { id: 'pp_inexistente' } },
         },
       }),
@@ -215,8 +221,10 @@ describe('elegibilidade do responsável (D-142) — critério único', () => {
   it('Educador Físico com CREF da academia É elegível e aparece na lista', async () => {
     const { tenantId, professionalProfileId } = await seedCompanyWithProvider({});
 
-    expect(await repo.isEligibleSupervisor(tenantId, professionalProfileId)).toBe(true);
-    const supervisors = await repo.listEligibleSupervisors(tenantId);
+    expect(
+      await repo.isEligibleSupervisor(tenantId, 'EDUCACAO_FISICA', professionalProfileId),
+    ).toBe(true);
+    const supervisors = await repo.listEligibleSupervisors(tenantId, 'EDUCACAO_FISICA');
     expect(supervisors).toHaveLength(1);
     expect(supervisors[0]).toMatchObject({
       professionalProfileId,
@@ -232,8 +240,10 @@ describe('elegibilidade do responsável (D-142) — critério único', () => {
       councilDocument: 'CRN-123456',
     });
 
-    expect(await repo.isEligibleSupervisor(tenantId, professionalProfileId)).toBe(false);
-    expect(await repo.listEligibleSupervisors(tenantId)).toHaveLength(0);
+    expect(
+      await repo.isEligibleSupervisor(tenantId, 'EDUCACAO_FISICA', professionalProfileId),
+    ).toBe(false);
+    expect(await repo.listEligibleSupervisors(tenantId, 'EDUCACAO_FISICA')).toHaveLength(0);
   });
 
   it('CREF SEM conselho preenchido NÃO é elegível (D-138 — formato é o mínimo)', async () => {
@@ -241,24 +251,179 @@ describe('elegibilidade do responsável (D-142) — critério único', () => {
       councilDocument: null,
     });
 
-    expect(await repo.isEligibleSupervisor(tenantId, professionalProfileId)).toBe(false);
-    expect(await repo.listEligibleSupervisors(tenantId)).toHaveLength(0);
+    expect(
+      await repo.isEligibleSupervisor(tenantId, 'EDUCACAO_FISICA', professionalProfileId),
+    ).toBe(false);
+    expect(await repo.listEligibleSupervisors(tenantId, 'EDUCACAO_FISICA')).toHaveLength(0);
   });
 
-  it('profissional de CLÍNICA não é elegível: estagiário é seat de ACADEMIA', async () => {
+  it('D-143: profissional de CLÍNICA com CREF É elegível — a vertical não decide mais', async () => {
+    // Regra invertida em relação ao D-142: quem decide é o CONSELHO do
+    // supervisor, não o tipo do tenant. Uma clínica com um educador físico no
+    // quadro pode, sim, ter estagiário de educação física.
     const { tenantId, professionalProfileId } = await seedCompanyWithProvider({
       tenantType: 'CLINIC',
     });
 
-    expect(await repo.isEligibleSupervisor(tenantId, professionalProfileId)).toBe(false);
-    expect(await repo.listEligibleSupervisors(tenantId)).toHaveLength(0);
+    expect(
+      await repo.isEligibleSupervisor(tenantId, 'EDUCACAO_FISICA', professionalProfileId),
+    ).toBe(true);
+    expect(await repo.listEligibleSupervisors(tenantId, 'EDUCACAO_FISICA')).toHaveLength(1);
   });
 
   it('responsável de OUTRA academia não é elegível neste tenant (D-002)', async () => {
     const a = await seedCompanyWithProvider({});
     const b = await seedCompanyWithProvider({});
 
-    expect(await repo.isEligibleSupervisor(a.tenantId, b.professionalProfileId)).toBe(false);
+    expect(
+      await repo.isEligibleSupervisor(a.tenantId, 'EDUCACAO_FISICA', b.professionalProfileId),
+    ).toBe(false);
+  });
+});
+
+describe('D-143 — a ÁREA decide qual conselho supervisiona', () => {
+  it('NUTRICAO com supervisor CREF → INELEGÍVEL (conselho não bate a área)', async () => {
+    const { tenantId, professionalProfileId } = await seedCompanyWithProvider({});
+
+    // O mesmo profissional é elegível para a área DELE e inelegível para outra —
+    // é a área, e só ela, que muda o veredito.
+    expect(
+      await repo.isEligibleSupervisor(tenantId, 'EDUCACAO_FISICA', professionalProfileId),
+    ).toBe(true);
+    expect(await repo.isEligibleSupervisor(tenantId, 'NUTRICAO', professionalProfileId)).toBe(
+      false,
+    );
+    expect(await repo.listEligibleSupervisors(tenantId, 'NUTRICAO')).toHaveLength(0);
+  });
+
+  it('NUTRICAO com supervisor CRN → elegível, seat nasce com area NUTRICAO', async () => {
+    const { tenantId, professionalProfileId } = await seedCompanyWithProvider({
+      tenantType: 'CLINIC',
+      specialtyId: nutritionSpecialtyId,
+      councilDocument: 'CRN-123456',
+    });
+    expect(await repo.isEligibleSupervisor(tenantId, 'NUTRICAO', professionalProfileId)).toBe(true);
+
+    const { token, email } = await createInvite(
+      tenantId,
+      professionalProfileId,
+      undefined,
+      'NUTRICAO',
+    );
+    const outcome = await repo.acceptInvite(hashInviteToken(token), internAccount(), ORIGIN);
+    expect(outcome).toMatchObject({
+      status: 'accepted',
+      area: 'NUTRICAO',
+      supervisorProfessionalProfileId: professionalProfileId,
+    });
+
+    const persisted = await prisma.account.findUniqueOrThrow({
+      where: { email },
+      select: {
+        internProfile: {
+          select: {
+            area: true,
+            tenantId: true,
+            supervisorProfessionalProfileId: true,
+            supervisor: {
+              select: { specialties: { select: { specialty: { select: { code: true } } } } },
+            },
+          },
+        },
+      },
+    });
+    expect(persisted.internProfile).toMatchObject({
+      area: 'NUTRICAO',
+      tenantId,
+      supervisorProfessionalProfileId: professionalProfileId,
+    });
+    // A capacidade deriva de um CRN — alcançável em leitura a partir do seat.
+    expect(persisted.internProfile?.supervisor.specialties[0]?.specialty.code).toBe('NUTRITION');
+  });
+
+  it('MEDICINA com supervisor CRM → elegível, seat nasce com area MEDICINA', async () => {
+    const { tenantId, professionalProfileId } = await seedCompanyWithProvider({
+      tenantType: 'CLINIC',
+      specialtyId: medicineSpecialtyId,
+      councilDocument: 'CRM-123456',
+    });
+    expect(await repo.isEligibleSupervisor(tenantId, 'MEDICINA', professionalProfileId)).toBe(true);
+
+    const { token } = await createInvite(tenantId, professionalProfileId, undefined, 'MEDICINA');
+    const outcome = await repo.acceptInvite(hashInviteToken(token), internAccount(), ORIGIN);
+    expect(outcome).toMatchObject({ status: 'accepted', area: 'MEDICINA' });
+  });
+
+  it('MEDICINA com supervisor CRN → inelegível (nutricionista não supervisiona medicina)', async () => {
+    const { tenantId, professionalProfileId } = await seedCompanyWithProvider({
+      tenantType: 'CLINIC',
+      specialtyId: nutritionSpecialtyId,
+      councilDocument: 'CRN-123456',
+    });
+
+    expect(await repo.isEligibleSupervisor(tenantId, 'MEDICINA', professionalProfileId)).toBe(
+      false,
+    );
+  });
+
+  it('REGRESSÃO D-142: EDUCACAO_FISICA com CREF em ACADEMIA continua funcionando', async () => {
+    const { tenantId, professionalProfileId } = await seedCompanyWithProvider({
+      tenantType: 'ACADEMIA',
+    });
+    const { token } = await createInvite(
+      tenantId,
+      professionalProfileId,
+      undefined,
+      'EDUCACAO_FISICA',
+    );
+
+    const outcome = await repo.acceptInvite(hashInviteToken(token), internAccount(), ORIGIN);
+    expect(outcome).toMatchObject({
+      status: 'accepted',
+      area: 'EDUCACAO_FISICA',
+      supervisorProfessionalProfileId: professionalProfileId,
+      created: true,
+    });
+  });
+
+  it('estagiário de NUTRIÇÃO existe em CLINIC — soltou da academia (D-143)', async () => {
+    const { tenantId, professionalProfileId } = await seedCompanyWithProvider({
+      tenantType: 'CLINIC',
+      specialtyId: nutritionSpecialtyId,
+      councilDocument: 'CRN-999999',
+    });
+    const { token } = await createInvite(tenantId, professionalProfileId, undefined, 'NUTRICAO');
+
+    const outcome = await repo.acceptInvite(hashInviteToken(token), internAccount(), ORIGIN);
+    expect(outcome.status).toBe('accepted');
+
+    const tenant = await prisma.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { type: true },
+    });
+    expect(tenant.type).toBe('CLINIC');
+    expect(await prisma.internProfile.count({ where: { tenantId, area: 'NUTRICAO' } })).toBe(1);
+  });
+
+  it('a listagem por área projeta o conselho DAQUELA área, não outro do mesmo profissional', async () => {
+    // Profissional com DOIS conselhos (CREF + CRN) no mesmo perfil: aparece nas
+    // duas listas, mas cada uma tem de exibir a credencial correspondente.
+    const { tenantId, professionalProfileId } = await seedCompanyWithProvider({
+      tenantType: 'CLINIC',
+    });
+    await prisma.professionalSpecialty.create({
+      data: {
+        professionalProfileId,
+        specialtyId: nutritionSpecialtyId,
+        councilDocument: 'CRN-555555',
+        councilState: 'SP',
+      },
+    });
+
+    const cref = await repo.listEligibleSupervisors(tenantId, 'EDUCACAO_FISICA');
+    const crn = await repo.listEligibleSupervisors(tenantId, 'NUTRICAO');
+    expect(cref[0]).toMatchObject({ specialtyCode: 'TRAINING', councilDocument: 'CREF-123456' });
+    expect(crn[0]).toMatchObject({ specialtyCode: 'NUTRITION', councilDocument: 'CRN-555555' });
   });
 });
 

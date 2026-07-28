@@ -20,13 +20,35 @@ export interface TermsAcceptanceOrigin {
   userAgent: string;
 }
 
+/**
+ * Endereço da PESSOA (D-044) — bloco persistido como colunas `address*` na
+ * `Account`, espelhando o precedente do `Tenant`. Só dígitos em `cep`
+ * (normalização é do schema Zod). `complemento` opcional; `country` sempre
+ * presente (default 'BR' resolvido no schema).
+ */
+export interface AddressInput {
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento?: string | undefined;
+  bairro: string;
+  cidade: string;
+  state: BrazilianState;
+  country: string;
+}
+
 export interface CreateProfessionalInput {
   email: string;
   passwordHash: string;
   name: string;
   document: string;
   documentType: DocumentType;
-  tenantName: string;
+  /** WhatsApp da pessoa — só dígitos (11), normalizado no schema (D-044). */
+  whatsapp: string;
+  /** Data de nascimento (calendário) — o schema já garantiu maioridade (D-044). */
+  birthDate: Date;
+  /** Endereço da pessoa (D-044) — colunas `address*` na Account. */
+  address: AddressInput;
   /** Especialidade reivindicada no signup (D-137 — ADR-0015). */
   specialtyId: string;
   /** Registro no conselho — validado so em formato pelo Zod (D-138). */

@@ -47,7 +47,17 @@
                   "password": {
                     "type": "string",
                     "minLength": 8,
-                    "description": "Senha em claro (mín. 8)."
+                    "allOf": [
+                      {
+                        "type": "string",
+                        "pattern": "[A-Za-z]"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\d"
+                      }
+                    ],
+                    "description": "Senha em claro — mín. 8, ao menos 1 letra e 1 número."
                   },
                   "name": {
                     "type": "string",
@@ -55,9 +65,8 @@
                   },
                   "document": {
                     "type": "string",
-                    "minLength": 11,
-                    "maxLength": 18,
-                    "description": "CPF ou CNPJ (D-043)."
+                    "pattern": "^\\d+$",
+                    "description": "CPF ou CNPJ, só dígitos (D-043)."
                   },
                   "documentType": {
                     "type": "string",
@@ -66,9 +75,92 @@
                       "CNPJ"
                     ]
                   },
-                  "tenantName": {
+                  "whatsapp": {
                     "type": "string",
-                    "minLength": 1
+                    "pattern": "^\\d{11}$",
+                    "description": "WhatsApp — 11 dígitos (DDD + celular), só números (máscara é UI)."
+                  },
+                  "birthDate": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                    "description": "Data de nascimento (YYYY-MM-DD) — maioridade obrigatória (D-044)."
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "cep": {
+                        "type": "string",
+                        "pattern": "^\\d{8}$",
+                        "description": "CEP — 8 dígitos, só números (máscara é UI)."
+                      },
+                      "logradouro": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "numero": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "complemento": {
+                        "type": "string"
+                      },
+                      "bairro": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "cidade": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "AC",
+                          "AL",
+                          "AM",
+                          "AP",
+                          "BA",
+                          "CE",
+                          "DF",
+                          "ES",
+                          "GO",
+                          "MA",
+                          "MG",
+                          "MS",
+                          "MT",
+                          "PA",
+                          "PB",
+                          "PE",
+                          "PI",
+                          "PR",
+                          "RJ",
+                          "RN",
+                          "RO",
+                          "RR",
+                          "RS",
+                          "SC",
+                          "SE",
+                          "SP",
+                          "TO"
+                        ],
+                        "description": "UF do endereço."
+                      },
+                      "country": {
+                        "default": "BR",
+                        "description": "País do endereço (default BR).",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "cep",
+                      "logradouro",
+                      "numero",
+                      "bairro",
+                      "cidade",
+                      "state"
+                    ],
+                    "description": "Endereço da pessoa (D-044)."
                   },
                   "specialtyId": {
                     "type": "string",
@@ -146,7 +238,9 @@
                   "name",
                   "document",
                   "documentType",
-                  "tenantName",
+                  "whatsapp",
+                  "birthDate",
+                  "address",
                   "specialtyId",
                   "councilDocument",
                   "councilState",

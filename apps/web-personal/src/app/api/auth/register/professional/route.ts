@@ -1,17 +1,23 @@
+import { registerProfessionalSchema } from '@fitvo/validation';
 import { NextResponse } from 'next/server';
 
 import { apiUrl } from '@/lib/api';
-import { type LoginResult, registerProfessionalInputSchema } from '@/lib/auth';
+import { type LoginResult } from '@/lib/auth';
 import { setSessionCookies } from '@/lib/session';
 
 /**
  * BFF do cadastro de profissional. Espelha o BFF de login: valida o corpo,
  * chama POST /v1/auth/register/professional e grava os tokens em cookies
  * httpOnly — o browser nunca ve o token.
+ *
+ * Validação CONTRACT-FIRST (D-032): reusa o `registerProfessionalSchema` de
+ * `@fitvo/validation` — o MESMO schema que a API valida — em vez de um mirror
+ * que pode divergir. O cliente normaliza (tira máscara, ISO na data) antes de
+ * postar; aqui só reconferimos o contrato do fio.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const body: unknown = await request.json().catch(() => null);
-  const parsed = registerProfessionalInputSchema.safeParse(body);
+  const parsed = registerProfessionalSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Dados invalidos.' }, { status: 400 });
   }

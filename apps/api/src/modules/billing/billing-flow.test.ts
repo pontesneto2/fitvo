@@ -2,22 +2,16 @@ import { FakePaymentGateway } from '@fitvo/payments';
 import { describe, expect, it } from 'vitest';
 
 import { buildTestHarness, type TestHarness } from '../../testing/build-test-app';
+import { validProfessionalRegistration } from '../../testing/professional-registration-fixture';
 
 const TENANT = 'tenant_solo';
 const SUB_KEY = 'idem-subscription-0001';
 const CHARGE_KEY = 'idem-charge-0001';
 
 const proPayload = {
+  ...validProfessionalRegistration,
   email: 'pro@fitvo.dev',
-  password: 'senha-forte-123',
   name: 'Profissional Solo',
-  document: '12345678901',
-  documentType: 'CPF',
-  tenantName: 'Estudio Solo',
-  specialtyId: 'spec_training',
-  councilDocument: 'CREF-123456',
-  councilState: 'SP',
-  acceptedTerms: { termsOfUse: true, privacyPolicy: true },
 };
 
 /**
@@ -241,7 +235,7 @@ describe('fluxo de billing (E2E via inject, FakePaymentGateway)', () => {
     const outsider = await harness.app.inject({
       method: 'POST',
       url: '/v1/auth/register/professional',
-      payload: { ...proPayload, email: 'outro@fitvo.dev', tenantName: 'Outro' },
+      payload: { ...proPayload, email: 'outro@fitvo.dev' },
     });
     const outsiderToken = outsider.json().tokens.accessToken;
 

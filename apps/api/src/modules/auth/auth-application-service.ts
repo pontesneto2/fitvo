@@ -16,7 +16,12 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '../../shared/http-errors';
-import type { AccountRecord, AccountRepository, TermsAcceptanceOrigin } from './account-repository';
+import type {
+  AccountRecord,
+  AccountRepository,
+  AddressInput,
+  TermsAcceptanceOrigin,
+} from './account-repository';
 
 /**
  * Guard minimo: a especialidade reivindicada no signup (D-137) precisa
@@ -47,7 +52,12 @@ export interface RegisterProfessionalInput {
   name: string;
   document: string;
   documentType: DocumentType;
-  tenantName: string;
+  /** WhatsApp — só dígitos (11), normalizado no contrato (D-044). */
+  whatsapp: string;
+  /** Data de nascimento `YYYY-MM-DD` no fio (maioridade já garantida — D-044). */
+  birthDate: string;
+  /** Endereço da pessoa (D-044) — bloco. */
+  address: AddressInput;
   /** Especialidade reivindicada no signup (D-137 — ADR-0015). */
   specialtyId: string;
   /** Registro no conselho — validado so em formato pelo Zod (D-138). */
@@ -94,7 +104,13 @@ export class AuthApplicationService {
       name: input.name,
       document: input.document,
       documentType: input.documentType,
-      tenantName: input.tenantName,
+      whatsapp: input.whatsapp,
+      // `YYYY-MM-DD` (calendário) → Date. UTC midnight, sem hora: o schema já
+      // validou o formato e a maioridade; aqui só a conversão para o boundary
+      // Prisma (@db.Date). O tenant SOLO herda o NOME do profissional (não há
+      // mais campo tenantName — ADR-0015).
+      birthDate: new Date(`${input.birthDate}T00:00:00Z`),
+      address: input.address,
       specialtyId: input.specialtyId,
       councilDocument: input.councilDocument,
       councilState: input.councilState,

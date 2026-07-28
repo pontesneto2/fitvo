@@ -2,20 +2,16 @@ import type { FastifyInstance } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
 import { buildTestHarness, type TestHarness } from '../../testing/build-test-app';
+import { validProfessionalRegistration } from '../../testing/professional-registration-fixture';
 
 const TENANT_A = 'nutri_tenant_a';
 const TENANT_B = 'nutri_tenant_b';
 
 const proPayload = {
-  password: 'senha-forte-123',
+  ...validProfessionalRegistration,
   name: 'Profissional',
-  document: '12345678901',
-  documentType: 'CPF',
-  tenantName: 'Estudio Nutricao (solo)',
   specialtyId: 'spec_nutrition',
   councilDocument: 'CRN-123456',
-  councilState: 'SP',
-  acceptedTerms: { termsOfUse: true, privacyPolicy: true },
 };
 
 /**
@@ -31,7 +27,7 @@ async function setupBond(
   const res = await harness.app.inject({
     method: 'POST',
     url: '/v1/auth/register/professional',
-    payload: { ...proPayload, email, tenantName: `${proPayload.tenantName} ${tenantId}` },
+    payload: { ...proPayload, email },
   });
   expect(res.statusCode).toBe(201);
   const body = res.json();

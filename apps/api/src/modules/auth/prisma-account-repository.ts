@@ -31,14 +31,18 @@ export class PrismaAccountRepository implements AccountRepository {
   createProfessional(input: CreateProfessionalInput): Promise<AccountRecord> {
     return this.db.$transaction(async (tx) => {
       const tenant = await tx.tenant.create({
-        data: { type: 'SOLO', name: input.tenantName },
+        // Tenant SOLO herda o NOME do profissional — nao ha mais campo
+        // tenantName no cadastro (ADR-0015). Nome comercial e preferencia de
+        // perfil, fora deste slice.
+        data: { type: 'SOLO', name: input.name },
       });
       // A ProfessionalSpecialty nasce ANINHADA na mesma escrita do
       // professionalProfile — uma unica operacao Prisma, dentro da mesma
       // $transaction: se specialtyId nao existir no catalogo (FK Restrict),
       // o Prisma reprova a escrita inteira e a transacao inteira reverte —
       // nem Tenant nem Account sobrevivem (D-137, mesma garantia atomica do
-      // aceite de convite).
+      // aceite de convite). whatsapp/birthDate/address* moram na Account
+      // (atributos da PESSOA — D-044) e sao gravados nesta MESMA escrita.
       const account = await tx.account.create({
         data: {
           email: input.email,
@@ -46,6 +50,16 @@ export class PrismaAccountRepository implements AccountRepository {
           name: input.name,
           document: input.document,
           documentType: input.documentType,
+          whatsapp: input.whatsapp,
+          birthDate: input.birthDate,
+          addressStreet: input.address.logradouro,
+          addressNumber: input.address.numero,
+          addressComplement: input.address.complemento ?? null,
+          addressDistrict: input.address.bairro,
+          addressCity: input.address.cidade,
+          addressState: input.address.state,
+          addressZipCode: input.address.cep,
+          addressCountry: input.address.country,
           professionalProfile: {
             create: {
               tenant: { connect: { id: tenant.id } },

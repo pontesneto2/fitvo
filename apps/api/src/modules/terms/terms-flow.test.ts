@@ -2,23 +2,15 @@ import type { FastifyInstance } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
 import { buildTestHarness, type TestHarness } from '../../testing/build-test-app';
+import { validProfessionalRegistration } from '../../testing/professional-registration-fixture';
 
 const PRO_TENANT = 'pro_tenant_terms';
 const SPECIALTY = 'spec_training';
 
-const acceptedTerms = { termsOfUse: true, privacyPolicy: true } as const;
-
 const proPayload = {
+  ...validProfessionalRegistration,
   email: 'pro-terms@fitvo.dev',
-  password: 'senha-forte-123',
   name: 'Profissional',
-  document: '12345678901',
-  documentType: 'CPF',
-  tenantName: 'Estudio Terms (solo)',
-  specialtyId: 'spec_training',
-  councilDocument: 'CREF-123456',
-  councilState: 'SP',
-  acceptedTerms,
 };
 
 /**

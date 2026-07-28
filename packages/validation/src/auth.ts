@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { isValidCnpj, isValidCpf } from './document';
+
 /**
  * Contrato de autenticação (D-032) — FONTE ÚNICA.
  *
@@ -20,6 +22,55 @@ import { z } from 'zod';
 const email = z.string().email().describe('E-mail de login (único) — D-042.');
 const password = z.string().min(8).describe('Senha em claro (mín. 8).');
 const oneTimeToken = z.string().min(1).describe('Token de uso único recebido por e-mail.');
+
+/**
+ * Gate MÍNIMO de força de senha no CADASTRO — servidor, não só UI. Além dos 8
+ * caracteres, exige ao menos 1 letra e ao menos 1 dígito. NÃO exige
+ * maiúscula/símbolo (fricção sem ganho real de segurança): o medidor visual do
+ * front incentiva mais, mas o gate obrigatório para a conta nascer é este. O
+ * `password` simples (min 8) segue valendo para login/recuperação, que não são
+ * momento de cadastro.
+ */
+const strongPassword = z
+  .string()
+  .min(8, 'A senha precisa ter no mínimo 8 caracteres.')
+  .regex(/[A-Za-z]/, 'A senha precisa ter ao menos uma letra.')
+  .regex(/\d/, 'A senha precisa ter ao menos um número.')
+  .describe('Senha em claro — mín. 8, ao menos 1 letra e 1 número.');
+
+/**
+ * WhatsApp da PESSOA — SÓ dígitos no fio (DDD + celular = 11 dígitos). A máscara
+ * `(00) 00000-0000` é responsabilidade da UI; o contrato armazena o número
+ * normalizado. Não-dígito (máscara) é rejeitado com 400, garantindo storage
+ * limpo sem depender de transform (que não é representável no OpenAPI — D-032).
+ */
+const whatsapp = z
+  .string()
+  .regex(/^\d{11}$/, 'WhatsApp deve ter 11 dígitos (DDD + celular), só números.')
+  .describe('WhatsApp — 11 dígitos (DDD + celular), só números (máscara é UI).');
+
+/**
+ * Data de nascimento (D-044) — data de CALENDÁRIO `YYYY-MM-DD` no fio, e o
+ * cadastro exige MAIORIDADE (18+). A idade é DERIVADA de hoje, nunca
+ * armazenada (mesma disciplina do IMC — D-132). @db.Date no banco: sem hora,
+ * sem fuso (ninguém nasce "às 00h UTC" — evita o deslize do ADR-0012).
+ */
+const birthDate = z.iso
+  .date()
+  .refine(isAtLeastEighteen, { message: 'É preciso ter 18 anos ou mais para se cadastrar.' })
+  .describe('Data de nascimento (YYYY-MM-DD) — maioridade obrigatória (D-044).');
+
+/** ≥ 18 anos completos na data de hoje (UTC). Aniversário no dia conta como completado. */
+function isAtLeastEighteen(isoDate: string): boolean {
+  const dob = new Date(`${isoDate}T00:00:00Z`);
+  if (Number.isNaN(dob.getTime())) {
+    return false;
+  }
+  const eighteenth = new Date(
+    Date.UTC(dob.getUTCFullYear() + 18, dob.getUTCMonth(), dob.getUTCDate()),
+  );
+  return eighteenth.getTime() <= Date.now();
+}
 
 /** UF (mirror do enum `BrazilianState` do Prisma) — usada pelo conselho profissional (D-126). */
 export const brazilianStateSchema = z.enum([
@@ -51,6 +102,29 @@ export const brazilianStateSchema = z.enum([
   'SP',
   'TO',
 ]);
+
+/**
+ * Endereço da PESSOA (D-044) — bloco. CEP só dígitos (8), como o WhatsApp:
+ * máscara é UI, storage é normalizado. `complemento` opcional; `country` default
+ * 'BR' (lançamento pt-BR). `state` reusa o enum de UF. Todos os campos textuais
+ * exigidos são não-vazios; o preenchimento pode vir do ViaCEP mas o gate é do
+ * servidor.
+ */
+export const addressSchema = z
+  .object({
+    cep: z
+      .string()
+      .regex(/^\d{8}$/, 'CEP deve ter 8 dígitos, só números.')
+      .describe('CEP — 8 dígitos, só números (máscara é UI).'),
+    logradouro: z.string().trim().min(1, 'Informe o logradouro.'),
+    numero: z.string().trim().min(1, 'Informe o número.'),
+    complemento: z.string().trim().optional(),
+    bairro: z.string().trim().min(1, 'Informe o bairro.'),
+    cidade: z.string().trim().min(1, 'Informe a cidade.'),
+    state: brazilianStateSchema.describe('UF do endereço.'),
+    country: z.string().trim().default('BR').describe('País do endereço (default BR).'),
+  })
+  .describe('Endereço da pessoa (D-044).');
 
 /**
  * Registro no conselho profissional (CREF/CRN/CRM) — validado apenas em
@@ -87,23 +161,53 @@ export const acceptedTerms = z
 // o lugar: o contrato agora é compartilhado).
 // ---------------------------------------------------------------------------
 
-export const registerProfessionalSchema = z.object({
-  email,
-  password,
-  name: z.string().min(1),
-  document: z.string().min(11).max(18).describe('CPF ou CNPJ (D-043).'),
-  documentType: z.enum(['CPF', 'CNPJ']),
-  tenantName: z.string().min(1),
-  /**
-   * Especialidade reivindicada no signup (D-137 — ADR-0015): o autônomo
-   * escolhe UMA especialidade no cadastro; as demais entram por fluxo
-   * proprio, fora deste contrato.
-   */
-  specialtyId: z.string().min(1).describe('Especialidade reivindicada no signup (D-137).'),
-  councilDocument,
-  councilState: brazilianStateSchema.describe('UF do conselho profissional (D-126).'),
-  acceptedTerms,
-});
+export const registerProfessionalSchema = z
+  .object({
+    email,
+    password: strongPassword,
+    name: z.string().min(1),
+    /**
+     * CPF ou CNPJ da PESSOA (D-043) — SÓ dígitos no fio (máscara é UI). O tipo
+     * decide o tamanho e o dígito verificador (regra cross-field no
+     * `.superRefine` abaixo): CPF ⇒ 11 díg + DV; CNPJ ⇒ 14 díg + DV. Aqui só a
+     * disciplina de "apenas dígitos"; a validade real do DV é o refine.
+     */
+    document: z
+      .string()
+      .regex(/^\d+$/, 'Documento deve conter apenas dígitos.')
+      .describe('CPF ou CNPJ, só dígitos (D-043).'),
+    documentType: z.enum(['CPF', 'CNPJ']),
+    whatsapp,
+    birthDate,
+    address: addressSchema,
+    /**
+     * Especialidade reivindicada no signup (D-137 — ADR-0015): o autônomo
+     * escolhe UMA especialidade no cadastro; as demais entram por fluxo
+     * proprio, fora deste contrato.
+     */
+    specialtyId: z.string().min(1).describe('Especialidade reivindicada no signup (D-137).'),
+    councilDocument,
+    councilState: brazilianStateSchema.describe('UF do conselho profissional (D-126).'),
+    acceptedTerms,
+  })
+  .superRefine((data, ctx) => {
+    // CPF-xor-CNPJ com dígito verificador REAL (D-043). O tipo declarado
+    // determina qual algoritmo e qual tamanho valem — um número bem formado do
+    // tipo errado (CPF com 14 díg, CNPJ com 11) ou com DV inválido é 400 antes
+    // de qualquer escrita. "Bem formado" ≠ "existe na Receita" — só o DV.
+    const valid =
+      data.documentType === 'CPF' ? isValidCpf(data.document) : isValidCnpj(data.document);
+    if (!valid) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['document'],
+        message:
+          data.documentType === 'CPF'
+            ? 'CPF inválido (11 dígitos + dígito verificador).'
+            : 'CNPJ inválido (14 dígitos + dígito verificador).',
+      });
+    }
+  });
 
 export const loginSchema = z.object({
   email,

@@ -2,21 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { buildTestApp, buildTestHarness } from '../../testing/build-test-app';
 import { createPatientViaInvite } from '../../testing/patient-invite-fixture';
+import { validProfessionalRegistration } from '../../testing/professional-registration-fixture';
 
-const acceptedTerms = { termsOfUse: true, privacyPolicy: true } as const;
-
-const professional = {
-  email: 'leo@fitvo.dev',
-  password: 'senha-forte-123',
-  name: 'Leo',
-  document: '12345678901',
-  documentType: 'CPF',
-  tenantName: 'Leo Personal',
-  specialtyId: 'spec_training',
-  councilDocument: 'CREF-123456',
-  councilState: 'SP',
-  acceptedTerms,
-};
+const professional = { ...validProfessionalRegistration, email: 'leo@fitvo.dev', name: 'Leo' };
 
 describe('fluxo de autenticacao (E2E via inject)', () => {
   it('registra profissional, faz login, refresh e logout', async () => {

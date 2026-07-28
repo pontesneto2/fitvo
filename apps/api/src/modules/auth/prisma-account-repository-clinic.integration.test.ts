@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@fitvo/database';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import type { CreateClinicInput } from './account-repository';
+import type { CreateCompanyInput } from './account-repository';
 import { PrismaAccountRepository } from './prisma-account-repository';
 
 /**
@@ -28,8 +28,9 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-function baseInput(email: string): CreateClinicInput {
+function baseInput(email: string): CreateCompanyInput {
   return {
+    tenantType: 'CLINIC',
     legalName: `Clinica ${email} LTDA`,
     tradeName: `Clinica ${email}`,
     cnpj: '11222333000181',
@@ -56,10 +57,10 @@ function baseInput(email: string): CreateClinicInput {
   };
 }
 
-describe('PrismaAccountRepository — createClinic (mapeamento contra Postgres real)', () => {
+describe('PrismaAccountRepository — createCompany CLINIC (mapeamento contra Postgres real)', () => {
   it('MANAGER_ONLY: cria Tenant(CLINIC) + admin + membership + termos, SEM ProfessionalSpecialty', async () => {
     const email = `gestor-${randomUUID().slice(0, 8)}@int.dev`;
-    const account = await repo.createClinic(baseInput(email));
+    const account = await repo.createCompany(baseInput(email));
 
     // Tudo lido do BANCO — a propagação é o que está sob teste.
     const persisted = await prisma.account.findUniqueOrThrow({
@@ -109,7 +110,7 @@ describe('PrismaAccountRepository — createClinic (mapeamento contra Postgres r
 
   it('MANAGER_PROVIDER médico: cria também ProfessionalProfile + ProfessionalSpecialty com medicalSpecialty', async () => {
     const email = `atende-${randomUUID().slice(0, 8)}@int.dev`;
-    const account = await repo.createClinic({
+    const account = await repo.createCompany({
       ...baseInput(email),
       professional: {
         specialtyId: medicineSpecialtyId,
@@ -148,7 +149,7 @@ describe('PrismaAccountRepository — createClinic (mapeamento contra Postgres r
     const email = `rollback-${randomUUID().slice(0, 8)}@int.dev`;
 
     await expect(
-      repo.createClinic({
+      repo.createCompany({
         ...baseInput(email),
         professional: {
           specialtyId: 'spec_inexistente',

@@ -19,6 +19,8 @@ import { ClinicApplicationService } from '../modules/clinic/clinic-application-s
 import { InMemoryClinicRepository } from '../modules/clinic/in-memory-clinic-repository';
 import { ConsentApplicationService } from '../modules/consent/consent-application-service';
 import { InMemoryConsentRepository } from '../modules/consent/in-memory-consent-repository';
+import { InMemoryInternRepository } from '../modules/intern/in-memory-intern-repository';
+import { InternApplicationService } from '../modules/intern/intern-application-service';
 import { InMemoryNutritionRepository } from '../modules/nutrition/in-memory-nutrition-repository';
 import { NutritionApplicationService } from '../modules/nutrition/nutrition-application-service';
 import { InMemoryPatientRepository } from '../modules/patient/in-memory-patient-repository';
@@ -36,6 +38,7 @@ export interface TestDependencies {
   accounts: InMemoryAccountRepository;
   verificationTokens: InMemoryVerificationTokenStore;
   clinic: InMemoryClinicRepository;
+  intern: InMemoryInternRepository;
   patient: InMemoryPatientRepository;
   consent: InMemoryConsentRepository;
   billing: InMemoryBillingRepository;
@@ -54,6 +57,8 @@ export interface TestHarness {
   verificationTokens: InMemoryVerificationTokenStore;
   /** Repositorio de clinica em memoria — expoe `seed*` para arranjar clinicas/admins. */
   clinic: InMemoryClinicRepository;
+  /** Repositorio do seat de estagiario em memoria (D-142) — expoe `seedSupervisor`/`listInternProfiles`. */
+  intern: InMemoryInternRepository;
   /** Repositorio de paciente/vinculo em memoria — expoe `seed*` para arranjar profissionais/especialidades. */
   patient: InMemoryPatientRepository;
   /** Repositorio de consentimento em memoria — expoe `seed*` para arranjar pacientes/profissionais/vinculos. */
@@ -128,6 +133,18 @@ export function buildTestDependencies(): TestDependencies {
     accounts,
     termsService,
   );
+  // Seat de estagiario (D-142): reusa o InMemoryClinicRepository como
+  // ClinicAdminLookup (interface estreita — so findMembership), igual a producao.
+  const intern = new InMemoryInternRepository(terms);
+  const internService = new InternApplicationService(
+    intern,
+    clinic,
+    hasher,
+    authCore,
+    3600,
+    accounts,
+    termsService,
+  );
   const queue = new InMemoryQueueFactory();
   const bondEvents = queue.createQueue<BondCreatedEvent>(SHARING_QUEUE);
   // Recebe `terms` para gravar o aceite inicial dos termos (D-025) e
@@ -165,6 +182,7 @@ export function buildTestDependencies(): TestDependencies {
       corsOrigin: '*',
       authService,
       clinicService,
+      internService,
       patientService,
       consentService,
       termsService,
@@ -176,6 +194,7 @@ export function buildTestDependencies(): TestDependencies {
     accounts,
     verificationTokens,
     clinic,
+    intern,
     patient,
     consent,
     billing,
@@ -195,6 +214,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     accounts,
     verificationTokens,
     clinic,
+    intern,
     patient,
     consent,
     billing,
@@ -210,6 +230,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     accounts,
     verificationTokens,
     clinic,
+    intern,
     patient,
     consent,
     billing,

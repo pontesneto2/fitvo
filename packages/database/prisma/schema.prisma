@@ -44,6 +44,11 @@ datasource db {
 enum TenantType {
   SOLO // profissional solo: tenant de 1 pessoa (auto-criado)
   CLINIC // clinica: tenant multiprofissional
+  /// Academia (D-141): MESMO cadastro de empresa da clinica (spec §4.2/§4.3) —
+  /// CNPJ obrigatorio, admin gestor/gestor-que-atende. Difere na VERTICAL: so
+  /// profissoes de CREF (Educador Fisico / Personal Trainer) e e o unico tenant
+  /// que hospeda o seat de estagiario (InternProfile — D-142).
+  ACADEMIA
 }
 
 enum DocumentType {
@@ -201,8 +206,8 @@ enum TermsAcceptanceEventType {
 /// Conta = identidade unica de login. Acumula N papeis (profissional, paciente,
 /// admin de clinica, super admin) sob a mesma conta (D-041/D-044).
 model Account {
-  id                String        @id @default(cuid())
-  email             String        @unique
+  id                String          @id @default(cuid())
+  email             String          @unique
   passwordHash      String
   name              String
   document          String // CPF ou CNPJ da PESSOA (D-043)
@@ -220,11 +225,11 @@ model Account {
   /// @db.Date: e data de CALENDARIO, nao instante — timestamptz reintroduziria o
   /// deslize de fuso do ADR-0012 (ninguem nasce "as 00h UTC"). Nulavel: conta
   /// antiga nao tem, e null e a unica representacao de "desconhecido".
-  birthDate         DateTime?     @db.Date
+  birthDate         DateTime?       @db.Date
   /// Sexo biologico (ver enum BiologicalSex). NOT NULL com default: NOT_INFORMED
   /// JA E o estado "desconhecido", entao nulavel criaria DUAS representacoes do
   /// mesmo estado (null e NOT_INFORMED) — o anti-padrao que o projeto evita (D-103).
-  biologicalSex     BiologicalSex @default(NOT_INFORMED)
+  biologicalSex     BiologicalSex   @default(NOT_INFORMED)
   /// WhatsApp da PESSOA — SO digitos (11: DDD + celular). Atributo da pessoa
   /// (D-044), como nome/CPF/nascimento. Nulavel: coluna aditiva e conta antiga
   /// nao tem. A obrigatoriedade no cadastro e da app/Zod, nao do banco.
@@ -242,13 +247,14 @@ model Account {
   addressState      BrazilianState?
   addressZipCode    String?
   addressCountry    String?
-  emailVerifiedAt   DateTime?     @db.Timestamptz(3)
-  preferredLocale   String        @default("pt-BR") // i18n (D-066)
-  preferredTimezone String        @default("America/Sao_Paulo") // exibicao (D-067)
-  createdAt         DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime      @updatedAt @db.Timestamptz(3)
+  emailVerifiedAt   DateTime?       @db.Timestamptz(3)
+  preferredLocale   String          @default("pt-BR") // i18n (D-066)
+  preferredTimezone String          @default("America/Sao_Paulo") // exibicao (D-067)
+  createdAt         DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @db.Timestamptz(3)
 
   professionalProfile   ProfessionalProfile?
+  internProfile         InternProfile? // seat de estagiario supervisionado (D-142)
   patientProfile        PatientProfile?
   platformAdmin         PlatformAdmin?
   clinicMemberships     ClinicMembership[]
@@ -320,8 +326,10 @@ model Tenant {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   professionals   ProfessionalProfile[]
+  interns         InternProfile[] // seats de estagiario da academia (D-142)
   memberships     ClinicMembership[]
   invites         ProfessionalInvite[]
+  internInvites   InternInvite[]
   patientInvites  PatientInvite[]
   bonds           Bond[]
   paymentAccount  PaymentAccount? // subconta Asaas + taxa por tenant (ADR-0004/D-058)
@@ -376,20 +384,28 @@ model ProfessionalProfile {
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
-  account                Account                     @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  tenant                 Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  specialties            ProfessionalSpecialty[]
-  patientInvites         PatientInvite[]
-  bonds                  Bond[]
-  consentsReceived       Consent[] // consentimentos em que este profissional e o grantee (D-016)
-  suggestionsAsA         SharingSuggestion[]         @relation("SuggestionProfessionalA")
-  suggestionsAsB         SharingSuggestion[]         @relation("SuggestionProfessionalB")
-  ownedExercises         Exercise[] // itens de biblioteca proprios do profissional (privados — ADR-0006)
-  ownedFoods             Food[] // itens de biblioteca proprios do profissional (privados — ADR-0006)
-  ownedFoodGroups        FoodGroup[] // grupos alimentares proprios do profissional (privados — D-114/D-117)
-  agendaSettings         ProfessionalAgendaSettings? // fuso das janelas + lembretes (ADR-0012)
-  availabilityRules      AvailabilityRule[] // janelas recorrentes (ADR-0012)
-  availabilityExceptions AvailabilityException[] // bloqueios pontuais (ADR-0012)
+  account                 Account                     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tenant                  Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  specialties             ProfessionalSpecialty[]
+  /// Estagiarios sob supervisao deste profissional (D-142). A capacidade deles
+  /// DERIVA do conselho ativo daqui — ver a nota de derivacao em InternProfile.
+  /// TODO(treino): o FLUXO DE VALIDACAO do trabalho do estagiario
+  /// (produz -> pendente -> supervisor revisa/ajusta/valida -> chega ao aluno)
+  /// engancha NESTA relacao quando o dominio de treino/prescricao existir.
+  /// Ver docs/roadmap.md. Este slice cria so identidade + vinculo.
+  supervisedInterns       InternProfile[]             @relation("InternSupervisor")
+  supervisedInternInvites InternInvite[]              @relation("InternInviteSupervisor")
+  patientInvites          PatientInvite[]
+  bonds                   Bond[]
+  consentsReceived        Consent[] // consentimentos em que este profissional e o grantee (D-016)
+  suggestionsAsA          SharingSuggestion[]         @relation("SuggestionProfessionalA")
+  suggestionsAsB          SharingSuggestion[]         @relation("SuggestionProfessionalB")
+  ownedExercises          Exercise[] // itens de biblioteca proprios do profissional (privados — ADR-0006)
+  ownedFoods              Food[] // itens de biblioteca proprios do profissional (privados — ADR-0006)
+  ownedFoodGroups         FoodGroup[] // grupos alimentares proprios do profissional (privados — D-114/D-117)
+  agendaSettings          ProfessionalAgendaSettings? // fuso das janelas + lembretes (ADR-0012)
+  availabilityRules       AvailabilityRule[] // janelas recorrentes (ADR-0012)
+  availabilityExceptions  AvailabilityException[] // bloqueios pontuais (ADR-0012)
 
   @@index([tenantId])
   @@map("professional_profile")
@@ -507,6 +523,84 @@ model ProfessionalInvite {
   @@index([tenantId, status])
   @@index([specialtyId])
   @@map("professional_invite")
+}
+
+// ---------------------------------------------------------------------------
+// Seat de ESTAGIARIO (D-142) — convite + perfil supervisionado
+// ---------------------------------------------------------------------------
+
+/// Seat de ESTAGIARIO (spec §1/§6 — D-142). Modelo PROPRIO, nao um
+/// ProfessionalProfile com flag: o estagiario e ESTUDANTE, nao tem conselho, e
+/// so existe SUPERVISIONADO. Nao ha coluna `seatType`: a existencia da linha JA
+/// e o fato "este seat e STUDENT_INTERN" — uma coluna de valor unico criaria
+/// DUAS representacoes do mesmo estado (o anti-padrao que o schema evita em
+/// biologicalSex — D-103). O rotulo `STUDENT_INTERN` vive no DTO da API.
+///
+/// `supervisorProfessionalProfileId` e NOT NULL de proposito: "estagiario sem
+/// responsavel" e um estado INVALIDO que o schema torna IRREPRESENTAVEL —
+/// exercicio ilegal da profissao se solto (art. 47 DL 3.688/1941). onDelete
+/// Restrict no supervisor: nao se apaga o responsavel por baixo de um estagiario.
+///
+/// DERIVACAO CONGELADA (D-142): a capacidade do estagiario DERIVA do conselho
+/// ativo do supervisor — nao ha capacidade propria, nem copia do CREF aqui. Se o
+/// supervisor perde o vinculo/o conselho, o estagiario perde a capacidade. A
+/// derivacao e feita em LEITURA (segue esta relacao), nunca materializada e
+/// nunca por job — materializar reintroduziria a divergencia que a FK evita.
+/// "Ativo" hoje = conselho PREENCHIDO em formato (D-138); a verificacao de
+/// registro ativo de verdade segue deferida — TODO(D-010).
+model InternProfile {
+  id                              String @id @default(cuid())
+  accountId                       String @unique
+  /// Academia a que o estagiario pertence (escopo de tenant obrigatorio — D-002).
+  tenantId                        String
+  /// Responsavel: profissional de CREF (TRAINING/PERSONAL_TRAINER) do MESMO
+  /// tenant. A elegibilidade (CREF + mesmo tenant) e checada na aplicacao no
+  /// momento do convite; a FK garante que o alvo existe e nao some depois.
+  supervisorProfessionalProfileId String
+
+  displayName String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  account    Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  supervisor ProfessionalProfile @relation("InternSupervisor", fields: [supervisorProfessionalProfileId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([supervisorProfessionalProfileId])
+  @@map("intern_profile")
+}
+
+/// Convite academia->estagiario (Fase A — D-142). Distinto do
+/// ProfessionalInvite: NAO carrega especialidade nem conselho (o estagiario nao
+/// tem conselho) e CARREGA o responsavel, NOT NULL — a mesma regra do
+/// InternProfile aplicada uma etapa antes, para que nem o convite consiga
+/// representar um estagiario sem responsavel. Token de uso unico guardado SO
+/// como hash (mesma disciplina de ProfessionalInvite/D-029); expira e e
+/// revogavel pelo admin.
+model InternInvite {
+  id       String  @id @default(cuid())
+  tenantId String
+  email    String
+  /// Nome informado pela academia no pre-cadastro — facilita o convite. O nome
+  /// definitivo (civil) vem no aceite, da propria pessoa.
+  name     String?
+
+  status                          InviteStatus @default(PENDING)
+  tokenHash                       String       @unique
+  expiresAt                       DateTime     @db.Timestamptz(3)
+  supervisorProfessionalProfileId String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supervisor ProfessionalProfile @relation("InternInviteSupervisor", fields: [supervisorProfessionalProfileId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([supervisorProfessionalProfileId])
+  @@map("intern_invite")
 }
 
 // ---------------------------------------------------------------------------

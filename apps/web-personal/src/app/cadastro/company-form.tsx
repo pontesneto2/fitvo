@@ -6,7 +6,7 @@ import { Controller, useForm } from 'react-hook-form';
 
 import { PasswordStrengthMeter } from '@/components/password-strength-meter';
 import { TermsFields } from '@/components/terms-fields';
-import { type RegisterClinicFormInput, registerClinicFormSchema } from '@/lib/auth';
+import { companyFormSchema, type CompanyVariant, type RegisterCompanyFormInput } from '@/lib/auth';
 import {
   brDateToIso,
   maskCep,
@@ -21,10 +21,11 @@ import { zodResolver } from '@/lib/zod-resolver';
 
 import {
   BRAZILIAN_STATE_OPTIONS,
-  CLINIC_ROLE_OPTIONS,
+  COMPANY_ROLE_OPTIONS,
+  COMPANY_VARIANT_COPY,
   GENDER_OPTIONS,
   MEDICAL_SPECIALTY_OPTIONS,
-  SPECIALTY_CODE_OPTIONS,
+  SPECIALTY_CODE_OPTIONS_BY_VARIANT,
 } from './options';
 
 const acceptedTermsDefaults = { termsOfUse: false, privacyPolicy: false };
@@ -36,8 +37,24 @@ const COUNCIL_LABEL_BY_SPECIALTY_CODE: Record<string, string> = {
   PERSONAL_TRAINER: 'CREF',
 };
 
-/** Cadastro público de CLÍNICA (spec §4.2 · D-139): empresa (só CNPJ) + admin (PF). */
-export function ClinicForm({ onSuccess }: { onSuccess: () => void }): ReactNode {
+/**
+ * Cadastro público de EMPRESA — clínica (spec §4.2 · D-139) e academia
+ * (spec §4.3 · D-141): empresa (só CNPJ) + admin (PF).
+ *
+ * UM formulário, duas verticais. A spec diz que os dois cadastros são idênticos;
+ * o que a `variant` troca é só o que de fato difere: as profissões oferecidas em
+ * "também atende", o texto de cada vertical e o endpoint. Duplicar o formulário
+ * criaria dois lugares para corrigir cada ajuste de UX.
+ */
+export function CompanyForm({
+  variant,
+  onSuccess,
+}: {
+  variant: CompanyVariant;
+  onSuccess: () => void;
+}): ReactNode {
+  const copy = COMPANY_VARIANT_COPY[variant];
+  const specialtyOptions = SPECIALTY_CODE_OPTIONS_BY_VARIANT[variant];
   const [formError, setFormError] = useState<string | null>(null);
   const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notFound'>('idle');
   const {
@@ -47,8 +64,8 @@ export function ClinicForm({ onSuccess }: { onSuccess: () => void }): ReactNode 
     watch,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterClinicFormInput>({
-    resolver: zodResolver(registerClinicFormSchema),
+  } = useForm<RegisterCompanyFormInput>({
+    resolver: zodResolver(companyFormSchema(variant)),
     defaultValues: {
       legalName: '',
       tradeName: '',
@@ -78,6 +95,9 @@ export function ClinicForm({ onSuccess }: { onSuccess: () => void }): ReactNode 
   const alsoProvides = role === 'MANAGER_PROVIDER';
   const password = watch('password');
   const specialtyCode = watch('specialtyCode');
+  // Especialidade médica só existe na Medicina — e Medicina só existe na
+  // clínica (D-141). Numa academia o select nem oferece Médico, então este
+  // ramo nunca abre lá.
   const isDoctor = specialtyCode === 'MEDICINE';
   const councilLabel = specialtyCode
     ? (COUNCIL_LABEL_BY_SPECIALTY_CODE[specialtyCode] ?? 'conselho')
@@ -139,7 +159,7 @@ export function ClinicForm({ onSuccess }: { onSuccess: () => void }): ReactNode 
       ...provider,
       acceptedTerms: values.acceptedTerms,
     };
-    const res = await fetch('/api/auth/register/clinic', {
+    const res = await fetch(copy.endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
@@ -156,7 +176,7 @@ export function ClinicForm({ onSuccess }: { onSuccess: () => void }): ReactNode 
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
       {/* Empresa */}
       <fieldset className="flex flex-col gap-4 rounded-md border border-line p-4">
-        <legend className="px-1 text-small font-medium text-fg-muted">Dados da empresa</legend>
+        <legend className="px-1 text-small font-medium text-fg-muted">{copy.companyLegend}</legend>
         <Field label="Razao social" error={errors.legalName?.message}>
           <Input placeholder="Razao social (contrato social)" {...register('legalName')} />
         </Field>
@@ -272,7 +292,7 @@ export function ClinicForm({ onSuccess }: { onSuccess: () => void }): ReactNode 
       {/* Admin */}
       <fieldset className="flex flex-col gap-4 rounded-md border border-line p-4">
         <legend className="px-1 text-small font-medium text-fg-muted">Seus dados (gestor)</legend>
-        <Field label="Voce e?" error={errors.role?.message}>
+        <Field label="Voce e?" description={copy.roleHint} error={errors.role?.message}>
           <Controller
             control={control}
             name="role"
@@ -281,7 +301,7 @@ export function ClinicForm({ onSuccess }: { onSuccess: () => void }): ReactNode 
                 name={field.name}
                 value={field.value}
                 onValueChange={field.onChange}
-                options={CLINIC_ROLE_OPTIONS}
+                options={COMPANY_ROLE_OPTIONS}
                 placeholder="Selecione"
                 status={errors.role ? 'error' : 'default'}
               />
@@ -300,7 +320,7 @@ export function ClinicForm({ onSuccess }: { onSuccess: () => void }): ReactNode 
                     name={field.name}
                     value={field.value ?? ''}
                     onValueChange={field.onChange}
-                    options={SPECIALTY_CODE_OPTIONS}
+                    options={specialtyOptions}
                     placeholder="Selecione a profissao"
                     status={errors.specialtyCode ? 'error' : 'default'}
                   />

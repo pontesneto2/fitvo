@@ -2,9 +2,9 @@ import { BOND_CREATED_EVENT, type BondCreatedEvent, SHARING_QUEUE } from '@fitvo
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
+import { hashInviteToken } from '../../shared/invite-token';
 import { buildTestHarness, type TestHarness } from '../../testing/build-test-app';
 import { validProfessionalRegistration } from '../../testing/professional-registration-fixture';
-import { hashInviteToken } from '../clinic/invite-token';
 
 const PRO_TENANT = 'pro_tenant_1';
 const SPECIALTY = 'spec_training';

@@ -21,6 +21,8 @@ import { ClinicApplicationService } from './modules/clinic/clinic-application-se
 import { PrismaClinicRepository } from './modules/clinic/prisma-clinic-repository';
 import { ConsentApplicationService } from './modules/consent/consent-application-service';
 import { PrismaConsentRepository } from './modules/consent/prisma-consent-repository';
+import { InternApplicationService } from './modules/intern/intern-application-service';
+import { PrismaInternRepository } from './modules/intern/prisma-intern-repository';
 import { NutritionApplicationService } from './modules/nutrition/nutrition-application-service';
 import { PrismaNutritionRepository } from './modules/nutrition/prisma-nutrition-repository';
 import { PatientApplicationService } from './modules/patient/patient-application-service';
@@ -36,6 +38,7 @@ export interface AppDependencies {
   corsOrigin: string;
   authService: AuthApplicationService;
   clinicService: ClinicApplicationService;
+  internService: InternApplicationService;
   patientService: PatientApplicationService;
   consentService: ConsentApplicationService;
   termsService: TermsApplicationService;
@@ -123,8 +126,23 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
   const termsService = new TermsApplicationService(new PrismaTermsRepository(prisma), authCore);
   // authCore satisfaz AccessTokenVerifier (verifyAccessToken) — o guard de admin
   // da clinica reusa o mesmo verificador de access token da slice de auth.
+  const clinicRepository = new PrismaClinicRepository(prisma);
   const clinicService = new ClinicApplicationService(
-    new PrismaClinicRepository(prisma),
+    clinicRepository,
+    passwordHasher,
+    authCore,
+    env.PROFESSIONAL_INVITE_TTL_SECONDS,
+    accountRepository,
+    termsService,
+  );
+  // Seat de estagiario (D-142). Reusa o MESMO PrismaClinicRepository como
+  // ClinicAdminLookup (interface estreita: so findMembership) — o admin de
+  // academia e a mesma ClinicMembership CLINIC_ADMIN, nao ha membership propria
+  // de academia. Reusa tambem passwordHasher/authCore/accountRepository/
+  // termsService, como as demais slices de convite.
+  const internService = new InternApplicationService(
+    new PrismaInternRepository(prisma),
+    clinicRepository,
     passwordHasher,
     authCore,
     env.PROFESSIONAL_INVITE_TTL_SECONDS,
@@ -171,6 +189,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     corsOrigin: env.CORS_ORIGIN,
     authService,
     clinicService,
+    internService,
     patientService,
     consentService,
     termsService,

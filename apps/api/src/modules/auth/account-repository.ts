@@ -97,11 +97,23 @@ export interface ClinicProviderInput {
 }
 
 /**
- * Cadastro público de CLÍNICA (spec §4.2 · D-139). Empresa (só CNPJ) +
- * admin (pessoa física, CPF). `tradeName` → `tenant.name` (exibição);
- * `legalName` → `tenant.legalName` (razão social/fiscal).
+ * Vertical do tenant de EMPRESA. Clínica (D-139) e academia (D-141) têm o mesmo
+ * cadastro (spec §4.2/§4.3) e a MESMA transação de criação — só o `type` do
+ * tenant muda. `SOLO` não entra aqui: nasce por `createProfessional`, com outra
+ * forma (herda o nome da pessoa, não tem CNPJ nem admin separado).
  */
-export interface CreateClinicInput {
+export type CompanyTenantType = 'CLINIC' | 'ACADEMIA';
+
+/**
+ * Cadastro público de EMPRESA — clínica (spec §4.2 · D-139) e academia
+ * (spec §4.3 · D-141). Empresa (só CNPJ) + admin (pessoa física, CPF).
+ * `tradeName` → `tenant.name` (exibição); `legalName` → `tenant.legalName`
+ * (razão social/fiscal). A vertical entra por `tenantType`, não por um input
+ * duplicado por vertical: a transação é a mesma, e duplicá-la criaria dois
+ * lugares para corrigir a mesma regra.
+ */
+export interface CreateCompanyInput {
+  tenantType: CompanyTenantType;
   legalName: string;
   tradeName: string;
   cnpj: string;
@@ -139,12 +151,13 @@ export interface AccountRepository {
    */
   createProfessional(input: CreateProfessionalInput): Promise<AccountRecord>;
   /**
-   * Cadastro público de clínica (D-139): cria Tenant(CLINIC) + Account(admin) +
-   * membership CLINIC_ADMIN (+ ProfessionalProfile/ProfessionalSpecialty se
-   * "também atende") + os 2 eventos ACCEPTED de termos, tudo na MESMA
-   * transação. Falha em qualquer etapa → nada órfão.
+   * Cadastro público de EMPRESA — clínica (D-139) ou academia (D-141): cria
+   * Tenant(CLINIC|ACADEMIA) + Account(admin) + membership CLINIC_ADMIN (+
+   * ProfessionalProfile/ProfessionalSpecialty se "também atende") + os 2 eventos
+   * ACCEPTED de termos, tudo na MESMA transação. Falha em qualquer etapa → nada
+   * órfão.
    */
-  createClinic(input: CreateClinicInput): Promise<AccountRecord>;
+  createCompany(input: CreateCompanyInput): Promise<AccountRecord>;
   /** Marca o e-mail como verificado (idempotente) — D-029. */
   markEmailVerified(id: string): Promise<void>;
   /** Atualiza o hash da senha (recuperacao/troca) — D-029. */

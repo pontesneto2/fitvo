@@ -5,7 +5,7 @@ import { recordInitialTermsAcceptanceInMemory } from '../terms/initial-terms-acc
 import type {
   AccountRecord,
   AccountRepository,
-  CreateClinicInput,
+  CreateCompanyInput,
   CreateProfessionalInput,
   TermsAcceptanceOrigin,
 } from './account-repository';
@@ -62,7 +62,7 @@ export class InMemoryAccountRepository implements AccountRepository {
     return account;
   }
 
-  async createClinic(input: CreateClinicInput): Promise<AccountRecord> {
+  async createCompany(input: CreateCompanyInput): Promise<AccountRecord> {
     const account = await this.insert(
       input.admin.email,
       input.admin.passwordHash,

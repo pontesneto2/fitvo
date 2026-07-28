@@ -15,18 +15,24 @@ import { COUNCIL_LABEL_BY_SPECIALTY_CODE, type Specialty } from '@/lib/specialty
 import { fetchAddressByCep } from '@/lib/via-cep';
 import { zodResolver } from '@/lib/zod-resolver';
 
-import { ClinicForm } from './clinic-form';
+import { CompanyForm } from './company-form';
 import { BRAZILIAN_STATE_OPTIONS, GENDER_OPTIONS } from './options';
 
 const acceptedTermsDefaults = { termsOfUse: false, privacyPolicy: false };
 
 /**
- * Caminhos de autocadastro (spec §1). Academia entra num slice próprio; o
- * seletor já é extensível — basta acrescentar um item aqui e o form respectivo.
+ * Caminhos de autocadastro (spec §1) — os TRÊS e só estes. Paciente/aluno,
+ * profissional de empresa, recepção e ESTAGIÁRIO não aparecem aqui de
+ * propósito: entram por convite. O estagiário, em especial, NUNCA se
+ * autocadastra (D-142) — seat supervisionado.
+ *
+ * Clínica e academia usam o MESMO formulário (`CompanyForm`), parametrizado
+ * pela vertical: o cadastro de empresa é idêntico (spec §4.2/§4.3).
  */
 const CADASTRO_MODES = [
   { value: 'professional', label: 'Sou profissional autônomo' },
   { value: 'clinic', label: 'Sou clínica' },
+  { value: 'academy', label: 'Sou academia' },
 ] as const;
 type CadastroMode = (typeof CADASTRO_MODES)[number]['value'];
 
@@ -467,7 +473,7 @@ export default function CadastroPage(): ReactNode {
           <Logo size={36} />
           <p className="text-small text-fg-muted">Crie sua conta na FITVO</p>
         </div>
-        {/* Seletor de tipo (spec §1) — extensível (Academia entra depois). */}
+        {/* Seletor de tipo (spec §1) — os três caminhos de autocadastro. */}
         <div
           role="radiogroup"
           aria-label="Tipo de cadastro"
@@ -491,7 +497,7 @@ export default function CadastroPage(): ReactNode {
         {mode === 'professional' ? (
           <ProfessionalForm onSuccess={onSuccess} />
         ) : (
-          <ClinicForm onSuccess={onSuccess} />
+          <CompanyForm variant={mode} onSuccess={onSuccess} />
         )}
         <p className="text-center text-caption text-fg-subtle">
           Ja tem conta?{' '}

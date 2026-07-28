@@ -13,6 +13,7 @@ import { authRoutes } from './modules/auth/auth-routes';
 import { billingRoutes } from './modules/billing/billing-routes';
 import { clinicRoutes } from './modules/clinic/clinic-routes';
 import { consentRoutes } from './modules/consent/consent-routes';
+import { internRoutes } from './modules/intern/intern-routes';
 import { nutritionRoutes } from './modules/nutrition/nutrition-routes';
 import { patientRoutes } from './modules/patient/patient-routes';
 import { specialtyRoutes } from './modules/specialty/specialty-routes';
@@ -29,7 +30,8 @@ function firstHeader(value: string | string[] | undefined): string | undefined {
  * - Seguranca de sistema grande: Helmet, CORS restrito, rate limiting (D-033).
  * - Erros RFC 7807 (D-031); logger JSON + correlation ID (D-073).
  * - Slices em /v1: auth (/v1/auth), clinica (/v1/clinic), paciente/vinculo
- *   (/v1/patients), consentimento (/v1/consents), termos (/v1/terms — D-025;
+ *   (/v1/patients), estagiario (/v1/interns — seat supervisionado, D-142),
+ *   consentimento (/v1/consents), termos (/v1/terms — D-025;
  *   NAO confundir com /v1/consents), financeiro (/v1/billing — inclui o
  *   webhook publico do Asaas), o catalogo fixo de especialidades
  *   (/v1/specialties — publico, so-leitura, D-047) e nutricao (/v1/nutrition
@@ -87,6 +89,7 @@ export async function buildApp(
 
   await app.register(authRoutes(deps.authService), { prefix: '/v1/auth' });
   await app.register(clinicRoutes(deps.clinicService), { prefix: '/v1/clinic' });
+  await app.register(internRoutes(deps.internService), { prefix: '/v1/interns' });
   await app.register(patientRoutes(deps.patientService), { prefix: '/v1/patients' });
   await app.register(consentRoutes(deps.consentService), { prefix: '/v1/consents' });
   await app.register(termsRoutes(deps.termsService), { prefix: '/v1/terms' });

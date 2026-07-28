@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@fitvo/database';
 import { afterAll, describe, expect, it } from 'vitest';
 
+import { hashInviteToken } from '../../shared/invite-token';
 import type { RequestOrigin } from '../terms/terms-repository';
-import { hashInviteToken } from './invite-token';
 import { PrismaClinicRepository } from './prisma-clinic-repository';
 
 /**

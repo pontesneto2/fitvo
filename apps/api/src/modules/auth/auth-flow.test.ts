@@ -12,6 +12,9 @@ const professional = {
   document: '12345678901',
   documentType: 'CPF',
   tenantName: 'Leo Personal',
+  specialtyId: 'spec_training',
+  councilDocument: 'CREF-123456',
+  councilState: 'SP',
   acceptedTerms,
 };
 
@@ -73,6 +76,86 @@ describe('fluxo de autenticacao (E2E via inject)', () => {
     expect(bad.json().title).toBe('Credenciais invalidas');
 
     await harness.app.close();
+  });
+
+  it('rejeita cadastro de profissional sem specialtyId/councilDocument/councilState (400)', async () => {
+    const app = await buildTestApp();
+    const { specialtyId, councilDocument, councilState, ...withoutSpecialtyFields } = professional;
+    void specialtyId;
+    void councilDocument;
+    void councilState;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/register/professional',
+      payload: withoutSpecialtyFields,
+    });
+    expect(response.statusCode).toBe(400);
+
+    await app.close();
+  });
+
+  it('cadastro valido cria a ProfessionalSpecialty (PENDING) junto da conta (D-137)', async () => {
+    const harness = await buildTestHarness();
+    const response = await harness.app.inject({
+      method: 'POST',
+      url: '/v1/auth/register/professional',
+      payload: { ...professional, email: 'especialidade@fitvo.dev' },
+    });
+    expect(response.statusCode).toBe(201);
+    const accountId = response.json().account.id as string;
+
+    const specialty = harness.accounts.getProfessionalSpecialty(accountId);
+    expect(specialty).toMatchObject({
+      specialtyId: 'spec_training',
+      councilDocument: 'CREF-123456',
+      councilState: 'SP',
+      verificationStatus: 'PENDING',
+    });
+
+    await harness.app.close();
+  });
+
+  it('cadastro com Personal Trainer (4a especialidade) cria a ProfessionalSpecialty (CREF) na mesma transacao', async () => {
+    const harness = await buildTestHarness();
+    const response = await harness.app.inject({
+      method: 'POST',
+      url: '/v1/auth/register/professional',
+      payload: {
+        ...professional,
+        email: 'personal-trainer@fitvo.dev',
+        specialtyId: 'spec_personal_trainer',
+        councilDocument: 'CREF-654321',
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    const accountId = response.json().account.id as string;
+
+    const specialty = harness.accounts.getProfessionalSpecialty(accountId);
+    expect(specialty).toMatchObject({
+      specialtyId: 'spec_personal_trainer',
+      councilDocument: 'CREF-654321',
+      councilState: 'SP',
+      verificationStatus: 'PENDING',
+    });
+
+    await harness.app.close();
+  });
+
+  it('rejeita cadastro com specialtyId fora do catalogo (404)', async () => {
+    const app = await buildTestApp();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/register/professional',
+      payload: {
+        ...professional,
+        email: 'sem-especialidade@fitvo.dev',
+        specialtyId: 'spec_inexistente',
+      },
+    });
+    expect(response.statusCode).toBe(404);
+
+    await app.close();
   });
 
   it('rejeita corpo invalido com 400 e lista de erros', async () => {

@@ -30,6 +30,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (res.status === 400) {
       return NextResponse.json({ error: 'Dados invalidos.' }, { status: 400 });
     }
+    if (res.status === 404) {
+      return NextResponse.json({ error: 'Especialidade invalida.' }, { status: 404 });
+    }
     return NextResponse.json({ error: 'Nao foi possivel criar a conta agora.' }, { status: 502 });
   }
 

@@ -1,3 +1,5 @@
+import type { BrazilianState, VerificationStatus } from '@fitvo/database';
+
 import type { InMemoryTermsRepository } from '../terms/in-memory-terms-repository';
 import { recordInitialTermsAcceptanceInMemory } from '../terms/initial-terms-acceptance';
 import type {
@@ -6,6 +8,14 @@ import type {
   CreateProfessionalInput,
   TermsAcceptanceOrigin,
 } from './account-repository';
+
+/** Projecao minima da ProfessionalSpecialty criada no cadastro (D-137) — so para asserts de teste. */
+export interface InMemoryProfessionalSpecialtyRecord {
+  specialtyId: string;
+  councilDocument: string;
+  councilState: BrazilianState;
+  verificationStatus: VerificationStatus;
+}
 
 /**
  * Implementacao em memoria para testes e desenvolvimento local. Recebe
@@ -17,6 +27,10 @@ import type {
 export class InMemoryAccountRepository implements AccountRepository {
   private readonly byId = new Map<string, AccountRecord>();
   private readonly emailToId = new Map<string, string>();
+  private readonly professionalSpecialtiesByAccountId = new Map<
+    string,
+    InMemoryProfessionalSpecialtyRecord
+  >();
   private sequence = 0;
 
   constructor(private readonly terms?: InMemoryTermsRepository) {}
@@ -32,8 +46,19 @@ export class InMemoryAccountRepository implements AccountRepository {
 
   async createProfessional(input: CreateProfessionalInput): Promise<AccountRecord> {
     const account = await this.insert(input.email, input.passwordHash, input.name);
+    this.professionalSpecialtiesByAccountId.set(account.id, {
+      specialtyId: input.specialtyId,
+      councilDocument: input.councilDocument,
+      councilState: input.councilState,
+      verificationStatus: 'PENDING',
+    });
     await this.recordInitialTermsAcceptance(account.id, input.termsAcceptance);
     return account;
+  }
+
+  /** Helper de teste: a ProfessionalSpecialty criada no cadastro (D-137), se houver. */
+  getProfessionalSpecialty(accountId: string): InMemoryProfessionalSpecialtyRecord | null {
+    return this.professionalSpecialtiesByAccountId.get(accountId) ?? null;
   }
 
   /**

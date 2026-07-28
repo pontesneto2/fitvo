@@ -7,15 +7,27 @@ import type {
   PasswordHasher,
   VerificationTokenStore,
 } from '@fitvo/auth';
-import type { DocumentType } from '@fitvo/database';
+import type { BrazilianState, DocumentType } from '@fitvo/database';
 
 import {
   EmailAlreadyInUseError,
   InvalidCredentialsError,
   InvalidVerificationTokenError,
+  NotFoundError,
   UnauthorizedError,
 } from '../../shared/http-errors';
 import type { AccountRecord, AccountRepository, TermsAcceptanceOrigin } from './account-repository';
+
+/**
+ * Guard minimo: a especialidade reivindicada no signup (D-137) precisa
+ * existir no catalogo (D-047). Interface estreita (nao o repositorio inteiro
+ * de `specialty`) — mesmo padrao de `EmailVerificationLookup`/
+ * `TermsAcceptanceLookup` (shared/auth-context.ts) para dependencias
+ * cross-slice.
+ */
+export interface SpecialtyLookup {
+  exists(specialtyId: string): Promise<boolean>;
+}
 
 export interface AuthResult {
   account: { id: string; email: string; name: string };
@@ -36,6 +48,11 @@ export interface RegisterProfessionalInput {
   document: string;
   documentType: DocumentType;
   tenantName: string;
+  /** Especialidade reivindicada no signup (D-137 — ADR-0015). */
+  specialtyId: string;
+  /** Registro no conselho — validado so em formato pelo Zod (D-138). */
+  councilDocument: string;
+  councilState: BrazilianState;
   /**
    * Aceite dos termos (D-025). O Zod ja garante `true` para os dois
    * documentos na borda HTTP (`acceptedTerms`); aqui so a ORIGEM da
@@ -64,10 +81,12 @@ export class AuthApplicationService {
     private readonly verificationTokens: VerificationTokenStore,
     private readonly emailSender: AuthEmailSender,
     private readonly ttl: AuthTtlConfig,
+    private readonly specialties: SpecialtyLookup,
   ) {}
 
   async registerProfessional(input: RegisterProfessionalInput): Promise<AuthResult> {
     await this.ensureEmailIsFree(input.email);
+    await this.ensureSpecialtyExists(input.specialtyId);
     const passwordHash = await this.hasher.hash(input.password);
     const account = await this.accounts.createProfessional({
       email: input.email,
@@ -76,6 +95,9 @@ export class AuthApplicationService {
       document: input.document,
       documentType: input.documentType,
       tenantName: input.tenantName,
+      specialtyId: input.specialtyId,
+      councilDocument: input.councilDocument,
+      councilState: input.councilState,
       termsAcceptance: input.termsAcceptance,
     });
     return this.completeRegistration(account);
@@ -171,6 +193,18 @@ export class AuthApplicationService {
   private async ensureEmailIsFree(email: string): Promise<void> {
     if (await this.accounts.findByEmail(email)) {
       throw new EmailAlreadyInUseError();
+    }
+  }
+
+  /**
+   * Guard previo a abrir a transacao (D-137): specialtyId inexistente vira um
+   * 404 limpo aqui, em vez de estourar a violacao de FK do banco la dentro da
+   * transacao. A atomicidade (rollback se a specialty falhar mesmo assim)
+   * continua garantida no repositorio — este guard so evita o caminho feio.
+   */
+  private async ensureSpecialtyExists(specialtyId: string): Promise<void> {
+    if (!(await this.specialties.exists(specialtyId))) {
+      throw new NotFoundError('Especialidade nao encontrada.');
     }
   }
 

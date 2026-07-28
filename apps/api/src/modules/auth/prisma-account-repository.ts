@@ -33,6 +33,12 @@ export class PrismaAccountRepository implements AccountRepository {
       const tenant = await tx.tenant.create({
         data: { type: 'SOLO', name: input.tenantName },
       });
+      // A ProfessionalSpecialty nasce ANINHADA na mesma escrita do
+      // professionalProfile — uma unica operacao Prisma, dentro da mesma
+      // $transaction: se specialtyId nao existir no catalogo (FK Restrict),
+      // o Prisma reprova a escrita inteira e a transacao inteira reverte —
+      // nem Tenant nem Account sobrevivem (D-137, mesma garantia atomica do
+      // aceite de convite).
       const account = await tx.account.create({
         data: {
           email: input.email,
@@ -40,7 +46,18 @@ export class PrismaAccountRepository implements AccountRepository {
           name: input.name,
           document: input.document,
           documentType: input.documentType,
-          professionalProfile: { create: { tenant: { connect: { id: tenant.id } } } },
+          professionalProfile: {
+            create: {
+              tenant: { connect: { id: tenant.id } },
+              specialties: {
+                create: {
+                  specialtyId: input.specialtyId,
+                  councilDocument: input.councilDocument,
+                  councilState: input.councilState,
+                },
+              },
+            },
+          },
         },
         select: ACCOUNT_PROJECTION,
       });

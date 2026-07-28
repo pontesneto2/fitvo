@@ -1,24 +1,60 @@
 'use client';
 
-import { Button, Card, Field, Input, Logo, Radio } from '@fitvo/ui-web';
+import { Button, Card, Field, Input, Logo, Radio, Select } from '@fitvo/ui-web';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type ReactNode, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { type ReactNode, useEffect, useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 
 import { TermsFields } from '@/components/terms-fields';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { type RegisterProfessionalInput, registerProfessionalInputSchema } from '@/lib/auth';
+import {
+  BRAZILIAN_STATES,
+  type RegisterProfessionalInput,
+  registerProfessionalInputSchema,
+} from '@/lib/auth';
+import { COUNCIL_LABEL_BY_SPECIALTY_CODE, type Specialty } from '@/lib/specialty';
 import { zodResolver } from '@/lib/zod-resolver';
 
 const acceptedTermsDefaults = { termsOfUse: false, privacyPolicy: false };
 
+const BRAZILIAN_STATE_OPTIONS = BRAZILIAN_STATES.map((uf) => ({ value: uf, label: uf }));
+
+/** Carrega o catalogo fixo de especialidades (D-047) para o select do cadastro. */
+function useSpecialties(): { specialties: Specialty[]; loadError: boolean } {
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/specialties')
+      .then((res) => {
+        if (!res.ok) throw new Error('specialties fetch failed');
+        return res.json() as Promise<{ specialties: Specialty[] }>;
+      })
+      .then((data) => {
+        if (!cancelled) setSpecialties(data.specialties);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { specialties, loadError };
+}
+
 function ProfessionalForm(): ReactNode {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
+  const { specialties, loadError } = useSpecialties();
   const {
     register,
     handleSubmit,
+    control,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<RegisterProfessionalInput>({
     resolver: zodResolver(registerProfessionalInputSchema),
@@ -29,9 +65,20 @@ function ProfessionalForm(): ReactNode {
       documentType: 'CPF',
       document: '',
       tenantName: '',
+      specialtyId: '',
+      councilDocument: '',
       acceptedTerms: acceptedTermsDefaults,
     },
   });
+
+  const selectedSpecialty = specialties.find((s) => s.id === watch('specialtyId'));
+  const councilLabel = selectedSpecialty
+    ? COUNCIL_LABEL_BY_SPECIALTY_CODE[selectedSpecialty.code]
+    : 'conselho';
+  const specialtyOptions = specialties.map((s) => ({
+    value: s.id,
+    label: `${s.name} (${COUNCIL_LABEL_BY_SPECIALTY_CODE[s.code]})`,
+  }));
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
@@ -91,6 +138,43 @@ function ProfessionalForm(): ReactNode {
       </div>
       <Field label="CPF ou CNPJ" error={errors.document?.message}>
         <Input placeholder="Somente numeros" {...register('document')} />
+      </Field>
+      <Field label="Profissao" error={errors.specialtyId?.message}>
+        <Controller
+          control={control}
+          name="specialtyId"
+          render={({ field }) => (
+            <Select
+              name={field.name}
+              value={field.value}
+              onValueChange={field.onChange}
+              options={specialtyOptions}
+              placeholder={loadError ? 'Nao foi possivel carregar' : 'Selecione'}
+              disabled={loadError}
+              status={errors.specialtyId ? 'error' : 'default'}
+            />
+          )}
+        />
+      </Field>
+      <Field label={`Registro no ${councilLabel}`} error={errors.councilDocument?.message}>
+        <Input placeholder="Numero do registro" {...register('councilDocument')} />
+      </Field>
+      <Field label="UF do conselho" error={errors.councilState?.message}>
+        <Controller
+          control={control}
+          name="councilState"
+          render={({ field }) => (
+            <Select
+              name={field.name}
+              value={field.value}
+              onValueChange={field.onChange}
+              options={BRAZILIAN_STATE_OPTIONS}
+              placeholder="Selecione a UF"
+              searchable
+              status={errors.councilState ? 'error' : 'default'}
+            />
+          )}
+        />
       </Field>
       <TermsFields
         errors={{

@@ -59,6 +59,51 @@ const registerPassword = z.string().min(8, 'A senha precisa ter no minimo 8 cara
 const registerName = z.string().min(1, 'Informe o nome completo.');
 const cpf = z.string().min(11, 'Informe um CPF valido.').max(14, 'Informe um CPF valido.');
 
+/** Mirror das 27 UFs (mesmo enum `BrazilianState` do Prisma) — conselho profissional (D-126). */
+export const BRAZILIAN_STATES = [
+  'AC',
+  'AL',
+  'AM',
+  'AP',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MG',
+  'MS',
+  'MT',
+  'PA',
+  'PB',
+  'PE',
+  'PI',
+  'PR',
+  'RJ',
+  'RN',
+  'RO',
+  'RR',
+  'RS',
+  'SC',
+  'SE',
+  'SP',
+  'TO',
+] as const;
+
+const brazilianStateInput = z.enum(BRAZILIAN_STATES, { message: 'Selecione a UF do conselho.' });
+
+/**
+ * Espelha o `councilDocument` de `registerProfessionalSchema` da API —
+ * validacao GENERICA de formato (D-138), sem regex por CREF/CRN/CRM (decisao
+ * de produto ainda nao registrada).
+ */
+const councilDocumentInput = z
+  .string()
+  .trim()
+  .min(1, 'Informe o registro no conselho.')
+  .max(20, 'Registro invalido.')
+  .regex(/^[A-Za-z0-9/-]+$/, 'Formato de registro no conselho invalido.');
+
 /** Espelha `registerProfessionalSchema` da API. */
 export const registerProfessionalInputSchema = z.object({
   email: registerEmail,
@@ -67,6 +112,9 @@ export const registerProfessionalInputSchema = z.object({
   documentType: z.enum(['CPF', 'CNPJ'], { message: 'Selecione o tipo de documento.' }),
   document: z.string().min(11, 'Informe um CPF ou CNPJ valido.').max(18, 'Documento invalido.'),
   tenantName: z.string().min(1, 'Informe o nome do consultorio/clinica.'),
+  specialtyId: z.string().min(1, 'Selecione uma especialidade.'),
+  councilDocument: councilDocumentInput,
+  councilState: brazilianStateInput,
   acceptedTerms: acceptedTermsInput,
 });
 export type RegisterProfessionalInput = z.infer<typeof registerProfessionalInputSchema>;

@@ -1,4 +1,4 @@
-import type { DocumentType } from '@fitvo/database';
+import type { BrazilianState, DocumentType } from '@fitvo/database';
 
 /** Projecao minima da conta usada pela autenticacao. */
 export interface AccountRecord {
@@ -27,6 +27,11 @@ export interface CreateProfessionalInput {
   document: string;
   documentType: DocumentType;
   tenantName: string;
+  /** Especialidade reivindicada no signup (D-137 — ADR-0015). */
+  specialtyId: string;
+  /** Registro no conselho — validado so em formato pelo Zod (D-138). */
+  councilDocument: string;
+  councilState: BrazilianState;
   /**
    * Aceite obrigatorio dos termos no cadastro (D-025). O Zod ja garante, na
    * borda HTTP, que ambos os documentos foram aceitos (`z.literal(true)`) —
@@ -43,7 +48,12 @@ export interface CreateProfessionalInput {
 export interface AccountRepository {
   findByEmail(email: string): Promise<AccountRecord | null>;
   findById(id: string): Promise<AccountRecord | null>;
-  /** Cria conta + tenant SOLO + perfil profissional atomicamente (D-045). */
+  /**
+   * Cria conta + tenant SOLO + perfil profissional + a PRIMEIRA
+   * ProfessionalSpecialty, tudo atomicamente (D-045/D-137). Se a specialty
+   * falhar (ex.: specialtyId inexistente), nada e criado — nem Account nem
+   * Tenant sobrevivem (mesma garantia atomica do aceite de convite).
+   */
   createProfessional(input: CreateProfessionalInput): Promise<AccountRecord>;
   /** Marca o e-mail como verificado (idempotente) — D-029. */
   markEmailVerified(id: string): Promise<void>;

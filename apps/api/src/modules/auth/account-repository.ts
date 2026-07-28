@@ -1,4 +1,4 @@
-import type { BrazilianState, DocumentType } from '@fitvo/database';
+import type { BrazilianState, DocumentType, Gender } from '@fitvo/database';
 
 /** Projecao minima da conta usada pela autenticacao. */
 export interface AccountRecord {
@@ -6,8 +6,24 @@ export interface AccountRecord {
   email: string;
   passwordHash: string;
   name: string;
+  /**
+   * Nome social (spec §3.1); null = sem nome social. Projetado aqui para o
+   * servidor derivar o `displayName` (`socialName ?? name`) — ver
+   * `deriveDisplayName`.
+   */
+  socialName: string | null;
   /** Momento da verificacao de e-mail (UTC); null enquanto nao verificado (D-029). */
   emailVerifiedAt: Date | null;
+}
+
+/**
+ * Nome de EXIBIÇÃO (spec §3.1) — FONTE ÚNICA da derivação: nome social quando
+ * preenchido, senão o nome civil. Centraliza a regra para que nenhuma
+ * superfície (web/mobile/admin) reimplemente e acabe vazando o nome civil de
+ * quem pediu nome social. O `name` civil segue intacto para tenant.name/fiscal.
+ */
+export function deriveDisplayName(account: { name: string; socialName: string | null }): string {
+  return account.socialName ?? account.name;
 }
 
 /**
@@ -41,6 +57,10 @@ export interface CreateProfessionalInput {
   email: string;
   passwordHash: string;
   name: string;
+  /** Nome social (spec §3.1) — opcional; ausente = usa o nome civil. */
+  socialName?: string | undefined;
+  /** Gênero/identidade (spec §3.1) — opcional. */
+  gender?: Gender | undefined;
   document: string;
   documentType: DocumentType;
   /** WhatsApp da pessoa — só dígitos (11), normalizado no schema (D-044). */

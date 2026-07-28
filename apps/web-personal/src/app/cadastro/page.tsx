@@ -23,6 +23,17 @@ const acceptedTermsDefaults = { termsOfUse: false, privacyPolicy: false };
 
 const BRAZILIAN_STATE_OPTIONS = BRAZILIAN_STATES.map((uf) => ({ value: uf, label: uf }));
 
+/** Gênero (spec §3.1) — labels legíveis em pt-BR mapeados aos valores do enum. */
+const GENDER_OPTIONS = [
+  { value: 'MULHER_CIS', label: 'Mulher cis' },
+  { value: 'HOMEM_CIS', label: 'Homem cis' },
+  { value: 'MULHER_TRANS', label: 'Mulher trans' },
+  { value: 'HOMEM_TRANS', label: 'Homem trans' },
+  { value: 'NAO_BINARIO', label: 'Não-binário' },
+  { value: 'OUTRO', label: 'Outro' },
+  { value: 'PREFIRO_NAO_INFORMAR', label: 'Prefiro não informar' },
+];
+
 /** Carrega o catalogo fixo de especialidades (D-047) para o select do cadastro. */
 function useSpecialties(): { specialties: Specialty[]; loadError: boolean } {
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
@@ -69,6 +80,8 @@ function ProfessionalForm(): ReactNode {
       documentType: 'CPF',
       document: '',
       name: '',
+      socialName: '',
+      gender: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -122,6 +135,9 @@ function ProfessionalForm(): ReactNode {
       documentType: values.documentType,
       document: onlyDigits(values.document),
       name: values.name,
+      // Opcionais (spec §3.1): só vão no payload quando preenchidos.
+      socialName: values.socialName?.trim() || undefined,
+      gender: values.gender || undefined,
       email: values.email,
       password: values.password,
       whatsapp: onlyDigits(values.whatsapp),
@@ -241,6 +257,15 @@ function ProfessionalForm(): ReactNode {
         <Input autoComplete="name" placeholder="Seu nome" {...register('name')} />
       </Field>
 
+      {/* (4b) Nome social — opcional (spec §3.1) */}
+      <Field
+        label="Nome social (opcional)"
+        description="Como você quer ser chamado(a). Aparece no lugar do nome civil."
+        error={errors.socialName?.message}
+      >
+        <Input placeholder="Nome social" {...register('socialName')} />
+      </Field>
+
       {/* (5) E-mail */}
       <Field label="E-mail" error={errors.email?.message}>
         <Input
@@ -303,6 +328,24 @@ function ProfessionalForm(): ReactNode {
               onBlur={field.onBlur}
               onChange={(e) => field.onChange(maskDateBr(e.target.value))}
               status={errors.birthDate ? 'error' : 'default'}
+            />
+          )}
+        />
+      </Field>
+
+      {/* (8b) Gênero — opcional (spec §3.1) */}
+      <Field label="Gênero (opcional)" error={errors.gender?.message}>
+        <Controller
+          control={control}
+          name="gender"
+          render={({ field }) => (
+            <Select
+              name={field.name}
+              value={field.value ?? ''}
+              onValueChange={field.onChange}
+              options={GENDER_OPTIONS}
+              placeholder="Selecione (opcional)"
+              status={errors.gender ? 'error' : 'default'}
             />
           )}
         />

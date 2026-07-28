@@ -13,6 +13,7 @@ const ACCOUNT_PROJECTION = {
   email: true,
   passwordHash: true,
   name: true,
+  socialName: true,
   emailVerifiedAt: true,
 } as const;
 
@@ -48,6 +49,8 @@ export class PrismaAccountRepository implements AccountRepository {
           email: input.email,
           passwordHash: input.passwordHash,
           name: input.name,
+          socialName: input.socialName ?? null,
+          gender: input.gender ?? null,
           document: input.document,
           documentType: input.documentType,
           whatsapp: input.whatsapp,

@@ -34,5 +34,10 @@ export const validProfessionalRegistration = {
   specialtyId: 'spec_training',
   councilDocument: 'CREF-123456',
   councilState: 'SP',
+  // Gênero é OPCIONAL (spec §3.1); presente na fixture só para exercitar o enum
+  // nos fluxos dependentes. socialName fica de fora de propósito: o caminho
+  // padrão (displayName === name civil) é o normal — os casos "com nome social"
+  // e "sem os campos novos" têm testes próprios.
+  gender: 'PREFIRO_NAO_INFORMAR',
   acceptedTerms: { termsOfUse: true, privacyPolicy: true },
 } as const;

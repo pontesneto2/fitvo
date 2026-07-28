@@ -104,6 +104,23 @@ export const brazilianStateSchema = z.enum([
 ]);
 
 /**
+ * Gênero / identidade (spec §3.1 — dado sensível LGPD). Enum INCLUSIVO,
+ * OPCIONAL em todos os cadastros. NÃO se confunde com sexo biológico
+ * (`biologicalSex`, exclusivo do paciente): respeito à identidade ≠ variável de
+ * cálculo clínico — por isso são campos distintos. Mirror do enum `Gender` do
+ * Prisma.
+ */
+export const genderSchema = z.enum([
+  'MULHER_CIS',
+  'HOMEM_CIS',
+  'MULHER_TRANS',
+  'HOMEM_TRANS',
+  'NAO_BINARIO',
+  'OUTRO',
+  'PREFIRO_NAO_INFORMAR',
+]);
+
+/**
  * Endereço da PESSOA (D-044) — bloco. CEP só dígitos (8), como o WhatsApp:
  * máscara é UI, storage é normalizado. `complemento` opcional; `country` default
  * 'BR' (lançamento pt-BR). `state` reusa o enum de UF. Todos os campos textuais
@@ -165,7 +182,21 @@ export const registerProfessionalSchema = z
   .object({
     email,
     password: strongPassword,
-    name: z.string().min(1),
+    name: z.string().min(1).describe('Nome civil — deriva tenant.name e uso fiscal/documento.'),
+    /**
+     * Nome social (Decreto 8.727/2016 — spec §3.1) — OPCIONAL. Quando presente,
+     * é o nome EXIBIDO no lugar do civil em toda a interface (derivação
+     * `displayName` no servidor). Se vier, não pode ser vazio; ausente = sem
+     * nome social (usa o civil).
+     */
+    socialName: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe('Nome social (exibido no lugar do civil quando preenchido) — spec §3.1.'),
+    /** Gênero/identidade — OPCIONAL (dado sensível, spec §3.1). */
+    gender: genderSchema.optional().describe('Gênero/identidade — opcional (spec §3.1).'),
     /**
      * CPF ou CNPJ da PESSOA (D-043) — SÓ dígitos no fio (máscara é UI). O tipo
      * decide o tamanho e o dígito verificador (regra cross-field no
@@ -241,7 +272,13 @@ export const tokensSchema = z.object({
 export const accountSummarySchema = z.object({
   id: z.string(),
   email: z.string(),
-  name: z.string(),
+  name: z.string().describe('Nome civil — uso fiscal/documento; NÃO exibir quando há nome social.'),
+  /**
+   * Nome de EXIBIÇÃO (spec §3.1) — `socialName ?? name`, derivado no servidor.
+   * Fonte única: web/mobile/admin apenas consomem, para nunca vazar o nome
+   * civil de quem pediu nome social.
+   */
+  displayName: z.string().describe('Nome de exibição (socialName ?? name) — spec §3.1.'),
 });
 
 export const authResultSchema = z.object({
@@ -254,7 +291,9 @@ export const refreshResultSchema = z.object({ tokens: tokensSchema });
 export const meResultSchema = z.object({
   id: z.string(),
   email: z.string(),
-  name: z.string(),
+  name: z.string().describe('Nome civil — uso fiscal/documento; NÃO exibir quando há nome social.'),
+  /** Nome de EXIBIÇÃO (socialName ?? name) — derivado no servidor (spec §3.1). */
+  displayName: z.string().describe('Nome de exibição (socialName ?? name) — spec §3.1.'),
   emailVerified: z.boolean(),
 });
 

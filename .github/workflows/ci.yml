@@ -3,11 +3,21 @@ name: CI
 # Checks obrigatorios para branch protection em main (configurar no GitHub):
 # lint, typecheck, test, build, format, dependency-scan, secret-scan, migrate,
 # commitlint (so em pull_request).
-on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
+#
+# CI DESATIVADO enquanto billing do GitHub estiver locked — reativar removendo
+# este guard quando resolver. A conta esta com billing lock; todo job falha em
+# ~5-13s com "The job was not started because your account is locked due to a
+# billing issue", antes de qualquer step rodar (nao e teste vermelho, e o
+# workflow nem iniciando). Branch protection ja esta desligada (repo solo) e o
+# gate real virou suite local + auditoria manual do diff (ver politica de merge
+# em CLAUDE.md). Reativar: apagar o bloco `on: {}` abaixo e descomentar o
+# original.
+on: {}
+# on:
+#   pull_request:
+#     branches: [main]
+#   push:
+#     branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}

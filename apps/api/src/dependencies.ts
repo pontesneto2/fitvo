@@ -23,6 +23,8 @@ import { ConsentApplicationService } from './modules/consent/consent-application
 import { PrismaConsentRepository } from './modules/consent/prisma-consent-repository';
 import { PatientApplicationService } from './modules/patient/patient-application-service';
 import { PrismaPatientRepository } from './modules/patient/prisma-patient-repository';
+import { PrismaSpecialtyRepository } from './modules/specialty/prisma-specialty-repository';
+import { SpecialtyApplicationService } from './modules/specialty/specialty-application-service';
 import { PrismaTermsRepository } from './modules/terms/prisma-terms-repository';
 import { TermsApplicationService } from './modules/terms/terms-application-service';
 
@@ -36,6 +38,7 @@ export interface AppDependencies {
   consentService: ConsentApplicationService;
   termsService: TermsApplicationService;
   billingService: BillingApplicationService;
+  specialtyService: SpecialtyApplicationService;
   onClose?: () => Promise<void>;
 }
 
@@ -92,6 +95,11 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
   // slices — evita repositorios de identidade duplicados so para checar
   // emailVerifiedAt no gate de acoes sensiveis (convidar/cobrar).
   const accountRepository = new PrismaAccountRepository(prisma);
+  // Catalogo fixo de especialidades (D-047) — montado ANTES do authService: o
+  // cadastro do profissional autonomo (D-137) exige a especialidade no
+  // catalogo antes de abrir a transacao de criacao da conta.
+  const specialtyRepository = new PrismaSpecialtyRepository(prisma);
+  const specialtyService = new SpecialtyApplicationService(specialtyRepository);
   const authService = new AuthApplicationService(
     accountRepository,
     passwordHasher,
@@ -102,6 +110,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
       emailVerificationTtlSeconds: env.EMAIL_VERIFICATION_TTL_SECONDS,
       passwordResetTtlSeconds: env.PASSWORD_RESET_TTL_SECONDS,
     },
+    specialtyRepository,
   );
   // authCore satisfaz AccessTokenVerifier — a slice de termos (D-025) reusa o
   // mesmo verificador. Instancia unica reusada como TermsAcceptanceLookup
@@ -156,6 +165,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     consentService,
     termsService,
     billingService,
+    specialtyService,
     onClose: async () => {
       await queueFactory.close();
       await redis.quit();

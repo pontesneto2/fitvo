@@ -12,4 +12,5 @@ export * from './clinic';
 export * from './consent';
 export * from './errors';
 export * from './patient';
+export * from './specialty';
 export * from './terms';

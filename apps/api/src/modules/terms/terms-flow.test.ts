@@ -15,6 +15,9 @@ const proPayload = {
   document: '12345678901',
   documentType: 'CPF',
   tenantName: 'Estudio Terms (solo)',
+  specialtyId: 'spec_training',
+  councilDocument: 'CREF-123456',
+  councilState: 'SP',
   acceptedTerms,
 };
 

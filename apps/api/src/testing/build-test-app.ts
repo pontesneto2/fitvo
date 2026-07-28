@@ -21,6 +21,8 @@ import { ConsentApplicationService } from '../modules/consent/consent-applicatio
 import { InMemoryConsentRepository } from '../modules/consent/in-memory-consent-repository';
 import { InMemoryPatientRepository } from '../modules/patient/in-memory-patient-repository';
 import { PatientApplicationService } from '../modules/patient/patient-application-service';
+import { InMemorySpecialtyRepository } from '../modules/specialty/in-memory-specialty-repository';
+import { SpecialtyApplicationService } from '../modules/specialty/specialty-application-service';
 import { InMemoryTermsRepository } from '../modules/terms/in-memory-terms-repository';
 import { TermsApplicationService } from '../modules/terms/terms-application-service';
 import { FakeAuthEmailSender } from './fake-auth-email-sender';
@@ -36,6 +38,7 @@ export interface TestDependencies {
   consent: InMemoryConsentRepository;
   billing: InMemoryBillingRepository;
   terms: InMemoryTermsRepository;
+  specialty: InMemorySpecialtyRepository;
   queue: InMemoryQueueFactory;
 }
 
@@ -56,6 +59,8 @@ export interface TestHarness {
   billing: InMemoryBillingRepository;
   /** Repositorio de termos em memoria (D-025) — expoe `seedVersion`/`seedDefaultCatalog` e helpers de leitura de eventos para os testes. */
   terms: InMemoryTermsRepository;
+  /** Catalogo de especialidades em memoria (D-047) — expoe `seed`/`seedDefaultCatalog`. */
+  specialty: InMemorySpecialtyRepository;
   /** Fabrica de filas em memoria — coleta os eventos publicados (ex.: bond.created). */
   queue: InMemoryQueueFactory;
 }
@@ -91,6 +96,12 @@ export function buildTestDependencies(): TestDependencies {
   // para escrever os eventos ACCEPTED iniciais no cadastro (D-025).
   const accounts = new InMemoryAccountRepository(terms);
   const verificationTokens = new InMemoryVerificationTokenStore();
+  // Catalogo fixo de especialidades (D-047), semeado com o mesmo conteudo da
+  // migracao de producao — reusado como SpecialtyLookup pelo cadastro do
+  // profissional autonomo (D-137).
+  const specialty = new InMemorySpecialtyRepository();
+  specialty.seedDefaultCatalog();
+  const specialtyService = new SpecialtyApplicationService(specialty);
   const authService = new AuthApplicationService(
     accounts,
     hasher,
@@ -98,6 +109,7 @@ export function buildTestDependencies(): TestDependencies {
     verificationTokens,
     emails,
     { emailVerificationTtlSeconds: 3600, passwordResetTtlSeconds: 3600 },
+    specialty,
   );
   const clinic = new InMemoryClinicRepository();
   const clinicService = new ClinicApplicationService(
@@ -147,6 +159,7 @@ export function buildTestDependencies(): TestDependencies {
       consentService,
       termsService,
       billingService,
+      specialtyService,
     },
     emails,
     accounts,
@@ -156,6 +169,7 @@ export function buildTestDependencies(): TestDependencies {
     consent,
     billing,
     terms,
+    specialty,
     queue,
   };
 }
@@ -173,6 +187,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     consent,
     billing,
     terms,
+    specialty,
     queue,
   } = buildTestDependencies();
   const app = await buildApp(deps);
@@ -186,6 +201,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     consent,
     billing,
     terms,
+    specialty,
     queue,
   };
 }

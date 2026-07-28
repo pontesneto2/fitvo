@@ -105,6 +105,7 @@ enum SpecialtyCode {
   TRAINING // treino / educacao fisica (CREF)
   NUTRITION // nutricao (CRN)
   MEDICINE // medicina (CRM)
+  PERSONAL_TRAINER // personal trainer (CREF) — sem RQE, conselho igual a TRAINING
 }
 
 enum VerificationStatus {

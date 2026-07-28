@@ -21,6 +21,53 @@ const email = z.string().email().describe('E-mail de login (único) — D-042.')
 const password = z.string().min(8).describe('Senha em claro (mín. 8).');
 const oneTimeToken = z.string().min(1).describe('Token de uso único recebido por e-mail.');
 
+/** UF (mirror do enum `BrazilianState` do Prisma) — usada pelo conselho profissional (D-126). */
+export const brazilianStateSchema = z.enum([
+  'AC',
+  'AL',
+  'AM',
+  'AP',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MG',
+  'MS',
+  'MT',
+  'PA',
+  'PB',
+  'PE',
+  'PI',
+  'PR',
+  'RJ',
+  'RN',
+  'RO',
+  'RR',
+  'RS',
+  'SC',
+  'SE',
+  'SP',
+  'TO',
+]);
+
+/**
+ * Registro no conselho profissional (CREF/CRN/CRM) — validado apenas em
+ * FORMATO (D-138): presença + tamanho razoável + caracteres esperados de um
+ * registro (dígitos/letras/`-`/`/`). NÃO valida atividade/validade real do
+ * registro — isso é TODO(D-010), trabalho futuro. "Obrigatório preencher" ≠
+ * "verificado" é palavra de força do ADR-0015 (D-138): não apertar esta regex
+ * para simular uma verificação que não existe.
+ */
+const councilDocument = z
+  .string()
+  .trim()
+  .min(1)
+  .max(20)
+  .regex(/^[A-Za-z0-9/-]+$/, 'Formato de registro no conselho invalido.')
+  .describe('Registro no conselho (CREF/CRN/CRM) — validado so em formato (D-138).');
+
 /**
  * Aceite OBRIGATÓRIO dos dois termos no cadastro (D-025 — LGPD). Cada campo
  * exige o literal booleano `true` — não `false`, ausente ou qualquer outro
@@ -47,6 +94,14 @@ export const registerProfessionalSchema = z.object({
   document: z.string().min(11).max(18).describe('CPF ou CNPJ (D-043).'),
   documentType: z.enum(['CPF', 'CNPJ']),
   tenantName: z.string().min(1),
+  /**
+   * Especialidade reivindicada no signup (D-137 — ADR-0015): o autônomo
+   * escolhe UMA especialidade no cadastro; as demais entram por fluxo
+   * proprio, fora deste contrato.
+   */
+  specialtyId: z.string().min(1).describe('Especialidade reivindicada no signup (D-137).'),
+  councilDocument,
+  councilState: brazilianStateSchema.describe('UF do conselho profissional (D-126).'),
   acceptedTerms,
 });
 

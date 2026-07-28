@@ -12,6 +12,9 @@ const professional = {
   document: '12345678901',
   documentType: 'CPF',
   tenantName: 'Leo Personal',
+  specialtyId: 'spec_training',
+  councilDocument: 'CREF-123456',
+  councilState: 'SP',
   acceptedTerms,
 };
 
@@ -136,6 +139,9 @@ describe('verificacao de e-mail (E2E via inject)', () => {
       document: '12345678901',
       documentType: 'CPF',
       tenantName: 'Tenant Expirado',
+      specialtyId: 'spec_training',
+      councilDocument: 'CREF-123456',
+      councilState: 'SP',
       termsAcceptance: { ipAddress: '127.0.0.1', userAgent: 'vitest' },
     });
     // TTL negativo: o token ja nasce expirado no MESMO store que a rota consome.

@@ -70,6 +70,51 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "specialtyId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Especialidade reivindicada no signup (D-137)."
+                  },
+                  "councilDocument": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20,
+                    "pattern": "^[A-Za-z0-9/-]+$",
+                    "description": "Registro no conselho (CREF/CRN/CRM) — validado so em formato (D-138)."
+                  },
+                  "councilState": {
+                    "type": "string",
+                    "enum": [
+                      "AC",
+                      "AL",
+                      "AM",
+                      "AP",
+                      "BA",
+                      "CE",
+                      "DF",
+                      "ES",
+                      "GO",
+                      "MA",
+                      "MG",
+                      "MS",
+                      "MT",
+                      "PA",
+                      "PB",
+                      "PE",
+                      "PI",
+                      "PR",
+                      "RJ",
+                      "RN",
+                      "RO",
+                      "RR",
+                      "RS",
+                      "SC",
+                      "SE",
+                      "SP",
+                      "TO"
+                    ],
+                    "description": "UF do conselho profissional (D-126)."
+                  },
                   "acceptedTerms": {
                     "type": "object",
                     "properties": {
@@ -102,6 +147,9 @@
                   "document",
                   "documentType",
                   "tenantName",
+                  "specialtyId",
+                  "councilDocument",
+                  "councilState",
                   "acceptedTerms"
                 ]
               }
@@ -2646,6 +2694,62 @@
                   "required": [
                     "received",
                     "duplicate"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/specialties/": {
+      "get": {
+        "summary": "Lista o catalogo fixo de especialidades (publico)",
+        "tags": [
+          "specialty"
+        ],
+        "description": "Catalogo fixo, semeado na migracao (D-047) — sem tenant/dado sensivel. Usado pelo cadastro publico de profissional para popular o select.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "specialties": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "TRAINING",
+                              "NUTRITION",
+                              "MEDICINE",
+                              "PERSONAL_TRAINER"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "specialties"
                   ],
                   "additionalProperties": false
                 }

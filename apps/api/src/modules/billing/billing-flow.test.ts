@@ -14,6 +14,9 @@ const proPayload = {
   document: '12345678901',
   documentType: 'CPF',
   tenantName: 'Estudio Solo',
+  specialtyId: 'spec_training',
+  councilDocument: 'CREF-123456',
+  councilState: 'SP',
   acceptedTerms: { termsOfUse: true, privacyPolicy: true },
 };
 

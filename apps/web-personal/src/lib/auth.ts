@@ -63,7 +63,21 @@ const acceptedTermsInput = z.object({
 const registerEmail = z.string().email('Informe um e-mail valido.');
 const registerPassword = z.string().min(8, 'A senha precisa ter no minimo 8 caracteres.');
 const registerName = z.string().min(1, 'Informe o nome completo.');
-const cpf = z.string().min(11, 'Informe um CPF valido.').max(14, 'Informe um CPF valido.');
+/**
+ * CPF do paciente — dígito verificador REAL, espelhando `cpfOnlyRefine` do
+ * servidor (spec §4.6: "CPF — exatamente 11 · DV real"). Reusa o validador de
+ * `@fitvo/validation`, sem duplicar a conta do DV.
+ *
+ * Tolera máscara na DIGITAÇÃO e normaliza para dígitos no `transform` — o fio
+ * carrega só dígitos (spec §3), mas quem digita não deveria ser punido por
+ * colar um CPF pontuado. Antes daqui o campo era `min(11).max(14)`, espelho do
+ * schema frouxo que o servidor tinha: aceitava CPF inválido no cliente e o
+ * usuário só descobria com um 400 opaco no submit.
+ */
+const cpf = z
+  .string()
+  .refine((v) => isValidCpf(onlyDigits(v)), { message: 'Informe um CPF valido.' })
+  .transform(onlyDigits);
 
 /**
  * Gate MÍNIMO de força de senha no cadastro — espelha `strongPassword` da API

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@fitvo/database';
 import { afterAll, describe, expect, it } from 'vitest';
 
+import { validNewPatientAccount } from '../../testing/patient-account-fixture';
 import { PrismaPatientRepository } from './prisma-patient-repository';
 
 /**
@@ -63,7 +64,7 @@ describe('PrismaPatientRepository — mapeamento contra Postgres real', () => {
 
     const outcome = await repo.acceptInvite(
       tokenHash,
-      { passwordHash: 'y', name: 'Paciente', document: '1' },
+      validNewPatientAccount({ name: 'Paciente' }),
       ORIGIN,
     );
     expect(outcome.status).toBe('accepted');
@@ -92,7 +93,7 @@ describe('PrismaPatientRepository — mapeamento contra Postgres real', () => {
     });
     const outcome = await repo.acceptInvite(
       tokenHash,
-      { passwordHash: 'y', name: 'Paciente Online', document: '2' },
+      validNewPatientAccount({ name: 'Paciente Online' }),
       ORIGIN,
     );
     expect(outcome.status).toBe('accepted');
@@ -114,11 +115,7 @@ describe('PrismaPatientRepository — mapeamento contra Postgres real', () => {
       tokenHash,
       expiresAt: new Date(Date.now() + 60_000),
     });
-    await repo.acceptInvite(
-      tokenHash,
-      { passwordHash: 'y', name: 'Pac Ov', document: '3' },
-      ORIGIN,
-    );
+    await repo.acceptInvite(tokenHash, validNewPatientAccount({ name: 'Pac Ov' }), ORIGIN);
 
     // INVITE_PROJECTION / a projecao de bonds sao `select` explicitos: um campo
     // esquecido ali some silenciosamente da API sem quebrar tipo nenhum.

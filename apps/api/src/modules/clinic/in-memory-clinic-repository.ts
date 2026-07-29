@@ -1,5 +1,6 @@
 import type { BrazilianState, ClinicRole, InviteStatus, MedicalSpecialty } from '@fitvo/database';
 
+import type { InMemoryAccountRepository } from '../auth/in-memory-account-repository';
 import type { SpecialtyRepository } from '../specialty/specialty-repository';
 import { recordInitialTermsAcceptanceInMemory } from '../terms/initial-terms-acceptance';
 import type { RequestOrigin, TermsRepository } from '../terms/terms-repository';
@@ -74,9 +75,18 @@ export class InMemoryClinicRepository implements ClinicRepository {
   private readonly professionalSpecialties: StoredProfessionalSpecialty[] = [];
   private sequence = 0;
 
+  /**
+   * `accounts` e OPCIONAL — necessario nos testes em que a conta criada pelo
+   * ACEITE DE CONVITE (#102) precisa ser visivel para login e `/me` (slice
+   * `auth`), como no gate de completar-perfil (spec §5). Em producao as duas
+   * escrevem na MESMA tabela `account`; nos doubles isso exige repassar a mesma
+   * instancia de `InMemoryAccountRepository` do harness. Mesmo padrao ja
+   * adotado pelo `InMemoryPatientRepository`.
+   */
   constructor(
     private readonly terms: TermsRepository,
     private readonly specialties: SpecialtyRepository,
+    private readonly accounts?: InMemoryAccountRepository,
   ) {}
 
   // --- Seed helpers (testes/dev; fora da interface de producao) ---
@@ -214,8 +224,16 @@ export class InMemoryClinicRepository implements ClinicRepository {
       };
     }
 
+    // Conta nasce no store COMPARTILHADO quando ele existe (mesma tabela unica
+    // do Prisma) — e o que permite o profissional de clinica LOGAR nos testes e
+    // cair no gate de completar-perfil. Note que o aceite de clinica NAO grava
+    // nascimento/WhatsApp/endereco: e exatamente por isso que a conta nasce
+    // incompleta (spec §5).
+    const seeded = this.accounts
+      ? await this.accounts.seedAccount(invite.email, account.passwordHash, account.name)
+      : null;
     const stored: StoredAccount = {
-      id: this.nextId('acc'),
+      id: seeded?.id ?? this.nextId('acc'),
       email: invite.email,
       name: account.name,
       professionalProfileId: null,

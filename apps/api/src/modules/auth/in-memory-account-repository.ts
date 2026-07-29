@@ -5,8 +5,11 @@ import { recordInitialTermsAcceptanceInMemory } from '../terms/initial-terms-acc
 import type {
   AccountRecord,
   AccountRepository,
+  AccountWithProfileRecord,
+  CompleteProfileInput,
   CreateCompanyInput,
   CreateProfessionalInput,
+  ProfileCompletenessFields,
   TermsAcceptanceOrigin,
 } from './account-repository';
 
@@ -26,7 +29,7 @@ export interface InMemoryProfessionalSpecialtyRecord {
  * `TermsApplicationService` no harness de teste.
  */
 export class InMemoryAccountRepository implements AccountRepository {
-  private readonly byId = new Map<string, AccountRecord>();
+  private readonly byId = new Map<string, AccountWithProfileRecord>();
   private readonly emailToId = new Map<string, string>();
   private readonly professionalSpecialtiesByAccountId = new Map<
     string,
@@ -45,12 +48,33 @@ export class InMemoryAccountRepository implements AccountRepository {
     return Promise.resolve(this.byId.get(id) ?? null);
   }
 
+  findByIdWithProfile(id: string): Promise<AccountWithProfileRecord | null> {
+    return Promise.resolve(this.byId.get(id) ?? null);
+  }
+
+  /** Espelha a Prisma: `undefined` = nao mexer (nao zera o que ja existe). */
+  completeProfile(id: string, input: CompleteProfileInput): Promise<AccountWithProfileRecord> {
+    const account = this.byId.get(id);
+    if (!account) {
+      throw new Error(`Conta ${id} nao encontrada.`);
+    }
+    const updated: AccountWithProfileRecord = {
+      ...account,
+      ...(input.whatsapp !== undefined ? { whatsapp: input.whatsapp } : {}),
+      ...(input.birthDate !== undefined ? { birthDate: input.birthDate } : {}),
+    };
+    this.byId.set(id, updated);
+    return Promise.resolve(updated);
+  }
+
   async createProfessional(input: CreateProfessionalInput): Promise<AccountRecord> {
+    // Autonomo coleta os tres (spec §4.1) — nasce COMPLETO, nunca ve o gate.
     const account = await this.insert(
       input.email,
       input.passwordHash,
       input.name,
       input.socialName ?? null,
+      { birthDate: input.birthDate, whatsapp: input.whatsapp },
     );
     this.professionalSpecialtiesByAccountId.set(account.id, {
       specialtyId: input.specialtyId,
@@ -63,11 +87,15 @@ export class InMemoryAccountRepository implements AccountRepository {
   }
 
   async createCompany(input: CreateCompanyInput): Promise<AccountRecord> {
+    // O admin da empresa informa nascimento e WhatsApp, mas NAO endereco
+    // pessoal: o endereco do cadastro e do ESTABELECIMENTO (spec §4.2, item 6)
+    // e vai para o Tenant, nao para a Account. Espelha a Prisma exatamente.
     const account = await this.insert(
       input.admin.email,
       input.admin.passwordHash,
       input.admin.name,
       input.admin.socialName ?? null,
+      { birthDate: input.admin.birthDate, whatsapp: input.admin.whatsapp },
     );
     // "Também atende" (MANAGER_PROVIDER): registra a ProfessionalSpecialty do
     // admin — espelha a criação atômica da Prisma; gestor-puro não gera nenhuma.
@@ -96,8 +124,36 @@ export class InMemoryAccountRepository implements AccountRepository {
    * tabela; nos doubles in-memory (Maps separados por modulo), sem isto o
    * login/verificacao de e-mail (slice `auth`) nunca enxergariam a conta.
    */
-  seedAccount(email: string, passwordHash: string, name: string): Promise<AccountRecord> {
-    return this.insert(email, passwordHash, name, null);
+  /**
+   * Semeia uma conta criada por OUTRA slice (aceite de convite de
+   * paciente/clinica/estagiario/recepcao) no store COMPARTILHADO — em producao
+   * todas escrevem na mesma tabela `account`.
+   *
+   * `profile` existe para o double ser FIEL ao gate (spec §5): cada fluxo passa
+   * o que de fato grava. O aceite de clinica nao passa nada e a conta nasce
+   * incompleta; os de paciente/estagiario/recepcao passam os tres e nascem
+   * completas — igualzinho a Prisma. Sem isso o double diria que todo mundo cai
+   * no gate, e o teste do gate provaria o double, nao o produto.
+   */
+  seedAccount(
+    email: string,
+    passwordHash: string,
+    name: string,
+    profile: Partial<ProfileCompletenessFields> = {},
+  ): Promise<AccountWithProfileRecord> {
+    return this.insert(email, passwordHash, name, null, profile);
+  }
+
+  /**
+   * Campos do gate que um aceite de convite grava. So nascimento e WhatsApp —
+   * endereco nao faz parte do minimo funcional (D-157), entao nao influencia
+   * `profileComplete`, mesmo quando o fluxo o coleta.
+   */
+  static profileFrom(input: {
+    birthDate: Date;
+    whatsapp: string;
+  }): Partial<ProfileCompletenessFields> {
+    return { birthDate: input.birthDate, whatsapp: input.whatsapp };
   }
 
   markEmailVerified(id: string): Promise<void> {
@@ -132,15 +188,22 @@ export class InMemoryAccountRepository implements AccountRepository {
     passwordHash: string,
     name: string,
     socialName: string | null,
-  ): Promise<AccountRecord> {
+    // Campos do gate de completar-perfil (spec §5). Espelham o que CADA fluxo
+    // de criacao realmente grava na Prisma — e por isso o double reproduz o
+    // gate de verdade: se um fluxo nao coleta nascimento/WhatsApp, aqui tambem
+    // nao chegam, e `profileComplete` da false nos dois lados.
+    profile: Partial<ProfileCompletenessFields> = {},
+  ): Promise<AccountWithProfileRecord> {
     this.sequence += 1;
-    const account: AccountRecord = {
+    const account: AccountWithProfileRecord = {
       id: `acc_${this.sequence}`,
       email,
       passwordHash,
       name,
       socialName,
       emailVerifiedAt: null,
+      birthDate: profile.birthDate ?? null,
+      whatsapp: profile.whatsapp ?? null,
     };
     this.byId.set(account.id, account);
     this.emailToId.set(email, account.id);

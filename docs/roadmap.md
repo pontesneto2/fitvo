@@ -224,6 +224,23 @@ página `/convite/aceitar` hoje é fechada no formato do convite de profissional
 a UI do estagiário precisa **resolver o tipo do token antes de renderizar**, que
 é o trabalho de fato deste slice.
 
+### Mobile: consumir `profileComplete` (gate de completar-perfil)
+
+O gate (D-157) está de pé na API e no web-personal (guard no shell +
+`/completar-perfil`). O app mobile ainda **não** consome `profileComplete` de
+`/me` — um profissional de clínica pré-cadastrado entra no mobile sem o gate.
+Reusar a mesma derivação do servidor: a superfície só consome, nunca recalcula.
+
+### Endereço como pedido contextual (decorrência do D-157)
+
+Endereço ficou **fora** do mínimo funcional do gate. Onde ele for necessário, é
+pedido no fluxo que precisa dele — não no login. Paciente já o coleta no aceite
+(spec §4.6); o profissional de clínica/academia precisará informá-lo ao
+**configurar recebimento**, junto do processo documental do Asaas (fora do
+cadastro por decisão de spec §3). Enquanto esse fluxo não existe, o
+profissional convidado opera sem endereço, o que é aceitável: nada no MVP
+depende dele.
+
 ### UI da recepção — slice próprio
 
 O seat de recepção entregou **API + contrato** (D-156, #115). Falta a UI: (a)

@@ -5,6 +5,8 @@ import { recordInitialTermsAcceptance } from '../terms/initial-terms-acceptance'
 import type {
   AccountRecord,
   AccountRepository,
+  AccountWithProfileRecord,
+  CompleteProfileInput,
   CreateCompanyInput,
   CreateProfessionalInput,
 } from './account-repository';
@@ -18,6 +20,18 @@ const ACCOUNT_PROJECTION = {
   emailVerifiedAt: true,
 } as const;
 
+/**
+ * Projecao do gate de completar-perfil (spec §5): a conta + exatamente as
+ * colunas que `deriveProfileComplete` le. Endereco NAO entra — nao faz parte do
+ * minimo funcional (D-157), entao projeta-lo aqui seria carregar dado que a
+ * regra nao usa.
+ */
+const ACCOUNT_WITH_PROFILE_PROJECTION = {
+  ...ACCOUNT_PROJECTION,
+  birthDate: true,
+  whatsapp: true,
+} as const;
+
 /** Implementacao Prisma (infra) do repositorio de identidade. */
 export class PrismaAccountRepository implements AccountRepository {
   constructor(private readonly db: PrismaClient = defaultPrisma) {}
@@ -28,6 +42,33 @@ export class PrismaAccountRepository implements AccountRepository {
 
   findById(id: string): Promise<AccountRecord | null> {
     return this.db.account.findUnique({ where: { id }, select: ACCOUNT_PROJECTION });
+  }
+
+  findByIdWithProfile(id: string): Promise<AccountWithProfileRecord | null> {
+    return this.db.account.findUnique({
+      where: { id },
+      select: ACCOUNT_WITH_PROFILE_PROJECTION,
+    });
+  }
+
+  /**
+   * Preenche SO o que veio (spec §5). `undefined` significa "nao mexer": um
+   * `update` do Prisma ignora chaves ausentes, entao quem manda so o WhatsApp
+   * nao zera o nascimento por omissao — o que seria um jeito silencioso de
+   * DESCOMPLETAR um perfil pelo endpoint que existe para completa-lo.
+   *
+   * Nao toca em termos (completar perfil nao e novo consentimento — D-025),
+   * nem em documento/e-mail (identidade, nao "dado faltando").
+   */
+  completeProfile(id: string, input: CompleteProfileInput): Promise<AccountWithProfileRecord> {
+    return this.db.account.update({
+      where: { id },
+      data: {
+        ...(input.whatsapp !== undefined ? { whatsapp: input.whatsapp } : {}),
+        ...(input.birthDate !== undefined ? { birthDate: input.birthDate } : {}),
+      },
+      select: ACCOUNT_WITH_PROFILE_PROJECTION,
+    });
   }
 
   createProfessional(input: CreateProfessionalInput): Promise<AccountRecord> {

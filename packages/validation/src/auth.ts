@@ -134,6 +134,26 @@ export const genderSchema = z.enum([
 ]);
 
 /**
+ * Sexo biológico (spec §3.1 — dado sensível LGPD). Mirror do enum
+ * `BiologicalSex` do Prisma, EM INGLÊS: os valores são os do banco, e a
+ * tradução pt-BR é só de UI (a divergência foi detectada no #105 — ver v2.1 da
+ * spec). **Exclusivo do paciente e obrigatório no aceite dele**: é variável
+ * fisiológica, base de cálculo metabólico, de dosagem e de faixa de referência
+ * em nutrição e medicina. De profissional/estagiário/recepção **não** se
+ * captura — não se calcula nada deles.
+ *
+ * NÃO se confunde com `genderSchema`: um serve ao cálculo clínico, o outro ao
+ * respeito à identidade. Um campo só forçaria escolher entre acertar a conta e
+ * respeitar a pessoa.
+ *
+ * `NOT_INFORMED` existe no enum do banco como default de linha antiga, mas
+ * **não** é oferecido no aceite: quem cadastra hoje informa.
+ */
+export const biologicalSexSchema = z
+  .enum(['MALE', 'FEMALE', 'INTERSEX'])
+  .describe('Sexo biológico (spec §3.1) — base de cálculo clínico, exclusivo do paciente.');
+
+/**
  * Endereço da PESSOA (D-044) — bloco. CEP só dígitos (8), como o WhatsApp:
  * máscara é UI, storage é normalizado. `complemento` opcional; `country` default
  * 'BR' (lançamento pt-BR). `state` reusa o enum de UF. Todos os campos textuais
@@ -279,6 +299,39 @@ export const meResultSchema = z.object({
   /** Nome de EXIBIÇÃO (socialName ?? name) — derivado no servidor (spec §3.1). */
   displayName: z.string().describe('Nome de exibição (socialName ?? name) — spec §3.1.'),
   emailVerified: z.boolean(),
+  /**
+   * Perfil completo? (spec §5) — `false` significa que falta o MÍNIMO
+   * FUNCIONAL (nascimento, WhatsApp, endereço) e a superfície deve levar a
+   * pessoa para completar antes de liberar o app.
+   *
+   * DERIVADO no servidor (`deriveProfileComplete`), como o `displayName`:
+   * web/mobile/admin apenas CONSOMEM. Nenhuma superfície refaz esta conta —
+   * duas cópias divergiriam e passariam a discordar sobre quem está bloqueado.
+   */
+  profileComplete: z
+    .boolean()
+    .describe('Perfil completo (spec §5) — derivado no servidor; nunca recalcular no cliente.'),
+});
+
+/**
+ * Completar perfil pós-login (spec §5). Campos OPCIONAIS: a pessoa completa **o
+ * que falta**, e mandar só o WhatsApp não deve zerar o nascimento. Cada campo
+ * enviado é validado com o MESMO rigor do cadastro — `whatsapp` e `birthDate`
+ * (≥18) são as peças compartilhadas, não versões relaxadas: um dado que não
+ * serviria no cadastro também não serve aqui.
+ *
+ * São exatamente os campos do MÍNIMO FUNCIONAL (D-157) — os que destravam o
+ * app. **Endereço não está aqui**: saiu do mínimo (o admin gestor não tem
+ * endereço pessoal, e ele não é necessário a todo papel), e vira pedido
+ * CONTEXTUAL no fluxo que precisar dele. Aceitá-lo neste endpoint faria o
+ * "endpoint do gate" carregar algo que o gate não exige.
+ *
+ * NÃO inclui documento, e-mail nem termos: documento e e-mail são identidade
+ * (não "dado faltando"), e completar perfil não é novo consentimento (D-025).
+ */
+export const completeProfileSchema = z.object({
+  whatsapp: whatsapp.optional(),
+  birthDate: birthDate.optional(),
 });
 
 /** Resposta 202 que não revela existência de conta (D-029): sempre `accepted`. */
@@ -299,6 +352,7 @@ export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
+export type CompleteProfileInputWire = z.infer<typeof completeProfileSchema>;
 export type Tokens = z.infer<typeof tokensSchema>;
 export type AccountSummary = z.infer<typeof accountSummarySchema>;
 export type AuthResult = z.infer<typeof authResultSchema>;

@@ -1,5 +1,6 @@
 import type { InviteStatus } from '@fitvo/database';
 
+import { InMemoryAccountRepository } from '../auth/in-memory-account-repository';
 import { recordInitialTermsAcceptanceInMemory } from '../terms/initial-terms-acceptance';
 import type { RequestOrigin, TermsRepository } from '../terms/terms-repository';
 import type {
@@ -45,7 +46,16 @@ export class InMemoryReceptionRepository implements ReceptionRepository {
   private readonly accountIdByEmail = new Map<string, string>();
   private sequence = 0;
 
-  constructor(private readonly terms: TermsRepository) {}
+  /**
+   * `accounts` e OPCIONAL — necessario nos testes em que a conta criada pelo
+   * aceite precisa ser visivel para login e `/me` (slice `auth`), como no gate
+   * de completar-perfil (spec §5). Em producao as duas escrevem na MESMA tabela
+   * `account`. Mesmo padrao do double de paciente e de clinica.
+   */
+  constructor(
+    private readonly terms: TermsRepository,
+    private readonly accounts?: InMemoryAccountRepository,
+  ) {}
 
   // --- Seed helpers (testes/dev; fora da interface de producao) ---
 
@@ -89,10 +99,7 @@ export class InMemoryReceptionRepository implements ReceptionRepository {
 
   async acceptInvite(
     tokenHash: string,
-    // Identidade da pessoa: este double nao espelha as colunas da `Account` (o
-    // que ele modela e o SEAT e o vinculo). A propagacao dos campos de pessoa e
-    // provada na integracao contra Postgres real.
-    _account: NewReceptionAccount,
+    account: NewReceptionAccount,
     origin: RequestOrigin,
   ): Promise<AcceptReceptionInviteOutcome> {
     const invite = this.findByTokenHash(tokenHash);
@@ -118,7 +125,18 @@ export class InMemoryReceptionRepository implements ReceptionRepository {
       };
     }
 
-    const accountId = this.nextId('acc');
+    // Conta nasce no store COMPARTILHADO quando ele existe (mesma tabela unica
+    // do Prisma). O aceite de recepcao coleta os tres campos do gate (spec
+    // §4.5), entao a conta nasce COMPLETA e nunca ve o gate (spec §5).
+    const seeded = this.accounts
+      ? await this.accounts.seedAccount(
+          invite.email,
+          account.passwordHash,
+          account.name,
+          InMemoryAccountRepository.profileFrom(account),
+        )
+      : null;
+    const accountId = seeded?.id ?? this.nextId('acc');
     this.accountIdByEmail.set(invite.email, accountId);
     this.attachReceptionProfile(accountId, invite);
     // Conta NOVA: grava o aceite inicial dos termos (D-025). Mesma regra da Prisma.

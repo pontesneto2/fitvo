@@ -1,5 +1,12 @@
-import type { BondStatus, CareModality, InviteStatus } from '@fitvo/database';
+import type {
+  BiologicalSex,
+  BondStatus,
+  CareModality,
+  Gender,
+  InviteStatus,
+} from '@fitvo/database';
 
+import type { AddressInput } from '../auth/account-repository';
 import type { RequestOrigin } from '../terms/terms-repository';
 
 /** Projecao do convite profissional->paciente usada pela slice (D-006). */
@@ -49,10 +56,26 @@ export interface CreatePatientInviteInput {
 }
 
 /** Dados para criar a conta do paciente quando o e-mail ainda e novo (paciente = CPF — D-043). */
+/**
+ * Dados para criar a conta do paciente. Campos COMPLETOS (spec §4.6): como o
+ * autocadastro de paciente nao existe (D-135), este e o UNICO caminho de
+ * nascimento da conta — o que nao vier aqui nao e capturado em lugar nenhum.
+ *
+ * `biologicalSex` e OBRIGATORIO e exclusivo do paciente (spec §3.1): base de
+ * calculo metabolico/dosagem/faixa de referencia, precisa existir antes do
+ * primeiro atendimento. Nao se confunde com `gender`, que e opcional e serve ao
+ * respeito a identidade.
+ */
 export interface NewPatientAccount {
   passwordHash: string;
   name: string;
+  socialName?: string | undefined;
+  gender?: Gender | undefined;
+  biologicalSex: BiologicalSex;
   document: string;
+  whatsapp: string;
+  birthDate: Date;
+  address: AddressInput;
 }
 
 /**

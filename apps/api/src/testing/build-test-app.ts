@@ -129,7 +129,7 @@ export function buildTestDependencies(): TestDependencies {
   // Recebe `terms` para gravar o aceite inicial (D-025) SO em conta nova, e
   // `specialty` (catalogo D-047) para resolver o SpecialtyCode do convite -> id
   // — mesma regra da PrismaClinicRepository (ADR-0015).
-  const clinic = new InMemoryClinicRepository(terms, specialty);
+  const clinic = new InMemoryClinicRepository(terms, specialty, accounts);
   const clinicService = new ClinicApplicationService(
     clinic,
     hasher,
@@ -152,7 +152,7 @@ export function buildTestDependencies(): TestDependencies {
   );
   // Seat administrativo de recepcao (D-156): mesma composicao do estagiario —
   // o InMemoryClinicRepository serve de ClinicAdminLookup (interface estreita).
-  const reception = new InMemoryReceptionRepository(terms);
+  const reception = new InMemoryReceptionRepository(terms, accounts);
   const receptionService = new ReceptionApplicationService(
     reception,
     clinic,

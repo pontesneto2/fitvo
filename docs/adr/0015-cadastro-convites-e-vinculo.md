@@ -1,7 +1,7 @@
 # ADR-0015 — Cadastro, Convite e Vínculo
 
 **Status:** Aceito
-**Decisões cobertas:** D-135 a D-143, D-156
+**Decisões cobertas:** D-135 a D-143, D-156, D-157
 **Relacionados:** D-006 (ADR-0001), D-025/D-029 (ADR-0002), D-046/D-051 (ADR-0003), TODO(D-010)
 
 ## Contexto
@@ -245,6 +245,57 @@ já está engajada. Consequência direta: o seat nasce com o perfil **completo**
 cobrar depois — troca fricção de cadastro por fricção de primeiro login, que é
 pior.
 
+### D-157 — Gate de completar-perfil: a regra é sobre DADO, não sobre papel
+
+Quem foi **pré-cadastrado por terceiro** sem os dados que o app precisa para
+operar cai, ao logar, numa tela de completar dados, com o app bloqueado até
+completar (spec §5). O **mínimo funcional** é **`birthDate` + WhatsApp**, e só.
+Senha não entra (é `NOT NULL` — condição sempre verdadeira).
+
+**Endereço NÃO entra no mínimo**, por duas razões — a primeira sozinha decide:
+
+1. **O admin gestor de empresa não tem endereço pessoal.** O endereço do
+   cadastro de empresa é o do **estabelecimento** (spec §4.2, item 6) e vai para
+   o `Tenant` — decisão já tomada em D-139/#108. Exigir endereço no gate faria o
+   admin nascer incompleto e cair numa tela que a spec §5 diz que ele **nunca**
+   vê; a alternativa seria contradizer o #108 só para satisfazer a derivação.
+2. **Endereço não é mínimo funcional para todo papel.** O gate é *progressive*:
+   trava o mínimo e deixa o resto como pedido **contextual**, no momento em que
+   faz falta — paciente já o coleta no aceite (spec §4.6), profissional informa
+   ao configurar recebimento. Travar o app por um dado que boa parte dos papéis
+   nunca usa é muralha, não gate.
+
+Esta é a escolha que mantém a derivação por dado **e** a spec §5 verdadeiras ao
+mesmo tempo, sem exceção por papel. Há teste fixando o admin como completo: se
+alguém reintroduzir endereço na derivação, ele fica vermelho.
+
+**`profileComplete` é DERIVADO no servidor**, em função única
+(`deriveProfileComplete`), exposto em `/me`. Mesma doutrina do `displayName`
+(spec §3.1): as superfícies **consomem**, nunca recalculam — duas derivações
+divergiriam e passariam a discordar sobre quem está bloqueado.
+
+**Não há flag de "este seat está sujeito ao gate".** A ausência é a decisão:
+uma flag seria uma **segunda representação** de um fato que as colunas já
+contam (D-103, o mesmo anti-padrão evitado em `biologicalSex` e em
+`seatType`), e passaria a mentir assim que alguém completasse o perfil por
+outro caminho. "Quem vê o gate" é **consequência** do que cada fluxo de criação
+coleta — um seat novo que colete tudo simplesmente nunca aparece no gate, sem
+ninguém precisar lembrar de atualizar uma lista.
+
+**Consequência que forçou a mão:** a promessa da spec §5 de que o paciente
+nunca vê o gate **não se sustentava** — o aceite de convite dele (único caminho
+de nascimento da conta, D-135) não coletava nascimento, WhatsApp nem endereço.
+O aceite passou a coletar a pessoa inteira, incluindo **sexo biológico**
+(obrigatório, spec §3.1/§4.6: base de cálculo metabólico/dosagem, e não há
+outra porta). Sem isso, a alternativa seria uma exceção por papel — exatamente
+a lista mantida à mão que esta decisão recusa.
+
+**Completar:** `PATCH /v1/auth/me/complete-profile`, autenticado pelo Bearer.
+Sem `tenantId`: `Account` é a **pessoa** (D-044), não o papel — a mesma conta
+tem seats em várias empresas e nasce uma vez só. Campos ausentes não são
+zerados; valida com o mesmo rigor do cadastro; **não** regrava termos (D-025)
+nem altera documento/e-mail. Idempotente.
+
 ## Alternativas consideradas
 
 - **Estagiário como `ProfessionalProfile` com flag + supervisor nulável:**
@@ -298,6 +349,9 @@ pior.
   Nenhuma outra parte do seat precisa mudar — é o que a forma escolhida compra.
 - **Recepção (D-156) não tem UI ainda:** o slice entrega API + contrato. As
   telas de convite (admin) e de aceite (recepcionista) são slice próprio,
+  registrado em `docs/roadmap.md`.
+- **Gate de completar-perfil (D-157) tem UI:** guard no shell do web-personal +
+  tela `/completar-perfil`. Mobile ainda não consome `profileComplete` —
   registrado em `docs/roadmap.md`.
 - **RBAC fino continua fora do MVP** (spec §8). Hoje a fronteira "recepção nunca
   vê dado clínico" é sustentada pela FORMA — o seat não tem

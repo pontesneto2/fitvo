@@ -3,10 +3,12 @@ import {
   acceptedResultSchema,
   type AuthResult as AuthResultDto,
   authResultSchema,
+  completeProfileSchema,
   emailVerifiedResultSchema,
   forgotPasswordSchema,
   loginSchema,
   meResultSchema,
+  problemDetailsSchema,
   refreshResultSchema,
   refreshSchema,
   registerAcademySchema,
@@ -216,6 +218,49 @@ export function authRoutes(service: AuthApplicationService): FastifyPluginAsync 
       },
       async (request, reply) => {
         return reply.send(await service.getMe(extractBearerToken(request.headers.authorization)));
+      },
+    );
+
+    /**
+     * Gate de completar-perfil (spec §5) — a pessoa preenche o que falta e
+     * recebe o `/me` JA recalculado, sem precisar de um segundo round-trip
+     * para saber se destravou.
+     *
+     * PATCH, nao PUT: e preenchimento PARCIAL do que falta. Nao ha `:tenantId`
+     * de proposito — `Account` e a PESSOA (D-044), nao o papel; a mesma conta
+     * pode ter seats em varias empresas e o nascimento dela e um so. O Bearer
+     * ja diz de quem e a conta: ninguem completa o perfil de outra pessoa.
+     */
+    app.patch(
+      '/me/complete-profile',
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'Completa os campos faltantes do perfil (gate pos-login — spec §5)',
+          description:
+            'Preenche nascimento/WhatsApp de quem foi pre-cadastrado por terceiro sem esses ' +
+            'dados, e devolve o `/me` com `profileComplete` recalculado. Sao os campos do ' +
+            'MINIMO FUNCIONAL (D-157) — endereco NAO entra: saiu do minimo e vira pedido ' +
+            'contextual. Cada campo e validado com o MESMO rigor do cadastro (maioridade, ' +
+            'so digitos) — nao ha versao relaxada. Campos ausentes NAO sao zerados. Nao ' +
+            'regrava termos (D-025) nem altera documento/e-mail. Idempotente.',
+          security: [{ bearerAuth: [] }],
+          body: completeProfileSchema,
+          response: { 200: meResultSchema, 401: problemDetailsSchema },
+        },
+      },
+      async (request, reply) => {
+        return reply.send(
+          await service.completeProfile(extractBearerToken(request.headers.authorization), {
+            whatsapp: request.body.whatsapp,
+            // `YYYY-MM-DD` -> Date UTC midnight (calendario, sem hora) — mesma
+            // ponte do cadastro; o schema ja validou formato e maioridade.
+            birthDate:
+              request.body.birthDate === undefined
+                ? undefined
+                : new Date(`${request.body.birthDate}T00:00:00Z`),
+          }),
+        );
       },
     );
 

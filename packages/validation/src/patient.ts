@@ -1,6 +1,15 @@
 import { z } from 'zod';
 
-import { acceptedTerms } from './auth';
+import {
+  acceptedTerms,
+  addressSchema,
+  biologicalSexSchema,
+  birthDate,
+  genderSchema,
+  socialName,
+  strongPassword,
+  whatsapp,
+} from './auth';
 import { cpfOnlyRefine, documentDigits } from './document';
 
 /**
@@ -34,12 +43,38 @@ export const patientCreateInviteSchema = z.object({
   modality,
 });
 
+/**
+ * Aceite do convite de paciente — **campos COMPLETOS** (spec §4.6).
+ *
+ * Como o autocadastro de paciente não existe (D-135), este é o **ÚNICO**
+ * caminho de nascimento de conta de paciente: o que não for capturado aqui não
+ * é capturado em lugar nenhum. Por isso o aceite recolhe a pessoa inteira —
+ * nascimento, WhatsApp, endereço e sexo biológico —, e não só as credenciais.
+ *
+ * Consequência direta no gate (spec §5): o paciente nasce com o perfil
+ * **completo** e por isso **nunca** vê a tela de completar dados. Enquanto
+ * estes campos não existiam aqui, essa promessa da spec não tinha como se
+ * sustentar — o paciente entraria sem eles e cairia no gate que a spec diz que
+ * ele não vê.
+ */
 export const patientAcceptInviteSchema = z
   .object({
     token: z.string().min(1).describe('Token de uso unico recebido no convite.'),
-    password: z.string().min(8).describe('Senha em claro (mín. 8).'),
-    name: z.string().min(1),
+    password: strongPassword,
+    name: z.string().min(1).describe('Nome civil do paciente.'),
+    socialName,
+    gender: genderSchema.optional().describe('Gênero/identidade — opcional (spec §3.1).'),
+    /**
+     * Sexo biológico — OBRIGATÓRIO e capturado AQUI (spec §3.1/§4.6, v2.1):
+     * completo no MVP, não deferido para a anamnese. É base de cálculo
+     * metabólico/dosagem/faixa de referência, então precisa existir antes do
+     * primeiro atendimento — e o aceite é a única porta.
+     */
+    biologicalSex: biologicalSexSchema,
     document: documentDigits.describe('CPF do paciente — só dígitos (D-043).'),
+    whatsapp,
+    birthDate,
+    address: addressSchema,
     /**
      * Aceite dos termos (D-025). Unico caminho de nascimento de conta de
      * paciente (D-135 — ADR-0015): sem o autocadastro, o aceite de convite

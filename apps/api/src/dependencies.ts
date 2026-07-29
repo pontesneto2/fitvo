@@ -33,11 +33,16 @@ import { PrismaSpecialtyRepository } from './modules/specialty/prisma-specialty-
 import { SpecialtyApplicationService } from './modules/specialty/specialty-application-service';
 import { PrismaTermsRepository } from './modules/terms/prisma-terms-repository';
 import { TermsApplicationService } from './modules/terms/terms-application-service';
+import type { AccessTokenVerifier } from './shared/auth-context';
 
 /** Dependencias injetadas na app (permite trocar por fakes nos testes). */
 export interface AppDependencies {
   logLevel: string;
   corsOrigin: string;
+  /** Verificador de access token compartilhado (D-150) — mesma instancia (authCore)
+   *  ja reusada por todas as slices para requireAuth; o hook de contexto de
+   *  tenant (shared/tenant-context-hook.ts) NAO usa uma fonte nova. */
+  tokenVerifier: AccessTokenVerifier;
   authService: AuthApplicationService;
   clinicService: ClinicApplicationService;
   internService: InternApplicationService;
@@ -203,6 +208,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
   return {
     logLevel: env.LOG_LEVEL,
     corsOrigin: env.CORS_ORIGIN,
+    tokenVerifier: authCore,
     authService,
     clinicService,
     internService,

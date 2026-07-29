@@ -21,6 +21,7 @@ import { specialtyRoutes } from './modules/specialty/specialty-routes';
 import { termsRoutes } from './modules/terms/terms-routes';
 import { registerErrorHandler } from './shared/error-handler';
 import { zodAwareTransform } from './shared/openapi-transform';
+import { createTenantContextHook } from './shared/tenant-context-hook';
 
 function firstHeader(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -64,6 +65,11 @@ export async function buildApp(
     reply.header(REQUEST_ID_HEADER, req.id);
     done();
   });
+
+  // Contexto de tenant (D-150 — ADR-0017, Camada 1). Aditivo: so popula o
+  // contexto quando ha token valido + `:tenantId` no path; nao consome nada
+  // ainda (Slice 2 injeta o filtro na extension do Prisma).
+  app.addHook('onRequest', createTenantContextHook(deps.tokenVerifier));
 
   registerErrorHandler(app);
 

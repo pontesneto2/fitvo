@@ -1,9 +1,9 @@
+import { getTenantContext } from '@fitvo/database';
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it } from 'vitest';
 
 import { buildTestApp } from '../testing/build-test-app';
 import { validProfessionalRegistration } from '../testing/professional-registration-fixture';
-import { getTenantContext } from './tenant-context';
 
 /**
  * Rotas de sonda so para este teste: registradas diretamente na instancia da

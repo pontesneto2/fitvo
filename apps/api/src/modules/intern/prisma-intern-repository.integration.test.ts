@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
-import { type InternArea, PrismaClient } from '@fitvo/database';
+import {
+  type InternArea,
+  prisma as extendedPrisma,
+  PrismaClient,
+  runWithTenantContext,
+} from '@fitvo/database';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { hashInviteToken } from '../../shared/invite-token';
@@ -554,5 +559,42 @@ describe('aceite do estagiário (Fase B) contra Postgres real', () => {
     // E o convite continua utilizável: o estagiário não foi punido pela falha.
     const outcome = await repo.acceptInvite(hashInviteToken(token), internAccount(), ORIGIN);
     expect(outcome.status).toBe('accepted');
+  });
+});
+
+describe('D-151 (slice 2) — eligibleSupervisorWhere (predicado de relação aninhada) sob a extension', () => {
+  // Repositorio a parte, com o cliente EXTENDIDO (@fitvo/database `prisma`) —
+  // o `repo` do topo do arquivo usa um PrismaClient CRU de proposito (prova
+  // regra de schema, nao isolamento). Este describe prova especificamente
+  // que a extension NAO quebra nem enfraquece o predicado aninhado
+  // (`tenant: {...}` + `specialties: { some: {...} } }`) que ja filtra por
+  // tenantId manualmente (D-002) — a nota de implementacao do ADR-0017 pedia
+  // exatamente essa auditoria.
+  const extendedRepo = new PrismaInternRepository(extendedPrisma);
+
+  it('injecao da extension + eligibleSupervisorWhere juntos: continua achando o supervisor do PROPRIO tenant e nunca o de outro', async () => {
+    const a = await seedCompanyWithProvider({});
+    const b = await seedCompanyWithProvider({});
+
+    // Contexto de A aberto (D-150) — a extension vai injetar tenantId=A em
+    // QUALQUER query de professionalProfile feita por dentro deste callback,
+    // por cima do filtro manual que eligibleSupervisorWhere ja aplica.
+    const supervisorsAsA = await runWithTenantContext(a.tenantId, async () =>
+      extendedRepo.listEligibleSupervisors(a.tenantId, 'EDUCACAO_FISICA'),
+    );
+    expect(supervisorsAsA).toHaveLength(1);
+    expect(supervisorsAsA[0]!.professionalProfileId).toBe(a.professionalProfileId);
+
+    const eligibleAsA = await runWithTenantContext(a.tenantId, async () =>
+      extendedRepo.isEligibleSupervisor(a.tenantId, 'EDUCACAO_FISICA', b.professionalProfileId),
+    );
+    expect(eligibleAsA).toBe(false);
+
+    // Contexto de B aberto — simetria: B nunca ve o supervisor de A.
+    const supervisorsAsB = await runWithTenantContext(b.tenantId, async () =>
+      extendedRepo.listEligibleSupervisors(b.tenantId, 'EDUCACAO_FISICA'),
+    );
+    expect(supervisorsAsB).toHaveLength(1);
+    expect(supervisorsAsB[0]!.professionalProfileId).toBe(b.professionalProfileId);
   });
 });

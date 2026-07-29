@@ -1,8 +1,8 @@
+import { runWithTenantContext } from '@fitvo/database';
 import type { FastifyRequest, onRequestHookHandler } from 'fastify';
 
 import type { AccessTokenVerifier } from './auth-context';
 import { extractBearerToken } from './auth-context';
-import { runWithTenantContext } from './tenant-context';
 
 /**
  * Le o `tenantId` da MESMA fonte que cada rota ja usa hoje para autorizacao:

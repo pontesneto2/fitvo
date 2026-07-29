@@ -1,5 +1,5 @@
 import type { PasswordHasher } from '@fitvo/auth';
-import type { ClinicRole, DocumentType, Gender, InviteStatus } from '@fitvo/database';
+import type { ClinicRole, DocumentType, Gender, InternArea, InviteStatus } from '@fitvo/database';
 
 import type {
   AccessTokenVerifier,
@@ -43,6 +43,7 @@ export interface InternInviteView {
   id: string;
   email: string;
   name: string | null;
+  area: InternArea;
   status: InviteStatus;
   supervisorProfessionalProfileId: string;
   expiresAt: string;
@@ -59,9 +60,10 @@ export interface InternCreateInviteResult {
   token: string;
 }
 
-/** Payload da Fase A: e-mail, nome opcional e o RESPONSÁVEL (obrigatório). */
+/** Payload da Fase A: e-mail, ÁREA, nome opcional e o RESPONSÁVEL (obrigatório). */
 export interface InternCreateInviteBody {
   email: string;
+  area: InternArea;
   name?: string | undefined;
   supervisorProfessionalProfileId: string;
 }
@@ -93,6 +95,8 @@ export interface InternAcceptInviteResult {
      * rótulo existe no CONTRATO, para quem consome a API distinguir seats.
      */
     seatType: 'STUDENT_INTERN';
+    /** Área de estágio, vinda do convite (D-143). */
+    area: InternArea;
     supervisorProfessionalProfileId: string;
   };
   created: boolean;
@@ -107,6 +111,7 @@ function toInviteView(invite: InternInviteRecord): InternInviteView {
     id: invite.id,
     email: invite.email,
     name: invite.name,
+    area: invite.area,
     status: invite.status,
     supervisorProfessionalProfileId: invite.supervisorProfessionalProfileId,
     expiresAt: invite.expiresAt.toISOString(),
@@ -148,9 +153,10 @@ export class InternApplicationService {
   async listEligibleSupervisors(
     authorization: string | undefined,
     tenantId: string,
+    area: InternArea,
   ): Promise<InternSupervisorListResult> {
-    await this.requireAcademyAdmin(authorization, tenantId);
-    return { supervisors: await this.interns.listEligibleSupervisors(tenantId) };
+    await this.requireCompanyAdmin(authorization, tenantId);
+    return { supervisors: await this.interns.listEligibleSupervisors(tenantId, area) };
   }
 
   /**
@@ -163,15 +169,22 @@ export class InternApplicationService {
     tenantId: string,
     input: InternCreateInviteBody,
   ): Promise<InternCreateInviteResult> {
-    const ctx = await this.requireAcademyAdmin(authorization, tenantId);
+    const ctx = await this.requireCompanyAdmin(authorization, tenantId);
     await requireVerifiedEmail(this.emailVerification, ctx.accountId);
     await requireCurrentTermsAcceptance(this.termsAcceptance, ctx.accountId, 'TERMS_OF_USE');
     await requireCurrentTermsAcceptance(this.termsAcceptance, ctx.accountId, 'PRIVACY_POLICY');
 
-    // Responsável elegível NESTE tenant (D-142) — o guard também barra apontar
-    // para profissional de outro tenant (isolamento — D-002).
+    // Responsável elegível NESTE tenant, PARA ESTA ÁREA (D-142/D-143). É dado de
+    // OUTRO registro (o conselho do supervisor), então o Zod não alcança: a
+    // checagem é contra o banco. Barra três coisas de uma vez — profissional de
+    // outro tenant (isolamento — D-002), conselho de outra área (um CREF não
+    // supervisiona estagiário de nutrição) e conselho em branco.
     if (
-      !(await this.interns.isEligibleSupervisor(tenantId, input.supervisorProfessionalProfileId))
+      !(await this.interns.isEligibleSupervisor(
+        tenantId,
+        input.area,
+        input.supervisorProfessionalProfileId,
+      ))
     ) {
       throw new IneligibleSupervisorError();
     }
@@ -186,6 +199,7 @@ export class InternApplicationService {
     const invite = await this.interns.createInvite({
       tenantId,
       email: input.email,
+      area: input.area,
       name: input.name,
       tokenHash: hashInviteToken(token),
       expiresAt,
@@ -230,21 +244,26 @@ export class InternApplicationService {
         accountId: outcome.accountId,
         tenantId: outcome.tenantId,
         seatType: 'STUDENT_INTERN',
+        area: outcome.area,
         supervisorProfessionalProfileId: outcome.supervisorProfessionalProfileId,
       },
       created: outcome.created,
     };
   }
 
-  /** Guard de admin (RBAC — D-013): Bearer válido + CLINIC_ADMIN do tenant. */
-  private async requireAcademyAdmin(
+  /**
+   * Guard de admin (RBAC — D-013): Bearer válido + CLINIC_ADMIN do tenant. Vale
+   * para clínica e academia — a membership de admin de empresa é a mesma nas
+   * duas verticais, e desde D-143 o seat de estagiário existe nas duas.
+   */
+  private async requireCompanyAdmin(
     authorization: string | undefined,
     tenantId: string,
   ): Promise<AuthContext> {
     const ctx = await requireAuth(this.tokenVerifier, authorization);
     const membership = await this.memberships.findMembership(ctx.accountId, tenantId);
     if (!membership || membership.role !== 'CLINIC_ADMIN') {
-      throw new ForbiddenError('Requer admin desta academia.');
+      throw new ForbiddenError('Requer admin desta empresa.');
     }
     return ctx;
   }

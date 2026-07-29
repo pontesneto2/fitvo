@@ -1,4 +1,5 @@
-import type { BrazilianState, InviteStatus, SpecialtyCode } from '@fitvo/database';
+import type { BrazilianState, InternArea, InviteStatus, SpecialtyCode } from '@fitvo/database';
+import { SUPERVISOR_SPECIALTY_CODES_BY_AREA } from '@fitvo/validation';
 
 import { recordInitialTermsAcceptanceInMemory } from '../terms/initial-terms-acceptance';
 import type { RequestOrigin, TermsRepository } from '../terms/terms-repository';
@@ -16,6 +17,7 @@ interface StoredInvite {
   tenantId: string;
   email: string;
   name: string | null;
+  area: InternArea;
   status: InviteStatus;
   tokenHash: string;
   expiresAt: Date;
@@ -33,6 +35,7 @@ export interface StoredInternProfile {
   id: string;
   accountId: string;
   tenantId: string;
+  area: InternArea;
   supervisorProfessionalProfileId: string;
 }
 
@@ -40,7 +43,7 @@ export interface SeedSupervisorInput {
   tenantId: string;
   accountId?: string;
   displayName?: string;
-  /** Conselho do responsavel. CREF por padrao — o unico elegivel (D-142). */
+  /** Conselho do responsavel. CREF por padrao (area de educacao fisica — D-143). */
   specialtyCode?: SpecialtyCode;
   councilDocument?: string;
   councilState?: BrazilianState;
@@ -98,16 +101,22 @@ export class InMemoryInternRepository implements InternRepository {
 
   // --- InternRepository ---
 
-  listEligibleSupervisors(tenantId: string): Promise<InternSupervisorRecord[]> {
+  listEligibleSupervisors(tenantId: string, area: InternArea): Promise<InternSupervisorRecord[]> {
     const rows = [...this.supervisors.values()]
-      .filter((s) => s.tenantId === tenantId)
+      .filter((s) => s.tenantId === tenantId && this.matchesArea(s.specialtyCode, area))
       .map(({ tenantId: _tenantId, ...view }) => view);
     return Promise.resolve(rows);
   }
 
-  isEligibleSupervisor(tenantId: string, professionalProfileId: string): Promise<boolean> {
+  isEligibleSupervisor(
+    tenantId: string,
+    area: InternArea,
+    professionalProfileId: string,
+  ): Promise<boolean> {
     const supervisor = this.supervisors.get(professionalProfileId);
-    return Promise.resolve(supervisor?.tenantId === tenantId);
+    return Promise.resolve(
+      supervisor?.tenantId === tenantId && this.matchesArea(supervisor.specialtyCode, area),
+    );
   }
 
   createInvite(input: CreateInternInviteInput): Promise<InternInviteRecord> {
@@ -116,6 +125,7 @@ export class InMemoryInternRepository implements InternRepository {
       tenantId: input.tenantId,
       email: input.email,
       name: input.name ?? null,
+      area: input.area,
       status: 'PENDING',
       tokenHash: input.tokenHash,
       expiresAt: input.expiresAt,
@@ -162,6 +172,7 @@ export class InMemoryInternRepository implements InternRepository {
         status: 'accepted',
         tenantId: invite.tenantId,
         accountId: existingId,
+        area: invite.area,
         supervisorProfessionalProfileId: invite.supervisorProfessionalProfileId,
         created: false,
       };
@@ -176,6 +187,7 @@ export class InMemoryInternRepository implements InternRepository {
       status: 'accepted',
       tenantId: invite.tenantId,
       accountId,
+      area: invite.area,
       supervisorProfessionalProfileId: invite.supervisorProfessionalProfileId,
       created: true,
     };
@@ -183,11 +195,17 @@ export class InMemoryInternRepository implements InternRepository {
 
   // --- helpers privados ---
 
+  /** MESMO mapa do contrato (D-143) — nunca uma segunda tabela area->conselho. */
+  private matchesArea(specialtyCode: SpecialtyCode, area: InternArea): boolean {
+    return (SUPERVISOR_SPECIALTY_CODES_BY_AREA[area] as readonly string[]).includes(specialtyCode);
+  }
+
   private attachInternProfile(accountId: string, invite: StoredInvite): void {
     const profile: StoredInternProfile = {
       id: this.nextId('ip'),
       accountId,
       tenantId: invite.tenantId,
+      area: invite.area,
       supervisorProfessionalProfileId: invite.supervisorProfessionalProfileId,
     };
     this.internProfiles.set(profile.id, profile);

@@ -149,6 +149,22 @@ enum ClinicRole {
   CLINIC_ADMIN // admin de clinica (visao ampla, dado operacional; nunca clinico)
 }
 
+/// Area de estagio (D-143). O estagiario NAO tem conselho proprio (e estudante,
+/// em qualquer area) — declara a AREA em que estuda, e a area determina QUAL
+/// conselho o responsavel precisa ter:
+///   EDUCACAO_FISICA -> CREF (TRAINING/PERSONAL_TRAINER)
+///   NUTRICAO        -> CRN  (NUTRITION)
+///   MEDICINA        -> CRM  (MEDICINE)
+/// O mapa vive no contrato (@fitvo/validation, SUPERVISOR_SPECIALTY_CODES_BY_AREA):
+/// servidor e UI precisam concordar sobre quem pode supervisionar o que.
+/// NAO se confunde com SpecialtyCode: aquele e a profissao de quem JA tem
+/// registro; esta e a area de quem ainda ESTUDA.
+enum InternArea {
+  EDUCACAO_FISICA
+  NUTRICAO
+  MEDICINA
+}
+
 enum InviteStatus {
   PENDING // aguardando aceite do profissional
   ACCEPTED // aceito: profissional vinculado a clinica
@@ -541,6 +557,12 @@ model ProfessionalInvite {
 /// exercicio ilegal da profissao se solto (art. 47 DL 3.688/1941). onDelete
 /// Restrict no supervisor: nao se apaga o responsavel por baixo de um estagiario.
 ///
+/// D-143: o seat existe em QUALQUER tenant-empresa (CLINIC ou ACADEMIA). Nao e a
+/// vertical do tenant que decide quem pode ter estagiario — e o CONSELHO do
+/// responsavel bater com a `area` do estagiario. Uma clinica com um CREF no
+/// quadro pode ter estagiario de educacao fisica; uma academia com um CRN, de
+/// nutricao.
+///
 /// DERIVACAO CONGELADA (D-142): a capacidade do estagiario DERIVA do conselho
 /// ativo do supervisor — nao ha capacidade propria, nem copia do CREF aqui. Se o
 /// supervisor perde o vinculo/o conselho, o estagiario perde a capacidade. A
@@ -549,13 +571,18 @@ model ProfessionalInvite {
 /// "Ativo" hoje = conselho PREENCHIDO em formato (D-138); a verificacao de
 /// registro ativo de verdade segue deferida — TODO(D-010).
 model InternProfile {
-  id                              String @id @default(cuid())
-  accountId                       String @unique
-  /// Academia a que o estagiario pertence (escopo de tenant obrigatorio — D-002).
+  id                              String     @id @default(cuid())
+  accountId                       String     @unique
+  /// Empresa (CLINIC ou ACADEMIA) a que o estagiario pertence (escopo de tenant
+  /// obrigatorio — D-002).
   tenantId                        String
-  /// Responsavel: profissional de CREF (TRAINING/PERSONAL_TRAINER) do MESMO
-  /// tenant. A elegibilidade (CREF + mesmo tenant) e checada na aplicacao no
-  /// momento do convite; a FK garante que o alvo existe e nao some depois.
+  /// Area de estagio (D-143), fixada no CONVITE — o estagiario nao escolhe, do
+  /// mesmo jeito que nao escolhe o responsavel. E o que substitui o conselho
+  /// proprio, que ele NAO tem em area nenhuma.
+  area                            InternArea
+  /// Responsavel: profissional do MESMO tenant com o conselho correspondente a
+  /// `area` (D-143). A elegibilidade e checada na aplicacao no momento do
+  /// convite; a FK garante que o alvo existe e nao some depois.
   supervisorProfessionalProfileId String
 
   displayName String?
@@ -571,7 +598,7 @@ model InternProfile {
   @@map("intern_profile")
 }
 
-/// Convite academia->estagiario (Fase A — D-142). Distinto do
+/// Convite empresa->estagiario (Fase A — D-142/D-143). Distinto do
 /// ProfessionalInvite: NAO carrega especialidade nem conselho (o estagiario nao
 /// tem conselho) e CARREGA o responsavel, NOT NULL — a mesma regra do
 /// InternProfile aplicada uma etapa antes, para que nem o convite consiga
@@ -585,6 +612,10 @@ model InternInvite {
   /// Nome informado pela academia no pre-cadastro — facilita o convite. O nome
   /// definitivo (civil) vem no aceite, da propria pessoa.
   name     String?
+
+  /// Area de estagio definida pela empresa (D-143). Viaja no convite junto do
+  /// responsavel: os dois sao decisao da empresa, nao do estagiario.
+  area InternArea
 
   status                          InviteStatus @default(PENDING)
   tokenHash                       String       @unique

@@ -194,4 +194,4 @@ jobs:
         run: |
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz" | tar -xz gitleaks
       - name: Scan for secrets (full history)
-        run: ./gitleaks detect --source . --redact -v --config .gitleaks.toml
+        run: ./gitleaks git . --redact -v --config .gitleaks.toml

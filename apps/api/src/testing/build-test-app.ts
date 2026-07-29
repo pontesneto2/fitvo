@@ -197,6 +197,7 @@ export function buildTestDependencies(): TestDependencies {
     deps: {
       logLevel: 'silent',
       corsOrigin: '*',
+      tokenVerifier: authCore,
       authService,
       clinicService,
       internService,

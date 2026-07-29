@@ -1,6 +1,5 @@
+import { getTenantContext, runWithTenantContext } from '@fitvo/database';
 import { describe, expect, it } from 'vitest';
-
-import { getTenantContext, runWithTenantContext } from './tenant-context';
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -271,6 +271,7 @@ model Account {
 
   professionalProfile   ProfessionalProfile?
   internProfile         InternProfile? // seat de estagiario supervisionado (D-142)
+  receptionProfile      ReceptionProfile? // seat administrativo de recepcao (D-156)
   patientProfile        PatientProfile?
   platformAdmin         PlatformAdmin?
   clinicMemberships     ClinicMembership[]
@@ -341,30 +342,32 @@ model Tenant {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  professionals   ProfessionalProfile[]
-  interns         InternProfile[] // seats de estagiario da academia (D-142)
-  memberships     ClinicMembership[]
-  invites         ProfessionalInvite[]
-  internInvites   InternInvite[]
-  patientInvites  PatientInvite[]
-  bonds           Bond[]
-  paymentAccount  PaymentAccount? // subconta Asaas + taxa por tenant (ADR-0004/D-058)
-  subscriptions   Subscription[] // assinaturas de plano da plataforma (Fluxo A)
-  charges         Charge[] // cobrancas paciente->profissional (Fluxo B, via split)
-  workoutPlans    WorkoutPlan[] // planos de treino escopados ao tenant (ADR-0009)
-  workouts        Workout[] // conteudo de treino escopado ao tenant (ADR-0006)
-  workoutSessions WorkoutSession[] // execucoes escopadas ao tenant (ADR-0009)
-  formAnalyses    FormAnalysis[] // analises de forma escopadas ao tenant (ADR-0009)
-  mealPlans       MealPlan[] // conteudo de nutricao escopado ao tenant (ADR-0006)
-  mealLogs        MealLog[] // registros de refeicao escopados ao tenant (D-118 — ADR-0013)
-  encounters      Encounter[] // atendimentos escopados ao tenant (ADR-0006)
-  medicalRecords  MedicalRecord[] // prontuarios escopados ao tenant (ADR-0006)
-  prescriptions   Prescription[] // folhas de receita escopadas ao tenant (ADR-0006)
-  anamneses       Anamnesis[] // anamneses escopadas ao tenant (ADR-0010)
-  assessments     Assessment[] // avaliacao/medidas escopadas ao tenant (ADR-0006)
-  progressPhotos  ProgressPhoto[] // fotos de evolucao escopadas ao tenant (ADR-0006)
-  attendances     Attendance[] // atendimentos (ticket) escopados ao tenant (ADR-0010)
-  appointments    Appointment[] // agendamentos escopados ao tenant (ADR-0012)
+  professionals    ProfessionalProfile[]
+  interns          InternProfile[] // seats de estagiario da academia (D-142)
+  receptionists    ReceptionProfile[] // seats administrativos de recepcao (D-156)
+  memberships      ClinicMembership[]
+  invites          ProfessionalInvite[]
+  internInvites    InternInvite[]
+  receptionInvites ReceptionInvite[]
+  patientInvites   PatientInvite[]
+  bonds            Bond[]
+  paymentAccount   PaymentAccount? // subconta Asaas + taxa por tenant (ADR-0004/D-058)
+  subscriptions    Subscription[] // assinaturas de plano da plataforma (Fluxo A)
+  charges          Charge[] // cobrancas paciente->profissional (Fluxo B, via split)
+  workoutPlans     WorkoutPlan[] // planos de treino escopados ao tenant (ADR-0009)
+  workouts         Workout[] // conteudo de treino escopado ao tenant (ADR-0006)
+  workoutSessions  WorkoutSession[] // execucoes escopadas ao tenant (ADR-0009)
+  formAnalyses     FormAnalysis[] // analises de forma escopadas ao tenant (ADR-0009)
+  mealPlans        MealPlan[] // conteudo de nutricao escopado ao tenant (ADR-0006)
+  mealLogs         MealLog[] // registros de refeicao escopados ao tenant (D-118 — ADR-0013)
+  encounters       Encounter[] // atendimentos escopados ao tenant (ADR-0006)
+  medicalRecords   MedicalRecord[] // prontuarios escopados ao tenant (ADR-0006)
+  prescriptions    Prescription[] // folhas de receita escopadas ao tenant (ADR-0006)
+  anamneses        Anamnesis[] // anamneses escopadas ao tenant (ADR-0010)
+  assessments      Assessment[] // avaliacao/medidas escopadas ao tenant (ADR-0006)
+  progressPhotos   ProgressPhoto[] // fotos de evolucao escopadas ao tenant (ADR-0006)
+  attendances      Attendance[] // atendimentos (ticket) escopados ao tenant (ADR-0010)
+  appointments     Appointment[] // agendamentos escopados ao tenant (ADR-0012)
 
   @@map("tenant")
 }
@@ -632,6 +635,76 @@ model InternInvite {
   @@index([tenantId, status])
   @@index([supervisorProfessionalProfileId])
   @@map("intern_invite")
+}
+
+// ---------------------------------------------------------------------------
+// Seat administrativo de RECEPCAO (D-156 — ADR-0015, spec §2/§4.5)
+// ---------------------------------------------------------------------------
+
+/// Seat ADMINISTRATIVO de recepcao. Pre-cadastrado por convite do admin da
+/// empresa (CLINIC ou ACADEMIA); nunca por autocadastro (spec §1).
+///
+/// NAO ATENDE. Recepcao opera agenda e cadastro — dado OPERACIONAL (D-015) —, e
+/// NUNCA acessa dado clinico (anamnese, avaliacao, prontuario, prescricao). Por
+/// isso o modelo nao tem conselho, nem especialidade, nem supervisor: os tres
+/// existem para quem atende, e representa-los aqui sugeriria uma capacidade
+/// clinica que este seat nao tem.
+///
+/// SEM coluna `seatType`: a existencia da linha JA e o fato (mesma doutrina de
+/// InternProfile — D-103, duas representacoes do mesmo estado divergem). O
+/// rotulo `RECEPTION` vive no DTO, em @fitvo/validation.
+///
+/// SEM ClinicMembership: a membership so tem o papel CLINIC_ADMIN, entao dar
+/// uma a recepcao lhe daria poder de admin da empresa — exatamente o oposto de
+/// um seat administrativo restrito. O vinculo da recepcao com o tenant E esta
+/// linha.
+model ReceptionProfile {
+  id String @id @default(cuid())
+
+  accountId String @unique
+  /// Empresa (CLINIC ou ACADEMIA) a que a recepcao pertence (escopo de tenant
+  /// obrigatorio — D-002).
+  tenantId  String
+
+  displayName String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// Restrict como no InternProfile: apagar a empresa nao pode apagar em
+  /// silencio o registro de quem trabalhou nela.
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@map("reception_profile")
+}
+
+/// Convite admin->recepcao (Fase A — D-156). Mesmo molde do InternInvite, MENOS
+/// area e responsavel: recepcao nao estagia sob ninguem. Token de uso unico
+/// guardado SO como hash (mesma disciplina de ProfessionalInvite/InternInvite);
+/// expira e e revogavel pelo admin.
+model ReceptionInvite {
+  id       String  @id @default(cuid())
+  tenantId String
+  email    String
+  /// Nome informado pela empresa no pre-cadastro — facilita o convite. O nome
+  /// definitivo (civil) vem no aceite, da propria pessoa.
+  name     String?
+
+  status    InviteStatus @default(PENDING)
+  tokenHash String       @unique
+  expiresAt DateTime     @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  /// Cascade como no InternInvite: convite e registro TRANSITORIO (e-mail +
+  /// hash de token), nao prova de nada — some com a empresa.
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("reception_invite")
 }
 
 // ---------------------------------------------------------------------------

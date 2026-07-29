@@ -158,6 +158,19 @@ export class InternProfileConflictError extends AppError {
 }
 
 /**
+ * A conta ja possui um seat de recepcao (1:1 conta<->seat — D-156).
+ */
+export class ReceptionProfileConflictError extends AppError {
+  readonly status = 409;
+  readonly problemType = 'https://fitvo.dev/problems/reception-exists';
+  readonly title = 'Conta ja e recepcao';
+  constructor() {
+    super('Esta conta ja possui um seat de recepcao.');
+    this.name = 'ReceptionProfileConflictError';
+  }
+}
+
+/**
  * O responsavel indicado nao pode supervisionar estagiario NESTE tenant (D-142):
  * nao e do tenant, nao tem CREF (TRAINING/PERSONAL_TRAINER) ou esta sem conselho
  * preenchido. Estagiario sem responsavel valido nao existe — o convite nao nasce.

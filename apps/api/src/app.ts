@@ -16,6 +16,7 @@ import { consentRoutes } from './modules/consent/consent-routes';
 import { internRoutes } from './modules/intern/intern-routes';
 import { nutritionRoutes } from './modules/nutrition/nutrition-routes';
 import { patientRoutes } from './modules/patient/patient-routes';
+import { receptionRoutes } from './modules/reception/reception-routes';
 import { specialtyRoutes } from './modules/specialty/specialty-routes';
 import { termsRoutes } from './modules/terms/terms-routes';
 import { registerErrorHandler } from './shared/error-handler';
@@ -90,6 +91,7 @@ export async function buildApp(
   await app.register(authRoutes(deps.authService), { prefix: '/v1/auth' });
   await app.register(clinicRoutes(deps.clinicService), { prefix: '/v1/clinic' });
   await app.register(internRoutes(deps.internService), { prefix: '/v1/interns' });
+  await app.register(receptionRoutes(deps.receptionService), { prefix: '/v1/reception' });
   await app.register(patientRoutes(deps.patientService), { prefix: '/v1/patients' });
   await app.register(consentRoutes(deps.consentService), { prefix: '/v1/consents' });
   await app.register(termsRoutes(deps.termsService), { prefix: '/v1/terms' });

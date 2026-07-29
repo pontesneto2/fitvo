@@ -27,6 +27,8 @@ import { NutritionApplicationService } from './modules/nutrition/nutrition-appli
 import { PrismaNutritionRepository } from './modules/nutrition/prisma-nutrition-repository';
 import { PatientApplicationService } from './modules/patient/patient-application-service';
 import { PrismaPatientRepository } from './modules/patient/prisma-patient-repository';
+import { PrismaReceptionRepository } from './modules/reception/prisma-reception-repository';
+import { ReceptionApplicationService } from './modules/reception/reception-application-service';
 import { PrismaSpecialtyRepository } from './modules/specialty/prisma-specialty-repository';
 import { SpecialtyApplicationService } from './modules/specialty/specialty-application-service';
 import { PrismaTermsRepository } from './modules/terms/prisma-terms-repository';
@@ -39,6 +41,7 @@ export interface AppDependencies {
   authService: AuthApplicationService;
   clinicService: ClinicApplicationService;
   internService: InternApplicationService;
+  receptionService: ReceptionApplicationService;
   patientService: PatientApplicationService;
   consentService: ConsentApplicationService;
   termsService: TermsApplicationService;
@@ -149,6 +152,19 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     accountRepository,
     termsService,
   );
+  // Seat administrativo de recepcao (D-156). Mesma composicao do estagiario: o
+  // PrismaClinicRepository serve de ClinicAdminLookup (interface estreita) e o
+  // TTL de convite e o mesmo do profissional — recepcao entra pela mesma porta
+  // de convite, so que sem conselho, especialidade nem responsavel.
+  const receptionService = new ReceptionApplicationService(
+    new PrismaReceptionRepository(prisma),
+    clinicRepository,
+    passwordHasher,
+    authCore,
+    env.PROFESSIONAL_INVITE_TTL_SECONDS,
+    accountRepository,
+    termsService,
+  );
   // authCore satisfaz AccessTokenVerifier — a slice de paciente reusa o mesmo
   // verificador de access token da slice de auth para o guard do profissional.
   const patientService = new PatientApplicationService(
@@ -190,6 +206,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     authService,
     clinicService,
     internService,
+    receptionService,
     patientService,
     consentService,
     termsService,

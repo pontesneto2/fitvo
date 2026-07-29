@@ -18,5 +18,6 @@ export * from './errors';
 export * from './intern';
 export * from './nutrition';
 export * from './patient';
+export * from './reception';
 export * from './specialty';
 export * from './terms';

@@ -2664,6 +2664,490 @@
         }
       }
     },
+    "/v1/reception/{tenantId}/invites": {
+      "post": {
+        "summary": "Pre-cadastra uma recepcionista (Fase A — admin)",
+        "tags": [
+          "reception"
+        ],
+        "description": "Cria um convite de uso unico para um seat ADMINISTRATIVO (D-156). Recepcao nao atende: nao ha profissao, conselho, especialidade nem responsavel no convite. Requer CLINIC_ADMIN do tenant e e-mail verificado (D-029). Devolve o token em claro UMA vez; o banco guarda apenas o hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+                    "description": "E-mail da recepcionista convidada."
+                  },
+                  "name": {
+                    "description": "Nome informado pela empresa — facilita o convite; o civil vem no aceite.",
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "description": "ID do tenant da empresa (clínica ou academia)."
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "invite": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "PENDING",
+                            "ACCEPTED",
+                            "EXPIRED",
+                            "REVOKED"
+                          ]
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name",
+                        "status",
+                        "expiresAt",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "token": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "invite",
+                    "token"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reception/invites/accept": {
+      "post": {
+        "summary": "Aceita o convite de recepcao (Fase B — publico, por token)",
+        "tags": [
+          "reception"
+        ],
+        "description": "Cria a conta (se nova) OU vincula o seat a conta existente, sempre no tenant DO CONVITE. Campos completos (nascimento, endereco, WhatsApp) — por isso o seat nasce sem pendencia no gate de completar-perfil (spec §5). Grava o aceite dos termos (D-025) so no ramo de conta nova. O token de uso unico e a autorizacao; nao requer Bearer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Token de uso único recebido no convite."
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "allOf": [
+                      {
+                        "type": "string",
+                        "pattern": "[A-Za-z]"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\d"
+                      }
+                    ],
+                    "description": "Senha em claro — mín. 8, ao menos 1 letra e 1 número."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Nome civil da recepcionista."
+                  },
+                  "socialName": {
+                    "description": "Nome social (exibido no lugar do civil quando preenchido) — spec §3.1.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "gender": {
+                    "description": "Gênero/identidade — opcional (spec §3.1).",
+                    "type": "string",
+                    "enum": [
+                      "MULHER_CIS",
+                      "HOMEM_CIS",
+                      "MULHER_TRANS",
+                      "HOMEM_TRANS",
+                      "NAO_BINARIO",
+                      "OUTRO",
+                      "PREFIRO_NAO_INFORMAR"
+                    ]
+                  },
+                  "document": {
+                    "type": "string",
+                    "pattern": "^\\d+$",
+                    "description": "CPF ou CNPJ, só dígitos (D-043)."
+                  },
+                  "documentType": {
+                    "type": "string",
+                    "enum": [
+                      "CPF",
+                      "CNPJ"
+                    ]
+                  },
+                  "whatsapp": {
+                    "type": "string",
+                    "pattern": "^\\d{11}$",
+                    "description": "WhatsApp — 11 dígitos (DDD + celular), só números (máscara é UI)."
+                  },
+                  "birthDate": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                    "description": "Data de nascimento (YYYY-MM-DD) — maioridade obrigatória (D-044)."
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "cep": {
+                        "type": "string",
+                        "pattern": "^\\d{8}$",
+                        "description": "CEP — 8 dígitos, só números (máscara é UI)."
+                      },
+                      "logradouro": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "numero": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "complemento": {
+                        "type": "string"
+                      },
+                      "bairro": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "cidade": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "AC",
+                          "AL",
+                          "AM",
+                          "AP",
+                          "BA",
+                          "CE",
+                          "DF",
+                          "ES",
+                          "GO",
+                          "MA",
+                          "MG",
+                          "MS",
+                          "MT",
+                          "PA",
+                          "PB",
+                          "PE",
+                          "PI",
+                          "PR",
+                          "RJ",
+                          "RN",
+                          "RO",
+                          "RR",
+                          "RS",
+                          "SC",
+                          "SE",
+                          "SP",
+                          "TO"
+                        ],
+                        "description": "UF do endereço."
+                      },
+                      "country": {
+                        "default": "BR",
+                        "description": "País do endereço (default BR).",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "cep",
+                      "logradouro",
+                      "numero",
+                      "bairro",
+                      "cidade",
+                      "state"
+                    ],
+                    "description": "Endereço da pessoa (D-044)."
+                  },
+                  "acceptedTerms": {
+                    "type": "object",
+                    "properties": {
+                      "termsOfUse": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ],
+                        "description": "Aceite explícito dos Termos de Uso."
+                      },
+                      "privacyPolicy": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ],
+                        "description": "Aceite explícito da Política de Privacidade."
+                      }
+                    },
+                    "required": [
+                      "termsOfUse",
+                      "privacyPolicy"
+                    ],
+                    "description": "Aceite dos termos no cadastro (D-025) — ambos obrigatoriamente `true`."
+                  }
+                },
+                "required": [
+                  "token",
+                  "password",
+                  "name",
+                  "document",
+                  "documentType",
+                  "whatsapp",
+                  "birthDate",
+                  "address",
+                  "acceptedTerms"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "reception": {
+                      "type": "object",
+                      "properties": {
+                        "accountId": {
+                          "type": "string"
+                        },
+                        "tenantId": {
+                          "type": "string"
+                        },
+                        "seatType": {
+                          "type": "string",
+                          "enum": [
+                            "RECEPTION"
+                          ],
+                          "description": "Tipo de seat — recepção administrativa (D-156)."
+                        }
+                      },
+                      "required": [
+                        "accountId",
+                        "tenantId",
+                        "seatType"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "created": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "reception",
+                    "created"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/patients/{tenantId}/invites": {
       "post": {
         "summary": "Convida um paciente para uma especialidade (profissional)",

@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
-import { AddressFields } from '@/components/address-fields';
 import { type CompleteProfileFormInput, completeProfileFormSchema } from '@/lib/auth';
 import { maskDateBr, maskPhone } from '@/lib/masks';
 import { useMe } from '@/lib/use-me';
@@ -22,10 +21,15 @@ import { zodResolver } from '@/lib/zod-resolver';
  * escapatória — sair daqui é completar. O `profileComplete` que decide vem
  * DERIVADO do servidor; esta tela nunca refaz essa conta.
  *
- * Os campos são exatamente os que faltam a esse público (§4.4): nascimento,
- * WhatsApp e endereço. Documento, e-mail e termos ficam de fora — os dois
- * primeiros são identidade (não "dado faltando") e o terceiro já foi aceito no
- * convite (D-025).
+ * Os campos são exatamente o MÍNIMO FUNCIONAL (D-157): nascimento e WhatsApp.
+ * **Endereço não entra** — saiu do mínimo (o admin gestor não tem endereço
+ * pessoal, e ele não é necessário a todo papel) e vira pedido CONTEXTUAL no
+ * fluxo que precisar dele. Pedi-lo aqui reintroduziria, na tela, a trava que a
+ * decisão tirou da regra.
+ *
+ * Documento, e-mail e termos também ficam de fora: os dois primeiros são
+ * identidade (não "dado faltando") e o terceiro já foi aceito no convite
+ * (D-025).
  */
 export default function CompletarPerfilPage(): ReactNode {
   const router = useRouter();
@@ -34,18 +38,13 @@ export default function CompletarPerfilPage(): ReactNode {
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
-    control,
     register,
     setValue,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<CompleteProfileFormInput>({
     resolver: zodResolver(completeProfileFormSchema),
-    defaultValues: {
-      whatsapp: '',
-      birthDate: '',
-      address: { cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '' },
-    },
+    defaultValues: { whatsapp: '', birthDate: '' },
   });
 
   const onSubmit = handleSubmit(async (values) => {
@@ -57,16 +56,6 @@ export default function CompletarPerfilPage(): ReactNode {
       body: JSON.stringify({
         whatsapp: onlyDigits(values.whatsapp),
         birthDate: toIsoDate(values.birthDate),
-        address: {
-          cep: onlyDigits(values.address.cep),
-          logradouro: values.address.logradouro,
-          numero: values.address.numero,
-          ...(values.address.complemento ? { complemento: values.address.complemento } : {}),
-          bairro: values.address.bairro,
-          cidade: values.address.cidade,
-          state: values.address.state,
-          country: 'BR',
-        },
       }),
     });
     if (!res.ok) {
@@ -111,8 +100,6 @@ export default function CompletarPerfilPage(): ReactNode {
             })}
           />
         </Field>
-
-        <AddressFields control={control} register={register} setValue={setValue} errors={errors} />
 
         {formError ? (
           <p role="alert" className="text-small text-danger">

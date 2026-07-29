@@ -1331,7 +1331,7 @@
         "tags": [
           "auth"
         ],
-        "description": "Preenche nascimento/WhatsApp/endereco de quem foi pre-cadastrado por terceiro sem esses dados, e devolve o `/me` com `profileComplete` recalculado. Cada campo e validado com o MESMO rigor do cadastro (DV/CEP/maioridade) — nao ha versao relaxada. Campos ausentes NAO sao zerados. Nao regrava termos (D-025) nem altera documento/e-mail (identidade, nao \"dado faltando\"). Idempotente.",
+        "description": "Preenche nascimento/WhatsApp de quem foi pre-cadastrado por terceiro sem esses dados, e devolve o `/me` com `profileComplete` recalculado. Sao os campos do MINIMO FUNCIONAL (D-157) — endereco NAO entra: saiu do minimo e vira pedido contextual. Cada campo e validado com o MESMO rigor do cadastro (maioridade, so digitos) — nao ha versao relaxada. Campos ausentes NAO sao zerados. Nao regrava termos (D-025) nem altera documento/e-mail. Idempotente.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1349,82 +1349,6 @@
                     "format": "date",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
                     "description": "Data de nascimento (YYYY-MM-DD) — maioridade obrigatória (D-044)."
-                  },
-                  "address": {
-                    "type": "object",
-                    "properties": {
-                      "cep": {
-                        "type": "string",
-                        "pattern": "^\\d{8}$",
-                        "description": "CEP — 8 dígitos, só números (máscara é UI)."
-                      },
-                      "logradouro": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "numero": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "complemento": {
-                        "type": "string"
-                      },
-                      "bairro": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "cidade": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "state": {
-                        "type": "string",
-                        "enum": [
-                          "AC",
-                          "AL",
-                          "AM",
-                          "AP",
-                          "BA",
-                          "CE",
-                          "DF",
-                          "ES",
-                          "GO",
-                          "MA",
-                          "MG",
-                          "MS",
-                          "MT",
-                          "PA",
-                          "PB",
-                          "PE",
-                          "PI",
-                          "PR",
-                          "RJ",
-                          "RN",
-                          "RO",
-                          "RR",
-                          "RS",
-                          "SC",
-                          "SE",
-                          "SP",
-                          "TO"
-                        ],
-                        "description": "UF do endereço."
-                      },
-                      "country": {
-                        "default": "BR",
-                        "description": "País do endereço (default BR).",
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "cep",
-                      "logradouro",
-                      "numero",
-                      "bairro",
-                      "cidade",
-                      "state"
-                    ],
-                    "description": "Endereço da pessoa (D-044)."
                   }
                 }
               }

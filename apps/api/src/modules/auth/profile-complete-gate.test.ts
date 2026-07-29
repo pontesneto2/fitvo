@@ -61,30 +61,15 @@ async function setupCompanyAdmin(
 }
 
 describe('deriveProfileComplete — a conta, isolada', () => {
-  const COMPLETE = {
-    birthDate: new Date('1990-01-01T00:00:00Z'),
-    whatsapp: '11987654321',
-    addressStreet: 'Rua A',
-    addressNumber: '1',
-    addressDistrict: 'Centro',
-    addressCity: 'Sao Paulo',
-    addressState: 'SP',
-    addressZipCode: '01310100',
-  };
+  const COMPLETE = { birthDate: new Date('1990-01-01T00:00:00Z'), whatsapp: '11987654321' };
 
-  it('completo quando os tres blocos estao presentes', () => {
+  it('completo com o MINIMO FUNCIONAL: nascimento + WhatsApp (D-157)', () => {
     expect(deriveProfileComplete(COMPLETE)).toBe(true);
   });
 
   it.each([
     ['birthDate', 'birthDate'],
     ['whatsapp', 'whatsapp'],
-    ['logradouro', 'addressStreet'],
-    ['numero', 'addressNumber'],
-    ['bairro', 'addressDistrict'],
-    ['cidade', 'addressCity'],
-    ['UF', 'addressState'],
-    ['CEP', 'addressZipCode'],
   ])('incompleto se faltar %s', (_label, field) => {
     expect(deriveProfileComplete({ ...COMPLETE, [field]: null })).toBe(false);
   });
@@ -247,7 +232,6 @@ describe('gate de completar-perfil — quem cai no gate (spec §5)', () => {
     const completed = await completeProfile(harness.app, token, {
       whatsapp: '11912345678',
       birthDate: '1988-07-30',
-      address: FULL_ADDRESS,
     });
     expect(completed.statusCode).toBe(200);
     // A propria resposta do PATCH ja traz o valor novo — sem segundo round-trip.
@@ -262,20 +246,16 @@ describe('gate de completar-perfil — quem cai no gate (spec §5)', () => {
     const harness = await buildTestHarness();
     const token = await acceptClinicInvite(harness);
 
-    // So o WhatsApp: ainda falta nascimento e endereco.
+    // So o WhatsApp: ainda falta o nascimento.
     const first = await completeProfile(harness.app, token, { whatsapp: '11912345678' });
     expect(first.statusCode).toBe(200);
     expect(first.json().profileComplete).toBe(false);
 
     // So o nascimento: o WhatsApp anterior NAO pode ter sido zerado por omissao
     // — seria um jeito silencioso de DESCOMPLETAR pelo endpoint que existe para
-    // completar.
+    // completar. Se tivesse sumido, isto daria false.
     const second = await completeProfile(harness.app, token, { birthDate: '1988-07-30' });
-    expect(second.json().profileComplete).toBe(false);
-
-    // Fecha com o endereco: se o WhatsApp tivesse sumido, isto daria false.
-    const third = await completeProfile(harness.app, token, { address: FULL_ADDRESS });
-    expect(third.json().profileComplete).toBe(true);
+    expect(second.json().profileComplete).toBe(true);
 
     await harness.app.close();
   });
@@ -283,7 +263,7 @@ describe('gate de completar-perfil — quem cai no gate (spec §5)', () => {
   it('e IDEMPOTENTE: reenviar os mesmos valores mantem completo', async () => {
     const harness = await buildTestHarness();
     const token = await acceptClinicInvite(harness);
-    const body = { whatsapp: '11912345678', birthDate: '1988-07-30', address: FULL_ADDRESS };
+    const body = { whatsapp: '11912345678', birthDate: '1988-07-30' };
 
     expect((await completeProfile(harness.app, token, body)).json().profileComplete).toBe(true);
     expect((await completeProfile(harness.app, token, body)).json().profileComplete).toBe(true);
@@ -303,15 +283,9 @@ describe('gate de completar-perfil — quem cai no gate (spec §5)', () => {
     expect(
       (await completeProfile(harness.app, token, { birthDate: '2020-01-01' })).statusCode,
     ).toBe(400);
-    // CEP fora do formato.
+    // Data fora do formato de calendario.
     expect(
-      (await completeProfile(harness.app, token, { address: { ...FULL_ADDRESS, cep: '1234' } }))
-        .statusCode,
-    ).toBe(400);
-    // UF inexistente.
-    expect(
-      (await completeProfile(harness.app, token, { address: { ...FULL_ADDRESS, state: 'XX' } }))
-        .statusCode,
+      (await completeProfile(harness.app, token, { birthDate: '30/07/1988' })).statusCode,
     ).toBe(400);
 
     await harness.app.close();
@@ -337,7 +311,6 @@ describe('gate de completar-perfil — quem cai no gate (spec §5)', () => {
     const completed = await completeProfile(harness.app, token, {
       whatsapp: '11912345678',
       birthDate: '1988-07-30',
-      address: FULL_ADDRESS,
       // Campos que o schema NAO aceita — ignorados, nunca aplicados.
       email: 'outro@fitvo.dev',
       document: '11222333000181',
@@ -352,22 +325,22 @@ describe('gate de completar-perfil — quem cai no gate (spec §5)', () => {
   });
 });
 
-describe('gate de completar-perfil — o caso do ADMIN DE EMPRESA (ver revisão)', () => {
+describe('gate de completar-perfil — o ADMIN DE EMPRESA (por que endereço saiu do mínimo)', () => {
   /**
-   * ⚠️ DIVERGÊNCIA CONHECIDA, fixada aqui de propósito para ficar visível.
+   * O admin gestor **não tem endereço pessoal**: o endereço do cadastro de
+   * empresa é o do ESTABELECIMENTO (spec §4.2, item 6) e vai para o `Tenant` —
+   * decisão já tomada em #108.
    *
-   * A spec §5 diz que o admin de clínica/academia **nunca** vê o gate. Mas o
-   * cadastro de empresa (spec §4.2, item 6) coleta o endereço **do
-   * estabelecimento**, que vai para o `Tenant` — o admin não informa endereço
-   * PESSOAL em lugar nenhum. Logo, sob a derivação por dado, ele nasce
-   * incompleto.
+   * É exatamente por isso que endereço **saiu do mínimo funcional** (D-157):
+   * mantê-lo faria o admin nascer incompleto e cair num gate que a spec §5 diz
+   * que ele NUNCA vê, ou obrigaria a contradizer o #108 para satisfazer a
+   * derivação. Com o mínimo em nascimento + WhatsApp, que ele informa, o
+   * comportamento e a spec voltam a concordar.
    *
-   * Este teste NÃO afirma que o comportamento está certo: ele PINA o
-   * comportamento atual para que a decisão seja explícita. As saídas são (a)
-   * coletar o endereço pessoal do admin no cadastro de empresa, ou (b) tirar o
-   * endereço do mínimo funcional. Ver a nota da revisão do slice.
+   * Este teste é a trava dessa decisão: se alguém reintroduzir endereço na
+   * derivação, ele fica vermelho.
    */
-  it('admin de empresa nasce SEM endereco pessoal -> hoje cai no gate', async () => {
+  it('admin de empresa nasce COMPLETO — informa nascimento e WhatsApp (spec §5)', async () => {
     const harness = await buildTestHarness();
     const res = await harness.app.inject({
       method: 'POST',
@@ -386,8 +359,8 @@ describe('gate de completar-perfil — o caso do ADMIN DE EMPRESA (ver revisão)
     });
     const profile = await me(harness.app, login.json().tokens.accessToken);
 
-    // Nascimento e WhatsApp ele tem; endereço pessoal, não.
-    expect(profile.json().profileComplete).toBe(false);
+    // Nascimento e WhatsApp ele tem; endereço pessoal, não — e não precisa.
+    expect(profile.json().profileComplete).toBe(true);
 
     await harness.app.close();
   });

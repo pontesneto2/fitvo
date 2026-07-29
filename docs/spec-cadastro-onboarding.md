@@ -296,9 +296,9 @@ Nunca materializada, nunca por job.
 
 ## 5. Gate de completar-perfil (pós-login)
 
-**Vê o gate:** **apenas** pré-cadastrados por terceiro com dados faltando — hoje, o **profissional de clínica/academia** (§4.4). Ao logar, se faltar `birthDate`/endereço/WhatsApp, a primeira tela é completar dados, com o app **bloqueado** até completar.
+**Vê o gate:** **apenas** pré-cadastrados por terceiro com dados faltando — hoje, o **profissional de clínica/academia** (§4.4). Ao logar, se faltar `birthDate` **ou** WhatsApp, a primeira tela é completar dados, com o app **bloqueado** até completar.
 
-**NÃO vê o gate (entram completos):** autônomo, admin de clínica/academia, paciente/aluno, **estagiário** (§4.8) e **recepção** (§4.5) — os dois últimos preenchem nascimento/endereço/WhatsApp no próprio aceite.
+**NÃO vê o gate (entram completos):** autônomo, admin de clínica/academia, paciente/aluno, **estagiário** (§4.8) e **recepção** (§4.5) — todos informam nascimento e WhatsApp no próprio cadastro/aceite.
 
 > **A regra é sobre DADO, não sobre papel.** Quem vê o gate não é uma lista de seats mantida à mão — é quem, de fato, está sem os campos. Cada fluxo de criação decide, pelo que coleta, se a conta nasce completa; a lista acima é **consequência** disso, não uma segunda fonte de verdade a manter em dia. Um seat novo que colete tudo simplesmente nunca aparece no gate, sem que ninguém precise lembrar de atualizar esta seção.
 
@@ -306,17 +306,20 @@ Gate estreito (só convidados-por-terceiro). FITVO **trava** (garante dado antes
 
 ### 5.1 Mínimo funcional e derivação (D-157)
 
-**Mínimo funcional** que bloqueia: `birthDate` + WhatsApp + endereço (logradouro, número, bairro, cidade, UF, CEP). Complemento e país ficam de fora — o primeiro é opcional, o segundo tem default `BR`. **Senha não entra**: `passwordHash` é `NOT NULL`, não existe conta sem senha; exigi-la seria condição sempre verdadeira.
+**Mínimo funcional** que bloqueia: **`birthDate` + WhatsApp**. Só isso.
+
+**Endereço NÃO entra** — decisão de mesa, por duas razões, e a primeira sozinha já decide:
+
+1. **O admin gestor não tem endereço pessoal.** O endereço do cadastro de empresa é o do **estabelecimento** (§4.2, item 6) e vai para o `Tenant` — decisão já tomada (#108). Exigir endereço no gate faria o admin nascer incompleto e cair numa tela que esta seção diz que ele **NUNCA** vê; ou obrigaria a contradizer o #108 só para satisfazer a derivação.
+2. **Endereço não é mínimo funcional para todo papel.** O gate é *progressive*: trava o mínimo, e o resto vira pedido **contextual**, no momento em que faz falta — paciente já o coleta no aceite (§4.6); profissional informa ao configurar recebimento. Travar o app inteiro por um dado que boa parte dos papéis nunca usa é muralha, não gate.
+
+**Senha também não entra**: `passwordHash` é `NOT NULL` — não existe conta sem senha, então exigi-la seria condição sempre verdadeira.
 
 `profileComplete` é **DERIVADO no servidor**, em função única (`deriveProfileComplete`), e exposto em `GET /v1/auth/me`. Mesma doutrina do `displayName`: web/mobile/admin **apenas consomem** — **NUNCA** recalculam. Duas derivações divergiriam e passariam a discordar sobre quem está bloqueado.
 
-**Não existe flag de "sujeito ao gate"**, e a ausência é deliberada: seria uma segunda representação de um fato que as colunas já contam (D-103), e mentiria assim que alguém completasse o perfil por outro caminho.
+**Não existe flag de "sujeito ao gate"**, e a ausência é deliberada: seria uma segunda representação de um fato que as colunas já contam (D-103), e mentiria assim que alguém completasse o perfil por outro caminho. Quem vê o gate é **consequência** do que cada fluxo coleta.
 
-**Completar:** `PATCH /v1/auth/me/complete-profile`, autenticado pelo Bearer (só o dono completa a própria conta; não há `tenantId` — `Account` é a PESSOA, D-044). Campos ausentes **não** são zerados. Valida com o **mesmo** rigor do cadastro — não há versão relaxada. **NÃO** regrava termos (completar perfil não é novo consentimento — D-025) nem altera documento/e-mail (identidade, não "dado faltando"). Idempotente.
-
-> **⚠️ Pendência conhecida — admin de empresa.** O cadastro de empresa (§4.2, item 6) coleta o endereço **do estabelecimento**, que vai para o `Tenant`; o admin não informa endereço **pessoal** em lugar nenhum. Logo, sob a derivação por dado, ele hoje nasce incompleto — contra o que esta seção afirma. Resolver por uma das duas: (a) coletar o endereço pessoal do admin no cadastro de empresa, ou (b) tirar o endereço do mínimo funcional. **Decisão pendente do responsável**; o comportamento atual está fixado em teste para não passar despercebido.
-
----
+**Completar:** `PATCH /v1/auth/me/complete-profile`, autenticado pelo Bearer (só o dono completa a própria conta; não há `tenantId` — `Account` é a PESSOA, D-044). Aceita **apenas** os campos do mínimo. Campos ausentes **não** são zerados. Valida com o **mesmo** rigor do cadastro — não há versão relaxada. **NÃO** regrava termos (completar perfil não é novo consentimento — D-025) nem altera documento/e-mail (identidade, não "dado faltando"). Idempotente.
 
 ## 6. Log de decisões (palavras de força)
 
@@ -333,7 +336,7 @@ Gate estreito (só convidados-por-terceiro). FITVO **trava** (garante dado antes
 - Conselho **SEMPRE** só formato agora; verificação de ativo **deferida** (TODO(D-010)).
 - Recebimento **NUNCA** no cadastro.
 - Senha **SEMPRE** ≥ 8 + letra + número.
-- `profileComplete` **SEMPRE** derivado no servidor; superfície **NUNCA** recalcula (D-157). Completar perfil **NUNCA** regrava termos nem altera documento/e-mail.
+- `profileComplete` **SEMPRE** derivado no servidor; superfície **NUNCA** recalcula (D-157). Mínimo do gate = nascimento + WhatsApp; endereço **NUNCA** entra no mínimo (o admin gestor não tem endereço pessoal). Completar perfil **NUNCA** regrava termos nem altera documento/e-mail.
 - Documento **SEMPRE** DV real + xor; só dígitos.
 - Paciente menor **SEMPRE** exige autorização de responsável armazenada como prova (Art. 14).
 - **Sexo biológico ≠ gênero** — campos distintos; **nome social** disponível em **todo** form (Decreto 8.727/2016).
@@ -354,7 +357,7 @@ Gate estreito (só convidados-por-terceiro). FITVO **trava** (garante dado antes
 | Estagiário: seat supervisionado + vínculo obrigatório ao responsável | ✅ D-142 (API/contrato; UI em slice próprio) |
 | Estagiário multi-área (ed. física / nutrição / medicina), em clínica ou academia | ✅ D-143 |
 | Fluxo de validação do trabalho do estagiário | ⏸ bloqueado no domínio de treino |
-| Gate de completar-perfil | ✅ D-157 (API + guard de UI; pendência do admin de empresa em aberto) |
+| Gate de completar-perfil | ✅ D-157 (API + guard de UI; mínimo = nascimento + WhatsApp) |
 | Recepção (seat administrativo por convite) | ✅ D-156 (API/contrato; UI em slice próprio) |
 | Paciente menor + autorização de responsável | ⬜ slice do fluxo de paciente |
 | Atribuição de RT (derivado) | ⬜ pós-cadastro |

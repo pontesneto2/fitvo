@@ -6,7 +6,6 @@ import type {
   AccountRecord,
   AccountRepository,
   AccountWithProfileRecord,
-  AddressInput,
   CompleteProfileInput,
   CreateCompanyInput,
   CreateProfessionalInput,
@@ -63,9 +62,6 @@ export class InMemoryAccountRepository implements AccountRepository {
       ...account,
       ...(input.whatsapp !== undefined ? { whatsapp: input.whatsapp } : {}),
       ...(input.birthDate !== undefined ? { birthDate: input.birthDate } : {}),
-      ...(input.address !== undefined
-        ? InMemoryAccountRepository.addressColumns(input.address)
-        : {}),
     };
     this.byId.set(id, updated);
     return Promise.resolve(updated);
@@ -78,11 +74,7 @@ export class InMemoryAccountRepository implements AccountRepository {
       input.passwordHash,
       input.name,
       input.socialName ?? null,
-      {
-        birthDate: input.birthDate,
-        whatsapp: input.whatsapp,
-        ...InMemoryAccountRepository.addressColumns(input.address),
-      },
+      { birthDate: input.birthDate, whatsapp: input.whatsapp },
     );
     this.professionalSpecialtiesByAccountId.set(account.id, {
       specialtyId: input.specialtyId,
@@ -152,17 +144,16 @@ export class InMemoryAccountRepository implements AccountRepository {
     return this.insert(email, passwordHash, name, null, profile);
   }
 
-  /** Traduz um bloco de endereco de aceite para as colunas do gate. */
+  /**
+   * Campos do gate que um aceite de convite grava. So nascimento e WhatsApp —
+   * endereco nao faz parte do minimo funcional (D-157), entao nao influencia
+   * `profileComplete`, mesmo quando o fluxo o coleta.
+   */
   static profileFrom(input: {
     birthDate: Date;
     whatsapp: string;
-    address: AddressInput;
   }): Partial<ProfileCompletenessFields> {
-    return {
-      birthDate: input.birthDate,
-      whatsapp: input.whatsapp,
-      ...InMemoryAccountRepository.addressColumns(input.address),
-    };
+    return { birthDate: input.birthDate, whatsapp: input.whatsapp };
   }
 
   markEmailVerified(id: string): Promise<void> {
@@ -199,8 +190,8 @@ export class InMemoryAccountRepository implements AccountRepository {
     socialName: string | null,
     // Campos do gate de completar-perfil (spec §5). Espelham o que CADA fluxo
     // de criacao realmente grava na Prisma — e por isso o double reproduz o
-    // gate de verdade: se um fluxo nao coleta endereco, aqui tambem nao chega,
-    // e `profileComplete` da false nos dois lados.
+    // gate de verdade: se um fluxo nao coleta nascimento/WhatsApp, aqui tambem
+    // nao chegam, e `profileComplete` da false nos dois lados.
     profile: Partial<ProfileCompletenessFields> = {},
   ): Promise<AccountWithProfileRecord> {
     this.sequence += 1;
@@ -213,27 +204,9 @@ export class InMemoryAccountRepository implements AccountRepository {
       emailVerifiedAt: null,
       birthDate: profile.birthDate ?? null,
       whatsapp: profile.whatsapp ?? null,
-      addressStreet: profile.addressStreet ?? null,
-      addressNumber: profile.addressNumber ?? null,
-      addressDistrict: profile.addressDistrict ?? null,
-      addressCity: profile.addressCity ?? null,
-      addressState: profile.addressState ?? null,
-      addressZipCode: profile.addressZipCode ?? null,
     };
     this.byId.set(account.id, account);
     this.emailToId.set(email, account.id);
     return Promise.resolve(account);
-  }
-
-  /** Traduz o bloco de endereco do cadastro para as colunas `address*`. */
-  private static addressColumns(address: AddressInput): Partial<ProfileCompletenessFields> {
-    return {
-      addressStreet: address.logradouro,
-      addressNumber: address.numero,
-      addressDistrict: address.bairro,
-      addressCity: address.cidade,
-      addressState: address.state,
-      addressZipCode: address.cep,
-    };
   }
 }

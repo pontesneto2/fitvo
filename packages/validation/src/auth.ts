@@ -314,11 +314,17 @@ export const meResultSchema = z.object({
 });
 
 /**
- * Completar perfil pós-login (spec §5). Todos os campos são OPCIONAIS: a pessoa
- * completa **o que falta**, e mandar só o WhatsApp não deve zerar o endereço.
- * Cada campo enviado é validado com o MESMO rigor do cadastro — `whatsapp`,
- * `birthDate` (≥18) e `addressSchema` são as peças compartilhadas, não versões
- * relaxadas: um dado que não serviria no cadastro também não serve aqui.
+ * Completar perfil pós-login (spec §5). Campos OPCIONAIS: a pessoa completa **o
+ * que falta**, e mandar só o WhatsApp não deve zerar o nascimento. Cada campo
+ * enviado é validado com o MESMO rigor do cadastro — `whatsapp` e `birthDate`
+ * (≥18) são as peças compartilhadas, não versões relaxadas: um dado que não
+ * serviria no cadastro também não serve aqui.
+ *
+ * São exatamente os campos do MÍNIMO FUNCIONAL (D-157) — os que destravam o
+ * app. **Endereço não está aqui**: saiu do mínimo (o admin gestor não tem
+ * endereço pessoal, e ele não é necessário a todo papel), e vira pedido
+ * CONTEXTUAL no fluxo que precisar dele. Aceitá-lo neste endpoint faria o
+ * "endpoint do gate" carregar algo que o gate não exige.
  *
  * NÃO inclui documento, e-mail nem termos: documento e e-mail são identidade
  * (não "dado faltando"), e completar perfil não é novo consentimento (D-025).
@@ -326,7 +332,6 @@ export const meResultSchema = z.object({
 export const completeProfileSchema = z.object({
   whatsapp: whatsapp.optional(),
   birthDate: birthDate.optional(),
-  address: addressSchema.optional(),
 });
 
 /** Resposta 202 que não revela existência de conta (D-029): sempre `accepted`. */

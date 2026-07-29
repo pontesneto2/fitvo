@@ -238,11 +238,12 @@ export function authRoutes(service: AuthApplicationService): FastifyPluginAsync 
           tags: TAGS,
           summary: 'Completa os campos faltantes do perfil (gate pos-login — spec §5)',
           description:
-            'Preenche nascimento/WhatsApp/endereco de quem foi pre-cadastrado por terceiro sem ' +
-            'esses dados, e devolve o `/me` com `profileComplete` recalculado. Cada campo e ' +
-            'validado com o MESMO rigor do cadastro (DV/CEP/maioridade) — nao ha versao ' +
-            'relaxada. Campos ausentes NAO sao zerados. Nao regrava termos (D-025) nem altera ' +
-            'documento/e-mail (identidade, nao "dado faltando"). Idempotente.',
+            'Preenche nascimento/WhatsApp de quem foi pre-cadastrado por terceiro sem esses ' +
+            'dados, e devolve o `/me` com `profileComplete` recalculado. Sao os campos do ' +
+            'MINIMO FUNCIONAL (D-157) — endereco NAO entra: saiu do minimo e vira pedido ' +
+            'contextual. Cada campo e validado com o MESMO rigor do cadastro (maioridade, ' +
+            'so digitos) — nao ha versao relaxada. Campos ausentes NAO sao zerados. Nao ' +
+            'regrava termos (D-025) nem altera documento/e-mail. Idempotente.',
           security: [{ bearerAuth: [] }],
           body: completeProfileSchema,
           response: { 200: meResultSchema, 401: problemDetailsSchema },
@@ -258,7 +259,6 @@ export function authRoutes(service: AuthApplicationService): FastifyPluginAsync 
               request.body.birthDate === undefined
                 ? undefined
                 : new Date(`${request.body.birthDate}T00:00:00Z`),
-            address: request.body.address,
           }),
         );
       },

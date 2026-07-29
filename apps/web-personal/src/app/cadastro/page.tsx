@@ -6,13 +6,13 @@ import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
-import { AddressFields } from '@/components/address-fields';
 import { PasswordStrengthMeter } from '@/components/password-strength-meter';
 import { TermsFields } from '@/components/terms-fields';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { type RegisterProfessionalFormInput, registerProfessionalFormSchema } from '@/lib/auth';
-import { brDateToIso, maskDateBr, maskDocument, maskPhone, onlyDigits } from '@/lib/masks';
+import { brDateToIso, maskCep, maskDateBr, maskDocument, maskPhone, onlyDigits } from '@/lib/masks';
 import { COUNCIL_LABEL_BY_SPECIALTY_CODE, type Specialty } from '@/lib/specialty';
+import { fetchAddressByCep } from '@/lib/via-cep';
 import { zodResolver } from '@/lib/zod-resolver';
 
 import { CompanyForm } from './company-form';
@@ -64,6 +64,7 @@ function useSpecialties(): { specialties: Specialty[]; loadError: boolean } {
 
 function ProfessionalForm({ onSuccess }: { onSuccess: () => void }): ReactNode {
   const [formError, setFormError] = useState<string | null>(null);
+  const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notFound'>('idle');
   const { specialties, loadError } = useSpecialties();
   const {
     register,
@@ -102,6 +103,27 @@ function ProfessionalForm({ onSuccess }: { onSuccess: () => void }): ReactNode {
     value: s.id,
     label: `${s.name} (${COUNCIL_LABEL_BY_SPECIALTY_CODE[s.code]})`,
   }));
+
+  /** Puxa o endereco pelo CEP no blur; CEP invalido/nao encontrado NAO trava (preenche manual). */
+  async function handleCepBlur(cep: string): Promise<void> {
+    if (onlyDigits(cep).length !== 8) {
+      return;
+    }
+    setCepStatus('loading');
+    const result = await fetchAddressByCep(onlyDigits(cep));
+    if (!result) {
+      setCepStatus('notFound');
+      return;
+    }
+    setCepStatus('idle');
+    // shouldValidate: limpa o erro dos campos recem-preenchidos.
+    setValue('address.logradouro', result.logradouro, { shouldValidate: true });
+    setValue('address.bairro', result.bairro, { shouldValidate: true });
+    setValue('address.cidade', result.cidade, { shouldValidate: true });
+    if (result.uf) {
+      setValue('address.state', result.uf, { shouldValidate: true });
+    }
+  }
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
@@ -330,13 +352,87 @@ function ProfessionalForm({ onSuccess }: { onSuccess: () => void }): ReactNode {
       </Field>
 
       {/* (9) Endereco (CEP puxa) */}
-      <AddressFields
-        control={control}
-        register={register}
-        setValue={setValue}
-        errors={errors}
-        legend="Endereco"
-      />
+      <fieldset className="flex flex-col gap-4 rounded-md border border-line p-4">
+        <legend className="px-1 text-small font-medium text-fg-muted">Endereco</legend>
+        <Field
+          label="CEP"
+          error={errors.address?.cep?.message}
+          description={
+            cepStatus === 'loading'
+              ? 'Buscando endereco...'
+              : cepStatus === 'notFound'
+                ? 'CEP nao encontrado — preencha manualmente.'
+                : undefined
+          }
+        >
+          <Controller
+            control={control}
+            name="address.cep"
+            render={({ field }) => (
+              <Input
+                inputMode="numeric"
+                autoComplete="postal-code"
+                placeholder="00000-000"
+                value={field.value}
+                onChange={(e) => field.onChange(maskCep(e.target.value))}
+                onBlur={(e) => {
+                  field.onBlur();
+                  void handleCepBlur(e.target.value);
+                }}
+                status={errors.address?.cep ? 'error' : 'default'}
+              />
+            )}
+          />
+        </Field>
+        <Field label="Logradouro" error={errors.address?.logradouro?.message}>
+          <Input
+            autoComplete="address-line1"
+            placeholder="Rua, avenida..."
+            {...register('address.logradouro')}
+          />
+        </Field>
+        <div className="flex gap-3">
+          <Field label="Numero" error={errors.address?.numero?.message} className="w-28">
+            <Input inputMode="numeric" placeholder="Numero" {...register('address.numero')} />
+          </Field>
+          <Field
+            label="Complemento (opcional)"
+            error={errors.address?.complemento?.message}
+            className="flex-1"
+          >
+            <Input
+              autoComplete="address-line2"
+              placeholder="Apto, bloco..."
+              {...register('address.complemento')}
+            />
+          </Field>
+        </div>
+        <Field label="Bairro" error={errors.address?.bairro?.message}>
+          <Input placeholder="Bairro" {...register('address.bairro')} />
+        </Field>
+        <div className="flex gap-3">
+          <Field label="Cidade" error={errors.address?.cidade?.message} className="flex-1">
+            <Input placeholder="Cidade" {...register('address.cidade')} />
+          </Field>
+          <Field label="UF" error={errors.address?.state?.message} className="w-24">
+            <Controller
+              control={control}
+              name="address.state"
+              render={({ field }) => (
+                <Select
+                  name={field.name}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={BRAZILIAN_STATE_OPTIONS}
+                  placeholder="UF"
+                  searchable
+                  status={errors.address?.state ? 'error' : 'default'}
+                />
+              )}
+            />
+          </Field>
+        </div>
+      </fieldset>
 
       {/* (10) Termos + Politica */}
       <TermsFields

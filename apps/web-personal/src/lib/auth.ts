@@ -160,21 +160,20 @@ const addressFormSchema = z.object({
 /**
  * Formulário de COMPLETAR PERFIL (spec §5) — valida os valores MASCARADOS que
  * o RHF guarda; a normalização para o fio acontece no submit. Reusa as mesmas
- * peças do cadastro (`addressFormSchema`, contagem de dígitos do WhatsApp,
- * maioridade) — não é uma versão relaxada: um dado que não serviria no cadastro
- * também não serve aqui.
+ * peças do cadastro (contagem de dígitos do WhatsApp, maioridade) — não é uma
+ * versão relaxada: um dado que não serviria no cadastro também não serve aqui.
  *
- * Diferente do contrato do servidor (`completeProfileSchema`, onde tudo é
- * opcional para permitir preenchimento parcial), aqui os três são
- * OBRIGATÓRIOS: esta tela existe para destravar o app, e destravar exige os
- * três. Enviar menos deixaria a pessoa presa no mesmo lugar.
+ * São o MÍNIMO FUNCIONAL (D-157) e nada além: endereço saiu do mínimo e vira
+ * pedido contextual. Diferente do contrato do servidor
+ * (`completeProfileSchema`, onde ambos são opcionais para permitir
+ * preenchimento parcial), aqui os dois são OBRIGATÓRIOS: esta tela existe para
+ * destravar o app, e destravar exige os dois.
  */
 export const completeProfileFormSchema = z.object({
   whatsapp: z
     .string()
     .refine((v) => onlyDigits(v).length === 11, { message: 'Informe um WhatsApp valido.' }),
   birthDate: z.string().refine(isAtLeastEighteen, { message: 'Voce precisa ter 18 anos ou mais.' }),
-  address: addressFormSchema,
 });
 export type CompleteProfileFormInput = z.infer<typeof completeProfileFormSchema>;
 

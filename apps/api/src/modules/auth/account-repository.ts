@@ -41,12 +41,6 @@ export function deriveDisplayName(account: { name: string; socialName: string | 
 export interface ProfileCompletenessFields {
   birthDate: Date | null;
   whatsapp: string | null;
-  addressStreet: string | null;
-  addressNumber: string | null;
-  addressDistrict: string | null;
-  addressCity: string | null;
-  addressState: string | null;
-  addressZipCode: string | null;
 }
 
 /**
@@ -64,32 +58,34 @@ export interface ProfileCompletenessFields {
  * Quem "esta sujeito ao gate" e, portanto, CONSEQUENCIA de cada fluxo de
  * criacao — do que ele coleta, nao de uma lista mantida a mao:
  *
- * - autonomo, admin de empresa, estagiario, recepcao e paciente coletam os tres
+ * - autonomo, admin de empresa, estagiario, recepcao e paciente coletam os dois
  *   no proprio cadastro/aceite ⇒ nascem completos, nunca veem o gate;
  * - profissional de clinica/academia (#102) NAO os coleta ⇒ nasce incompleto e
  *   cai no gate — exatamente o publico que a spec §5 descreve.
  *
- * Um seat novo que colete tudo simplesmente nunca aparece no gate, sem que
+ * Um seat novo que colete os dois simplesmente nunca aparece no gate, sem que
  * ninguem precise lembrar de atualizar uma lista.
  *
- * **Senha nao entra na conta**: `passwordHash` e NOT NULL: nao existe conta sem
- * senha, entao exigi-la aqui seria uma condicao sempre verdadeira — ruido que
- * sugeriria um estado que o schema nao admite.
+ * **ENDERECO NAO ENTRA** (D-157, decisao de mesa). Duas razoes, e a primeira
+ * sozinha ja decide:
  *
- * `addressComplement` e `addressCountry` ficam de fora: o primeiro e opcional
- * no cadastro (spec §4.1), e o segundo tem default 'BR'.
+ * 1. O **admin gestor de empresa NAO TEM endereco pessoal** — o endereco que
+ *    ele informa no cadastro e o do ESTABELECIMENTO (spec §4.2, item 6) e vai
+ *    para o `Tenant`. Isso e decisao ja tomada (#108); exigir endereco aqui
+ *    faria o admin nascer incompleto e cair num gate que a spec §5 diz que ele
+ *    NUNCA ve — ou obrigaria a contradizer o #108 para satisfazer a derivacao.
+ * 2. Endereco **nao e minimo funcional para todo papel**. O gate e
+ *    *progressive*: bloqueia o minimo, e o resto vira pedido CONTEXTUAL, no
+ *    momento em que faz falta — paciente ja o coleta no aceite (spec §4.6);
+ *    profissional informa ao configurar recebimento. Bloquear o app inteiro por
+ *    um dado que boa parte dos papeis nunca usa e muralha, nao gate.
+ *
+ * **Senha nao entra**: `passwordHash` e NOT NULL: nao existe conta sem senha,
+ * entao exigi-la seria uma condicao sempre verdadeira — ruido que sugeriria um
+ * estado que o schema nao admite.
  */
 export function deriveProfileComplete(account: ProfileCompletenessFields): boolean {
-  return (
-    account.birthDate !== null &&
-    account.whatsapp !== null &&
-    account.addressStreet !== null &&
-    account.addressNumber !== null &&
-    account.addressDistrict !== null &&
-    account.addressCity !== null &&
-    account.addressState !== null &&
-    account.addressZipCode !== null
-  );
+  return account.birthDate !== null && account.whatsapp !== null;
 }
 
 /**
@@ -203,15 +199,17 @@ export interface CreateCompanyInput {
 }
 
 /**
- * Campos que o gate de completar-perfil preenche (spec §5). Todos OPCIONAIS: a
- * pessoa pode ter parte deles e completar so o que falta. O que ja estiver
- * preenchido e sobrescrito pelo valor enviado — e edicao do proprio perfil,
- * feita pelo dono da conta.
+ * Campos que o gate de completar-perfil preenche (spec §5) — o MINIMO FUNCIONAL
+ * (D-157), e so ele. Ambos OPCIONAIS: a pessoa pode ter um e completar o outro.
+ * O que ja estiver preenchido e sobrescrito pelo valor enviado — e edicao do
+ * proprio perfil, feita pelo dono da conta.
+ *
+ * Endereco NAO entra: saiu do minimo funcional e vira pedido contextual no
+ * fluxo que precisar dele.
  */
 export interface CompleteProfileInput {
   whatsapp?: string | undefined;
   birthDate?: Date | undefined;
-  address?: AddressInput | undefined;
 }
 
 /**

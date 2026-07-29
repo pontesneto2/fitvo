@@ -22,19 +22,14 @@ const ACCOUNT_PROJECTION = {
 
 /**
  * Projecao do gate de completar-perfil (spec §5): a conta + exatamente as
- * colunas que `deriveProfileComplete` le. Nao vira a projecao padrao para nao
- * carregar endereco em toda autenticacao.
+ * colunas que `deriveProfileComplete` le. Endereco NAO entra — nao faz parte do
+ * minimo funcional (D-157), entao projeta-lo aqui seria carregar dado que a
+ * regra nao usa.
  */
 const ACCOUNT_WITH_PROFILE_PROJECTION = {
   ...ACCOUNT_PROJECTION,
   birthDate: true,
   whatsapp: true,
-  addressStreet: true,
-  addressNumber: true,
-  addressDistrict: true,
-  addressCity: true,
-  addressState: true,
-  addressZipCode: true,
 } as const;
 
 /** Implementacao Prisma (infra) do repositorio de identidade. */
@@ -59,7 +54,7 @@ export class PrismaAccountRepository implements AccountRepository {
   /**
    * Preenche SO o que veio (spec §5). `undefined` significa "nao mexer": um
    * `update` do Prisma ignora chaves ausentes, entao quem manda so o WhatsApp
-   * nao zera o endereco por omissao — o que seria um jeito silencioso de
+   * nao zera o nascimento por omissao — o que seria um jeito silencioso de
    * DESCOMPLETAR um perfil pelo endpoint que existe para completa-lo.
    *
    * Nao toca em termos (completar perfil nao e novo consentimento — D-025),
@@ -71,18 +66,6 @@ export class PrismaAccountRepository implements AccountRepository {
       data: {
         ...(input.whatsapp !== undefined ? { whatsapp: input.whatsapp } : {}),
         ...(input.birthDate !== undefined ? { birthDate: input.birthDate } : {}),
-        ...(input.address !== undefined
-          ? {
-              addressStreet: input.address.logradouro,
-              addressNumber: input.address.numero,
-              addressComplement: input.address.complemento ?? null,
-              addressDistrict: input.address.bairro,
-              addressCity: input.address.cidade,
-              addressState: input.address.state,
-              addressZipCode: input.address.cep,
-              addressCountry: input.address.country,
-            }
-          : {}),
       },
       select: ACCOUNT_WITH_PROFILE_PROJECTION,
     });

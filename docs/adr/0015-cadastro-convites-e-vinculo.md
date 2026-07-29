@@ -249,8 +249,25 @@ pior.
 
 Quem foi **pré-cadastrado por terceiro** sem os dados que o app precisa para
 operar cai, ao logar, numa tela de completar dados, com o app bloqueado até
-completar (spec §5). O **mínimo funcional** é `birthDate` + WhatsApp +
-endereço; senha não entra (é `NOT NULL` — condição sempre verdadeira).
+completar (spec §5). O **mínimo funcional** é **`birthDate` + WhatsApp**, e só.
+Senha não entra (é `NOT NULL` — condição sempre verdadeira).
+
+**Endereço NÃO entra no mínimo**, por duas razões — a primeira sozinha decide:
+
+1. **O admin gestor de empresa não tem endereço pessoal.** O endereço do
+   cadastro de empresa é o do **estabelecimento** (spec §4.2, item 6) e vai para
+   o `Tenant` — decisão já tomada em D-139/#108. Exigir endereço no gate faria o
+   admin nascer incompleto e cair numa tela que a spec §5 diz que ele **nunca**
+   vê; a alternativa seria contradizer o #108 só para satisfazer a derivação.
+2. **Endereço não é mínimo funcional para todo papel.** O gate é *progressive*:
+   trava o mínimo e deixa o resto como pedido **contextual**, no momento em que
+   faz falta — paciente já o coleta no aceite (spec §4.6), profissional informa
+   ao configurar recebimento. Travar o app por um dado que boa parte dos papéis
+   nunca usa é muralha, não gate.
+
+Esta é a escolha que mantém a derivação por dado **e** a spec §5 verdadeiras ao
+mesmo tempo, sem exceção por papel. Há teste fixando o admin como completo: se
+alguém reintroduzir endereço na derivação, ele fica vermelho.
 
 **`profileComplete` é DERIVADO no servidor**, em função única
 (`deriveProfileComplete`), exposto em `/me`. Mesma doutrina do `displayName`
@@ -278,13 +295,6 @@ Sem `tenantId`: `Account` é a **pessoa** (D-044), não o papel — a mesma cont
 tem seats em várias empresas e nasce uma vez só. Campos ausentes não são
 zerados; valida com o mesmo rigor do cadastro; **não** regrava termos (D-025)
 nem altera documento/e-mail. Idempotente.
-
-**Débito aberto — admin de empresa.** O cadastro de empresa coleta o endereço
-do **estabelecimento** (vai para o `Tenant`); o admin não informa endereço
-pessoal. Sob a derivação por dado ele hoje nasce **incompleto**, contra o que a
-spec §5 afirma. Saídas: coletar o endereço pessoal do admin, ou tirar o
-endereço do mínimo funcional. Decisão do responsável; o comportamento atual
-está **fixado em teste** para não passar despercebido.
 
 ## Alternativas consideradas
 

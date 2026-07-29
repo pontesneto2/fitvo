@@ -644,6 +644,42 @@ describe('tenant-isolation-extension (D-151) — bateria de vazamento contra Pos
     expect(found?.id).toBe(a.bondId);
   });
 
+  it('a extension so escopa o where/data do modelo RAIZ — include de relacao aninhada (bucket E) nunca cruza tenant, por correlacao de FK', async () => {
+    // A extension NAO toca em `include`/`select` (grep no arquivo confirma) —
+    // este teste prova que isso e SEGURO: o Prisma resolve `include` sempre
+    // correlacionado a FK da linha ja devolvida, nunca por join plano contra
+    // a tabela inteira. ProfessionalSpecialty (bucket E, sem tenantId) so
+    // pode aparecer pendurada no professionalProfile QUE A POSSUI.
+    // seedTenantGraph ja cria uma ProfessionalSpecialty por tenant (dependencia
+    // de ProfessionalService) — reusa em vez de duplicar (unique
+    // [professionalProfileId, specialtyId] barraria uma segunda).
+    const a = await seedTenantGraph('a');
+    const b = await seedTenantGraph('b');
+    const specA = { id: a.professionalSpecialtyId };
+    const specB = { id: b.professionalSpecialtyId };
+
+    // SEM contexto (prova neutra): os dois profiles voltam, mas o include
+    // NUNCA cruza — cada um so mostra a PROPRIA specialty.
+    const noContext = await prisma.professionalProfile.findMany({
+      where: { id: { in: [a.professionalProfileId, b.professionalProfileId] } },
+      include: { specialties: true },
+    });
+    const byId = new Map(noContext.map((p) => [p.id, p.specialties.map((s) => s.id)]));
+    expect(byId.get(a.professionalProfileId)).toEqual([specA.id]);
+    expect(byId.get(b.professionalProfileId)).toEqual([specB.id]);
+
+    // COM contexto de A: extension escopa o RAIZ (so profileA volta) e o
+    // include continua correlacionado corretamente por baixo (so specA).
+    const asA = await runScoped(a.tenantId, async () =>
+      prisma.professionalProfile.findMany({
+        where: { id: { in: [a.professionalProfileId, b.professionalProfileId] } },
+        include: { specialties: true },
+      }),
+    );
+    expect(asA.map((p) => p.id)).toEqual([a.professionalProfileId]);
+    expect(asA[0]!.specialties.map((s) => s.id)).toEqual([specA.id]);
+  });
+
   describe('D-153 — compatibilidade com $transaction', () => {
     it('$transaction com contexto de tenant aberto continua atomica E injeta tenantId em cada passo', async () => {
       const a = await seedTenantGraph('a');

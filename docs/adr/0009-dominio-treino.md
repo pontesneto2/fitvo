@@ -1,7 +1,17 @@
 # ADR-0009 — Domínio de Treino
 
-**Status:** Aceito
-**Decisões cobertas:** D-079 a D-092, D-105
+**Status:** Aceito (revisado jul/2026 — incorpora contribuições do ADR-0018, superseded)
+**Decisões cobertas:** D-079 a D-092, D-105, D-164 a D-167
+
+> **Revisão de jul/2026.** O [ADR-0018](0018-dominio-treino.md) redecidiu este mesmo
+> domínio sem consultar este ADR, gerando conflito de filosofia (prescrição por
+> alvos vs. série-linha; progressão automática vs. reativa; append-only vs. merge
+> por campo). A mesa resolveu **em favor deste ADR** e marcou o 0018 como
+> **superseded**. Três contribuições do 0018 foram incorporadas aqui — taxonomia de
+> grupo muscular (**D-164**), lifecycle DRAFT/ISSUED/CANCELLED (**D-165**) e
+> `tenantId` explícito por ADR-0017 (**D-166**) — mais um complemento ao D-085
+> (**D-167**, progressão sugerida). O D-085 original **não foi reescrito**: decisão
+> registrada não se apaga, a evolução fica rastreável.
 
 ## Contexto
 
@@ -241,6 +251,103 @@ o **dado** precisa nascer certo, com índices por data):
 Todos os indicadores são **derivados** de execuções e séries registradas — não
 há entidade nova de indicador, há índices planejados.
 
+---
+
+> As quatro decisões a seguir entraram na **revisão de jul/2026** (ver nota do topo).
+> As três primeiras são contribuições preservadas do ADR-0018 (superseded); a
+> quarta complementa o D-085 sem reescrevê-lo.
+
+### D-164 — Taxonomia de grupo muscular: tabela-pai com primário + secundários
+
+> Contribuição preservada do ADR-0018 (D-158). **Fecha o gap** "Taxonomia de grupo
+> muscular" que este ADR listava como aberto.
+
+- `MuscleGroup` é **tabela-pai**, não enum: o catálogo de grupos musculares vive em
+  linha de banco, o que permite adicionar/renomear grupo sem migração de enum e
+  manter rótulo no i18n (mesma disciplina do D-087 — o código é estável, a redação
+  é tradução).
+- Cada `Exercise` tem **um grupo primário** (FK obrigatória para `MuscleGroup`) e
+  **N grupos secundários** (relação N:N). Um supino tem primário `PEITO` e
+  secundários `TRICEPS`/`OMBRO` — o modelo precisa dos dois, senão a busca por
+  "exercícios de tríceps" perde os compostos.
+- **Por que não enum fixo:** enum obriga migração a cada ajuste de taxonomia e não
+  hospeda atributo (região do corpo, ordem de exibição, ilustração). **Por que não
+  só uma lista de músculos sem primário:** sem primário não há como agrupar o treino
+  por grupo dominante nem calcular volume por grupo — perde-se um indicador que o
+  D-092 pressupõe.
+- Segue a deleção lógica do D-089: grupo descontinuado some da busca e continua
+  válido nos exercícios que já o usam.
+
+### D-165 — Lifecycle do plano: DRAFT / ISSUED / CANCELLED
+
+> Contribuição preservada do ADR-0018 (D-158).
+
+- `WorkoutPlan` ganha `status` com o **lifecycle padrão do projeto**:
+  `DRAFT` → `ISSUED` → `CANCELLED`.
+- **Imutabilidade na emissão:** um plano em `DRAFT` é livremente editável e **não é
+  visível ao aluno**; ao ser emitido (`ISSUED`), o que foi prescrito é o que o aluno
+  vê. Alteração posterior é ato explícito e rastreável, não edição silenciosa de
+  algo que o aluno já está executando. `CANCELLED` retira o plano de circulação sem
+  apagá-lo — deleção lógica (D-089).
+- **Habilita o fluxo de validação do estagiário:** o estagiário monta o plano em
+  `DRAFT`, o supervisor com CREF revisa e emite (`ISSUED`). Isso engancha no vínculo
+  estagiário↔supervisor do [ADR-0015](0015-cadastro-convites-e-vinculo.md)
+  (D-142/D-143), onde o estagiário não tem responsabilidade técnica própria.
+- **O fluxo de validação em si é slice futuro** — quem pode emitir, notificação ao
+  supervisor, fila de pendências e devolutiva são decisão de produto ainda não
+  tomada. O que nasce **aqui** é o **lifecycle que o habilita**: sem `DRAFT`, não há
+  onde o trabalho não-emitido existir, e retrofitar estado em plano já em uso é caro.
+- Interage com o D-084 (liberação agendada): plano programado para o futuro nasce
+  emitido com data de início futura — agendamento é **quando vale**, `DRAFT` é
+  **se está pronto**. São eixos distintos e não se substituem.
+
+### D-166 — Isolamento por tenant em todo o domínio de treino
+
+> Contribuição preservada do ADR-0018 (D-158). Não redecide nada deste ADR — **soma**
+> a camada de tenant do [ADR-0017](0017-tenant-isolation.md), posterior a ele.
+
+- Todas as tabelas do domínio de treino — `WorkoutPlan`, `Workout`, `WorkoutItem`,
+  `WorkoutSet`, `WorkoutSession`, `SetLog`, `WorkoutRating`, `FormAnalysis`,
+  `Exercise`, `MuscleGroup` — carregam **`tenantId` + `@@index([tenantId])`**,
+  conforme ADR-0017 (D-150 – D-155).
+- **Não substitui o isolamento por vínculo** deste ADR (D-079/D-090, ADR-0001): o
+  `bond` continua sendo o eixo que diz *de quem é aquele plano*. O `tenantId` é a
+  camada de **defense in depth** por cima — a extensão do Prisma escopa a query
+  mesmo que o filtro de vínculo seja esquecido. As duas camadas convivem; nenhuma
+  torna a outra opcional.
+- A biblioteca compartilhada da plataforma (`PLATFORM`, D-089) e o catálogo base de
+  `MuscleGroup` são o caso legítimo de linha **sem dono de tenant** — o
+  comportamento exato desse escopo global segue o que o ADR-0017 definir para
+  registros de plataforma, e não é redecidido aqui.
+- **Ordem de implementação:** o slice de treino roda **depois** do tenant isolation
+  implementado; enquanto não estiver, vale a disciplina de `tenantId` explícito em
+  toda query.
+
+### D-167 — Progressão automática SUGERIDA (não imposta) — complementa o D-085
+
+> **Complementa o D-085, não o substitui.** O D-085 permanece como registrado — a
+> decisão de que o sistema não prescreve progressão sozinho continua válida. O que
+> muda é que passa a existir um **assistente** dentro desse princípio.
+
+- O sistema **pode pré-preencher uma sugestão de progressão** no próximo treino —
+  por exemplo, sugerir +carga quando o aluno bateu todas as repetições prescritas.
+  Isso é **sugestão**: o profissional **aceita, edita ou ignora**.
+- **Mantém o princípio do D-085** — o profissional é o decisor e a inteligência está
+  na leitura do dado, não na prescrição. A diferença é que a leitura agora chega
+  pronta para virar edição com um toque, economizando tempo (a dor #1 do mercado,
+  D-084/D-090).
+- **A automação NUNCA prescreve sozinha sem o aval do profissional.** Não existe
+  plano que avance de semana por conta própria (o que o D-085 rejeitou), nem carga
+  que suba no plano do aluno sem alguém com responsabilidade técnica ter confirmado.
+  Coerente com o D-023 (ADR-0005) e com o D-088: a IA sugere, o profissional valida
+  antes de chegar ao aluno.
+- **Dados de evolução/progressão aparecem em várias partes do app** — dashboards do
+  aluno e do profissional — todos **derivados das execuções** registradas, sem
+  entidade de agregação própria. Coerente com o D-092.
+- O **algoritmo** da sugestão (regra linear simples, critério por nível do aluno,
+  janela de histórico) é slice futuro com mesa própria. O que este D fixa é o
+  **contorno**: sugerir sim, impor nunca.
+
 ## Gaps conhecidos (decisão de produto pendente — não modelar sem ADR)
 
 Registrados aqui para ficarem **visíveis, não esquecidos**. Nenhum é bloqueante
@@ -260,11 +367,12 @@ do MVP; nenhum deve ser modelado por conta própria.
 - **Relevante se** CrossFit/HIIT/treino funcional entrarem no escopo de verdade.
   Nenhum ADR decidiu isso. Exige decisão de produto explícita.
 
-### Taxonomia de grupo muscular
+### ~~Taxonomia de grupo muscular~~ — FECHADO pelo D-164 (jul/2026)
 
-- O D-089 cita "músculo" como conteúdo da biblioteca, mas **nenhum ADR decidiu a
-  taxonomia** (enum fixo de grupos × catálogo em tabela × múltiplos músculos por
-  exercício com primário/secundário). Não modelado — decisão de produto pendente.
+- Era gap aberto: o D-089 citava "músculo" como conteúdo da biblioteca sem taxonomia
+  decidida. **Decidido no D-164** — `MuscleGroup` como tabela-pai, com grupo primário
+  (FK) + secundários (N:N) por `Exercise`. Mantido aqui como registro de que o gap
+  existiu e de onde foi fechado.
 
 ### Catálogo de técnicas de série
 
@@ -325,7 +433,17 @@ aprovação.
   D-099). Reavaliar se surgir atributo real de grupo.
 - **Progressão prescrita/automática no plano:** parece sofisticado, mas engessa
   e não reflete a prática (o profissional ajusta reagindo ao dado). Rejeitado —
-  progressão reativa (D-085).
+  progressão reativa (D-085). **Continua rejeitada** na revisão de jul/2026: o
+  D-167 admite a **sugestão** pré-preenchida, nunca a prescrição autônoma.
+- **Prescrição por alvos (séries-alvo/reps-alvo/carga-alvo no item):** proposta
+  pelo ADR-0018 (superseded). Rejeitada — colapsa a série numa faixa uniforme e
+  contradiz o D-081, que exige série como linha própria com valores distintos.
+- **Execução append-only imutável:** proposta pelo ADR-0018 (superseded).
+  Rejeitada — incompatível com o **merge por campo** que o offline-first exige
+  (D-099, ADR-0010); a série é registrada sem sinal e reconciliada depois.
+- **Grupo muscular como enum fixo:** menos tabela, mas obriga migração a cada
+  ajuste de taxonomia e não hospeda atributo nem rótulo traduzível. Rejeitado —
+  tabela-pai (D-164).
 - **Manter `detail Json?` e detalhar em runtime:** adia trabalho, mas cria
   dívida imediata e inviabiliza o merge por campo do offline (D-099). Rejeitado
   — colunas tipadas agora.
@@ -340,8 +458,15 @@ aprovação.
 ## Consequências
 
 - Novas entidades a modelar: `WorkoutPlan`, `WorkoutSet`, `WorkoutSession`,
-  `SetLog`, `WorkoutRating`, `FormAnalysis`; e alteração de `Workout`,
-  `WorkoutItem`, `Exercise` (deleção lógica + vídeo).
+  `SetLog`, `WorkoutRating`, `FormAnalysis`, `MuscleGroup` (D-164, com a junção
+  N:N dos secundários); e alteração de `Workout`, `WorkoutItem`, `Exercise`
+  (deleção lógica + vídeo + FK do grupo primário).
+- `WorkoutPlan` nasce com `status DRAFT/ISSUED/CANCELLED` (D-165) — o fluxo de
+  validação do estagiário tem onde plugar quando virar slice.
+- Todas as tabelas do domínio nascem com `tenantId` + índice (D-166); o slice
+  roda depois do tenant isolation (ADR-0017) ou sob disciplina explícita até lá.
+- A sugestão de progressão (D-167) é camada de aplicação sobre os dados de
+  execução — não adiciona entidade nem coluna de estado que possa divergir.
 - A migração é **destrutiva em forma** (troca `Json` por colunas, reestrutura a
   hierarquia), porém sobre **tabelas vazias** — o esqueleto (PR #14) é
   schema-only, sem slice de API que escreva. Não há dado em produção, mas a área

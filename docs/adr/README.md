@@ -28,7 +28,7 @@ o formato: contexto, decisão, alternativas consideradas, consequências.
 | [0015](0015-cadastro-convites-e-vinculo.md) | Cadastro, convite e vínculo |
 | [0016](0016-storage-arquivos.md) | Armazenamento de arquivos (storage) |
 | [0017](0017-tenant-isolation.md) | Isolamento de tenant — defense in depth (blocker go-live #1) |
-| [0018](0018-dominio-treino.md) | Domínio de treino: prescrição, periodização e execução |
+| [0018](0018-dominio-treino.md) | ~~Domínio de treino: prescrição, periodização e execução~~ — **Superseded por [0009](0009-dominio-treino.md)** |
 
 ## Mapa D-número → ADR
 
@@ -47,7 +47,7 @@ sem repetir o número. **A tabela é a autoridade sobre a cobertura**, não o `g
 | D-037 – D-040, D-063 – D-068, D-070 – D-073 | [0006](0006-monorepo-e-fundacao.md) | Monorepo e fundação |
 | D-074 – D-076 | [0007](0007-videoconferencia-e-telemedicina.md) | Videoconferência e telemedicina |
 | D-077, D-078 | [0008](0008-perfil-publico-e-white-label.md) | Perfil público e white-label |
-| D-079 – D-092, D-105 | [0009](0009-dominio-treino.md) | Domínio de treino |
+| D-079 – D-092, D-105, **D-164 – D-167** | [0009](0009-dominio-treino.md) | Domínio de treino (D-164: taxonomia de grupo muscular; D-165: lifecycle DRAFT/ISSUED/CANCELLED; D-166: `tenantId`; D-167: progressão sugerida — revisão jul/2026) |
 | D-093 – D-100 | [0010](0010-fluxo-aluno-gates-atendimento.md) | Fluxo do aluno, gates, atendimento |
 | D-101 – D-104 | [0011](0011-modalidade-e-anamnese.md) | Modalidade e anamnese |
 | D-106 – D-111 | [0012](0012-agenda.md) | Agenda |
@@ -56,9 +56,12 @@ sem repetir o número. **A tabela é a autoridade sobre a cobertura**, não o `g
 | D-135 – D-143, D-156, D-157 | [0015](0015-cadastro-convites-e-vinculo.md) | Cadastro, convite e vínculo (D-141: academia; D-142/D-143: seat de estagiário, multi-área; D-156: seat de recepção; D-157: gate de completar-perfil) |
 | D-144 – D-149 | [0016](0016-storage-arquivos.md) | Armazenamento de arquivos (adapter S3, bucket privado, arquivo como recurso do bond) |
 | D-150 – D-155 | [0017](0017-tenant-isolation.md) | Isolamento de tenant (AsyncLocalStorage + Prisma extension + RLS seletivo) |
-| D-158 – D-163 | [0018](0018-dominio-treino.md) | Domínio de treino: prescrição, periodização e execução (hierarquia, periodização completa no schema, biblioteca curada + custom, execução append-only, card efêmero) |
+| ~~D-158 – D-163~~ | [0018](0018-dominio-treino.md) | ~~Domínio de treino: prescrição, periodização e execução~~ — **SUPERSEDED por [0009](0009-dominio-treino.md); estas decisões NÃO estão em vigor.** O arquivo é registro histórico (pesquisa competitiva jul/2026) |
 
-**Cobertura:** D-001 a D-163, sem lacunas. **D-133 e D-134 são adendos de
+**Cobertura:** D-001 a D-167, sem lacunas. **D-158 – D-163 estão cobertas pelo
+ADR-0018, que é `Superseded`** — os números existem e não são reutilizáveis, mas
+as decisões não valem; o que sobreviveu delas foi reincorporado ao ADR-0009 como
+D-164 – D-167. **D-133 e D-134 são adendos de
 concorrência ao domínio de nutrição (ADR-0013)** numerados **depois** de medicina
 (D-122–D-132) porque nasceram depois — a numeração é cronológica, não temática, e
 por isso a linha do 0013 não é contígua. Algumas decisões aparecem em dois ADRs
@@ -74,6 +77,9 @@ verdade:
 | D-094 (anamnese: quem responde) | D-102 | [0011](0011-modalidade-e-anamnese.md) |
 | D-104 (`MealLog` binário) | D-118 | [0013](0013-dominio-nutricao.md) |
 | D-063/ADR-0006 (esqueleto previu `MedicalRecord`) | D-122 | [0014](0014-dominio-medicina.md) |
+| **ADR-0018 inteiro (D-158 – D-163)** — redecidiu o domínio de treino em conflito com o 0009 | **Superseded por ADR-0009** | [0018](0018-dominio-treino.md) → [0009](0009-dominio-treino.md) |
+| **ADR-0009 revisado** (incorpora MuscleGroup, lifecycle DRAFT/ISSUED, `tenantId`, progressão sugerida) | D-164 – D-167 | [0009](0009-dominio-treino.md) |
+| D-085 (progressão reativa, "sem automática") — **não reescrito**, complementado | D-167 (sugerida, nunca imposta) | [0009](0009-dominio-treino.md) |
 
 ## Convenção
 

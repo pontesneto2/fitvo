@@ -1,8 +1,22 @@
 # ADR-0018 — Domínio de Treino (prescrição, periodização e execução)
 
-**Status:** Proposto (mesa, jul/2026). Decisões D-158 – D-163.
+**Status:** **Superseded por [ADR-0009](0009-dominio-treino.md)** (mesa, jul/2026). Decisões D-158 – D-163 — **NÃO estão em vigor**.
 **Relacionados:** `bond` (entidade central — o programa é prescrito num bond); ADR-0015 (cadastro/vínculo/estagiário); ADR-0016 (storage — dependência do card com foto, fora do MVP); ADR-0017 (tenant isolation — todas as tabelas escopadas por tenant); brief FITVO academias; roadmap camada "instagramável".
 **Classe:** decisão de fundação do maior domínio de produto. Destrava academia, estagiário (fluxo de validação), e a camada de compartilhamento.
+
+---
+
+> ## ⚠️ SUPERSEDED — este ADR não vale como decisão vigente
+>
+> Este ADR redecidiu o domínio de treino sem consultar o ADR-0009 (Aceito), gerando conflito de
+> filosofia (prescrição por alvos vs. série-linha; progressão automática vs. reativa; append-only
+> vs. merge por campo). Resolvido em favor do 0009. Três contribuições deste ADR foram incorporadas
+> ao 0009 revisado: MuscleGroup, lifecycle DRAFT/ISSUED/CANCELLED, e tenantId explícito (ADR-0017).
+> As decisões D-158–D-163 **NÃO estão em vigor** — ver [ADR-0009](0009-dominio-treino.md).
+>
+> O arquivo é preservado como **registro histórico**: a pesquisa competitiva (jul/2026) e as
+> alternativas avaliadas continuam sendo insumo legítimo para mesas futuras. Nada abaixo desta nota
+> deve ser lido como regra vigente.
 
 ---
 

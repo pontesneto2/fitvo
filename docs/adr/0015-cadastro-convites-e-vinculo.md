@@ -1,7 +1,7 @@
 # ADR-0015 — Cadastro, Convite e Vínculo
 
 **Status:** Aceito
-**Decisões cobertas:** D-135 a D-140
+**Decisões cobertas:** D-135 a D-143, D-156
 **Relacionados:** D-006 (ADR-0001), D-025/D-029 (ADR-0002), D-046/D-051 (ADR-0003), TODO(D-010)
 
 ## Contexto
@@ -208,6 +208,43 @@ em leitura** (nunca materializada, nunca por job), sem autocadastro, base legal
 do art. 47. A área **acompanha** o responsável: os dois são decisão da empresa,
 viajam no convite, e o estagiário não escolhe nenhum dos dois.
 
+### D-156 — Recepção: seat administrativo por convite, sem vínculo de admin
+
+A empresa (clínica **ou** academia) precisa de gente que opere **agenda e
+cadastro** sem atender ninguém. Esse é o seat de **recepção** (spec §2/§4.5):
+por convite do admin, no mesmo molde de duas fases do profissional (D-137) e do
+estagiário (D-142), e **nunca** por autocadastro.
+
+O que o distingue dos outros dois seats é o que ele **não** tem:
+
+- **Sem conselho e sem especialidade.** Não são campos opcionais deixados em
+  branco: são campos que **não existem**. Os dois qualificam quem **atende**, e
+  recepção não atende — declará-los sugeriria uma capacidade clínica que este
+  seat não possui.
+- **Sem responsável.** A capacidade do estagiário **deriva** do conselho do
+  supervisor (D-142); recepção não exerce atividade regulamentada, então não há
+  o que supervisionar.
+- **Sem `ClinicMembership`.** Este é o ponto não óbvio. A membership carrega um
+  único papel, `CLINIC_ADMIN`; conceder uma à recepção lhe daria **poder de
+  admin da empresa** — o oposto de um seat administrativo restrito. O vínculo da
+  recepção com o tenant **é a própria linha** de `reception_profile`, e só ela.
+- **Sem coluna `seatType`.** Mesma doutrina do `InternProfile`: a existência da
+  linha já é o fato, e uma segunda representação divergiria (D-103). O rótulo
+  `RECEPTION` vive no DTO.
+
+**Nunca dado clínico.** Recepção enxerga dado **operacional** (D-015) —
+anamnese, avaliação, prontuário e prescrição estão fora, por construção: sem
+`ProfessionalProfile` não há caminho de leitura clínica a partir deste seat.
+Quando o RBAC fino existir (hoje MVP = admin/atende/recepção — spec §8), esta é
+a fronteira a preservar.
+
+**Campos completos no aceite** (nascimento, endereço, WhatsApp — spec §4.5): a
+recepcionista é pré-cadastrada por terceiro, mas preenche tudo no momento em que
+já está engajada. Consequência direta: o seat nasce com o perfil **completo** e
+**não** cai no gate de completar-perfil. A alternativa — pedir menos agora e
+cobrar depois — troca fricção de cadastro por fricção de primeiro login, que é
+pior.
+
 ## Alternativas consideradas
 
 - **Estagiário como `ProfessionalProfile` com flag + supervisor nulável:**
@@ -259,3 +296,11 @@ viajam no convite, e o estagiário não escolhe nenhum dos dois.
 - **Áreas futuras** (fisioterapia/CREFITO, psicologia/CRP...): entram
   acrescentando uma linha ao enum `InternArea` e uma ao mapa área→conselhos.
   Nenhuma outra parte do seat precisa mudar — é o que a forma escolhida compra.
+- **Recepção (D-156) não tem UI ainda:** o slice entrega API + contrato. As
+  telas de convite (admin) e de aceite (recepcionista) são slice próprio,
+  registrado em `docs/roadmap.md`.
+- **RBAC fino continua fora do MVP** (spec §8). Hoje a fronteira "recepção nunca
+  vê dado clínico" é sustentada pela FORMA — o seat não tem
+  `ProfessionalProfile`, e é por ele que passa toda leitura clínica. Quando o
+  sistema de permissões por papel existir, essa fronteira precisa ser
+  reafirmada explicitamente, não herdada por acidente.

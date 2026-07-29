@@ -156,8 +156,39 @@ Autônomo médico informa **só a inscrição** (especialidade fina é exclusiva
 
 **Cria:** `ProfessionalProfile`(tenant da empresa) + `ProfessionalSpecialty`(do convite, incl. especialidade médica) + `Account` se nova + 2× `TermsAcceptanceEvent` (só nova). **Vê o gate de completar-perfil** (§5). Corrigido em **#102**.
 
-### 4.5 Recepção — por convite do admin
-Fase A + B **sem** profissão/conselho/especialidade. Não atende; acesso administrativo, nunca dado clínico. Campos mínimos (nome, senha, documento, contato, aceite); nascimento/endereço conforme necessidade — **definir no slice de recepção**. Vê o gate se faltar dado.
+### 4.5 Recepção — seat administrativo, por convite do admin (D-156)
+
+**NUNCA** aparece em seletor: recepção é pré-cadastrada pela empresa (clínica **ou** academia), no mesmo molde de duas fases do §4.4, **sem** profissão, conselho, especialidade **nem responsável** — não são campos vazios, são campos que **não existem**. Os três primeiros qualificam quem **atende**; o quarto (§4.8) existe porque a capacidade do estagiário deriva do conselho do supervisor. Recepção não atende e não exerce atividade regulamentada.
+
+**NUNCA dado clínico.** Acesso administrativo (agenda/cadastro) — dado operacional (D-015). Anamnese, avaliação, prontuário e prescrição estão fora **por construção**: sem `ProfessionalProfile` não há caminho de leitura clínica a partir deste seat.
+
+**Sem `ClinicMembership`:** a membership carrega um papel só, `CLINIC_ADMIN` — concedê-la à recepção daria **poder de admin da empresa**. O vínculo com o tenant **é a linha** de `reception_profile`. Sem coluna `seatType` (a existência da linha já é o fato — D-103); o rótulo `RECEPTION` vive no DTO.
+
+**Fase A — o admin pré-cadastra:**
+
+| Campo | Obrig. | Nota |
+|---|---|---|
+| E-mail | ● | destino do convite |
+| Nome | ○ | facilita o convite; o civil vem no aceite |
+| Profissão / conselho / especialidade / responsável | ✗ | **não existem** para recepção |
+
+**Fase B — a recepcionista aceita e completa:**
+
+| Campo | Obrig. | Nota |
+|---|---|---|
+| Senha | ● | 8+letra+número + confirmar + medidor |
+| Nome civil + nome social(○) | ● | §3.1 |
+| Documento (CPF/CNPJ) | ● | DV real + xor |
+| Data de nascimento | ● | — |
+| Gênero | ○ | §3.1 |
+| Endereço completo | ● | CEP puxa |
+| WhatsApp | ● | — |
+| Aceite Termos + Política | ● | `literal(true)` ×2, gravado **só** em conta nova |
+| Sexo biológico | ✗ | é base de cálculo clínico de **paciente** (§3.1); de recepção não se calcula nada |
+
+**Cria:** `ReceptionProfile`(tenant da empresa) + `Account` se nova + 2× `TermsAcceptanceEvent` (só nova). **NÃO** cria `ProfessionalProfile` nem `ClinicMembership`.
+
+**Campos completos ⇒ NÃO vê o gate (§5).** A recepcionista é pré-cadastrada por terceiro, mas preenche nascimento/endereço/WhatsApp no próprio aceite — nasce com perfil completo. Pedir menos agora e cobrar depois trocaria fricção de cadastro por fricção de primeiro login, que é pior.
 
 ### 4.6 Paciente / Aluno — por convite (preenche tudo no aceite)
 
@@ -265,9 +296,11 @@ Nunca materializada, nunca por job.
 
 ## 5. Gate de completar-perfil (pós-login)
 
-**Vê o gate:** **apenas** pré-cadastrados por terceiro com dados faltando — **profissional de clínica/academia** e **recepção**. Ao logar, se faltar `birthDate`/endereço/WhatsApp, a primeira tela é completar dados, com o app **bloqueado** até completar.
+**Vê o gate:** **apenas** pré-cadastrados por terceiro com dados faltando — hoje, o **profissional de clínica/academia** (§4.4). Ao logar, se faltar `birthDate`/endereço/WhatsApp, a primeira tela é completar dados, com o app **bloqueado** até completar.
 
-**NÃO vê o gate (entram completos):** autônomo, admin de clínica/academia, paciente/aluno e **estagiário** (§4.8 — preenche nascimento/endereço/WhatsApp no próprio aceite).
+**NÃO vê o gate (entram completos):** autônomo, admin de clínica/academia, paciente/aluno, **estagiário** (§4.8) e **recepção** (§4.5) — os dois últimos preenchem nascimento/endereço/WhatsApp no próprio aceite.
+
+> **A regra é sobre DADO, não sobre papel.** Quem vê o gate não é uma lista de seats mantida à mão — é quem, de fato, está sem os campos. Cada fluxo de criação decide, pelo que coleta, se a conta nasce completa; a lista acima é **consequência** disso, não uma segunda fonte de verdade a manter em dia. Um seat novo que colete tudo simplesmente nunca aparece no gate, sem que ninguém precise lembrar de atualizar esta seção.
 
 Gate estreito (só convidados-por-terceiro). FITVO **trava** (garante dado antes do uso); iClinic apenas sinaliza — escolha consciente pela trava.
 
@@ -280,6 +313,7 @@ Gate estreito (só convidados-por-terceiro). FITVO **trava** (garante dado antes
 - Estagiário **NUNCA** tem conselho próprio, em **NENHUMA** área — declara uma **ÁREA**, e a área define o conselho exigido do responsável (D-143). O mapa área→conselho é **UM só**, no contrato.
 - Academia **SEMPRE** só profissões de **CREF** — Médico e Nutricionista **PROIBIDOS**; sem Médico, **nunca** há especialidade médica (D-141).
 - **SEMPRE** gravar consentimento (D-025) na mesma transação, só no ramo de conta nova.
+- Recepção **NUNCA** tem conselho, especialidade ou responsável, e **NUNCA** acessa dado clínico. **NUNCA** recebe `ClinicMembership` — a membership só carrega `CLINIC_ADMIN`, e dá-la à recepção seria dar poder de admin (D-156).
 - Clínica/academia **SEMPRE** CNPJ. Autônomo CPF ou CNPJ.
 - Admin de empresa: campo **"Você é?"** — gestor-puro **NÃO** informa conselho; "também atende" abre conselho condicionalmente.
 - **RT SEMPRE** é profissional com conselho ativo — **NUNCA** gestor-puro; é derivado, não campo do cadastro.
@@ -308,7 +342,7 @@ Gate estreito (só convidados-por-terceiro). FITVO **trava** (garante dado antes
 | Estagiário multi-área (ed. física / nutrição / medicina), em clínica ou academia | ✅ D-143 |
 | Fluxo de validação do trabalho do estagiário | ⏸ bloqueado no domínio de treino |
 | Gate de completar-perfil | ⬜ depois de clínica |
-| Recepção (seat administrativo por convite) | ⬜ MVP |
+| Recepção (seat administrativo por convite) | ✅ D-156 (API/contrato; UI em slice próprio) |
 | Paciente menor + autorização de responsável | ⬜ slice do fluxo de paciente |
 | Atribuição de RT (derivado) | ⬜ pós-cadastro |
 | Verificação de conselho ativo | ⏸ deferido — TODO(D-010) |

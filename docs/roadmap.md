@@ -215,19 +215,6 @@ vínculo nasce (`prisma-intern-repository.ts`, no `acceptInvite`).
 terceiro — é **ordem de construção**. Sai sozinho assim que o domínio de treino
 estiver de pé.
 
-### Corrigir DV do documento no aceite de convite de profissional (#102)
-
-`clinicAcceptInviteSchema` valida o documento só por **comprimento**
-(`min(11).max(18)`), sem dígito verificador e sem o xor CPF/CNPJ — enquanto a
-spec §3 exige **"CPF-xor-CNPJ + dígito verificador (`.superRefine`)"** e todos os
-outros cadastros já cumprem (autônomo, empresa, e o aceite de estagiário de
-D-142). Um profissional de clínica entra hoje com documento mal formado.
-
-**Correção:** aplicar em `clinicAcceptInviteSchema` o mesmo `.superRefine` de
-`registerProfessionalSchema`/`internAcceptInviteSchema`. Slice próprio — é
-mudança de contrato numa porta de nascimento de conta (área crítica), não
-carona em slice alheio.
-
 ### UI do estagiário — slice próprio
 
 O seat de estagiário entregou **API + contrato** (D-142). Falta a UI: (a) tela
@@ -236,6 +223,16 @@ da academia para pré-cadastrar (Fase A, com o select de responsáveis vindo de
 página `/convite/aceitar` hoje é fechada no formato do convite de profissional —
 a UI do estagiário precisa **resolver o tipo do token antes de renderizar**, que
 é o trabalho de fato deste slice.
+
+### UI da recepção — slice próprio
+
+O seat de recepção entregou **API + contrato** (D-156, #115). Falta a UI: (a)
+tela do admin para pré-cadastrar (Fase A — só e-mail e nome, sem select de
+responsável, ao contrário do estagiário); (b) aceite da recepcionista (Fase B,
+campos completos). Compartilha com a UI do estagiário o mesmo pré-requisito: a
+página `/convite/aceitar` precisa **resolver o tipo do token antes de
+renderizar** — hoje ela é fechada no formato do convite de profissional. Vale
+tratar os dois no mesmo slice, já que o trabalho difícil é o mesmo.
 
 ## BLOQUEADO — RESPONSÁVEL (decisão que só você pode tomar)
 

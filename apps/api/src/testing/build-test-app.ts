@@ -25,6 +25,8 @@ import { InMemoryNutritionRepository } from '../modules/nutrition/in-memory-nutr
 import { NutritionApplicationService } from '../modules/nutrition/nutrition-application-service';
 import { InMemoryPatientRepository } from '../modules/patient/in-memory-patient-repository';
 import { PatientApplicationService } from '../modules/patient/patient-application-service';
+import { InMemoryReceptionRepository } from '../modules/reception/in-memory-reception-repository';
+import { ReceptionApplicationService } from '../modules/reception/reception-application-service';
 import { InMemorySpecialtyRepository } from '../modules/specialty/in-memory-specialty-repository';
 import { SpecialtyApplicationService } from '../modules/specialty/specialty-application-service';
 import { InMemoryTermsRepository } from '../modules/terms/in-memory-terms-repository';
@@ -39,6 +41,7 @@ export interface TestDependencies {
   verificationTokens: InMemoryVerificationTokenStore;
   clinic: InMemoryClinicRepository;
   intern: InMemoryInternRepository;
+  reception: InMemoryReceptionRepository;
   patient: InMemoryPatientRepository;
   consent: InMemoryConsentRepository;
   billing: InMemoryBillingRepository;
@@ -59,6 +62,8 @@ export interface TestHarness {
   clinic: InMemoryClinicRepository;
   /** Repositorio do seat de estagiario em memoria (D-142) — expoe `seedSupervisor`/`listInternProfiles`. */
   intern: InMemoryInternRepository;
+  /** Repositorio do seat de recepcao em memoria (D-156) — expoe `seedAccount`/`listReceptionProfiles`. */
+  reception: InMemoryReceptionRepository;
   /** Repositorio de paciente/vinculo em memoria — expoe `seed*` para arranjar profissionais/especialidades. */
   patient: InMemoryPatientRepository;
   /** Repositorio de consentimento em memoria — expoe `seed*` para arranjar pacientes/profissionais/vinculos. */
@@ -145,6 +150,18 @@ export function buildTestDependencies(): TestDependencies {
     accounts,
     termsService,
   );
+  // Seat administrativo de recepcao (D-156): mesma composicao do estagiario —
+  // o InMemoryClinicRepository serve de ClinicAdminLookup (interface estreita).
+  const reception = new InMemoryReceptionRepository(terms);
+  const receptionService = new ReceptionApplicationService(
+    reception,
+    clinic,
+    hasher,
+    authCore,
+    3600,
+    accounts,
+    termsService,
+  );
   const queue = new InMemoryQueueFactory();
   const bondEvents = queue.createQueue<BondCreatedEvent>(SHARING_QUEUE);
   // Recebe `terms` para gravar o aceite inicial dos termos (D-025) e
@@ -183,6 +200,7 @@ export function buildTestDependencies(): TestDependencies {
       authService,
       clinicService,
       internService,
+      receptionService,
       patientService,
       consentService,
       termsService,
@@ -195,6 +213,7 @@ export function buildTestDependencies(): TestDependencies {
     verificationTokens,
     clinic,
     intern,
+    reception,
     patient,
     consent,
     billing,
@@ -215,6 +234,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     verificationTokens,
     clinic,
     intern,
+    reception,
     patient,
     consent,
     billing,
@@ -231,6 +251,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     verificationTokens,
     clinic,
     intern,
+    reception,
     patient,
     consent,
     billing,

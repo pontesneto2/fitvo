@@ -28,6 +28,7 @@ o formato: contexto, decisão, alternativas consideradas, consequências.
 | [0015](0015-cadastro-convites-e-vinculo.md) | Cadastro, convite e vínculo |
 | [0016](0016-storage-arquivos.md) | Armazenamento de arquivos (storage) |
 | [0017](0017-tenant-isolation.md) | Isolamento de tenant — defense in depth (blocker go-live #1) |
+| [0018](0018-dominio-treino.md) | Domínio de treino: prescrição, periodização e execução |
 
 ## Mapa D-número → ADR
 
@@ -55,8 +56,9 @@ sem repetir o número. **A tabela é a autoridade sobre a cobertura**, não o `g
 | D-135 – D-143, D-156, D-157 | [0015](0015-cadastro-convites-e-vinculo.md) | Cadastro, convite e vínculo (D-141: academia; D-142/D-143: seat de estagiário, multi-área; D-156: seat de recepção; D-157: gate de completar-perfil) |
 | D-144 – D-149 | [0016](0016-storage-arquivos.md) | Armazenamento de arquivos (adapter S3, bucket privado, arquivo como recurso do bond) |
 | D-150 – D-155 | [0017](0017-tenant-isolation.md) | Isolamento de tenant (AsyncLocalStorage + Prisma extension + RLS seletivo) |
+| D-158 – D-163 | [0018](0018-dominio-treino.md) | Domínio de treino: prescrição, periodização e execução (hierarquia, periodização completa no schema, biblioteca curada + custom, execução append-only, card efêmero) |
 
-**Cobertura:** D-001 a D-157, sem lacunas. **D-133 e D-134 são adendos de
+**Cobertura:** D-001 a D-163, sem lacunas. **D-133 e D-134 são adendos de
 concorrência ao domínio de nutrição (ADR-0013)** numerados **depois** de medicina
 (D-122–D-132) porque nasceram depois — a numeração é cronológica, não temática, e
 por isso a linha do 0013 não é contígua. Algumas decisões aparecem em dois ADRs

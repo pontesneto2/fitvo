@@ -43,27 +43,31 @@ crítica, não opcional. Bots varrem repositórios públicos em minutos.
 
 ---
 
-## Política de Merge — repo solo: CI é o gate duro, revisão humana é o gate de risco
+## Política de Merge — repo solo: suíte local é o gate duro, revisão humana é o gate de risco
 
-O CI verde prova que o código compila e passa nos testes. NÃO prova que a regra
-de negócio está correta. O gate é por **risco**, não por conveniência.
+A suíte verde prova que o código compila e passa nos testes. NÃO prova que a
+regra de negócio está correta. O gate é por **risco**, não por conveniência.
 
 **Contexto (mudou em relação à versão anterior desta política):** o repositório
 é mantido por uma única pessoa. Branch protection exigindo "1 approving review"
 é **impossível de satisfazer sozinho** (GitHub não permite auto-aprovar o
 próprio PR) — por isso a exigência de Approve formal no GitHub foi **removida**
-da configuração de proteção da branch; os **required status checks continuam
-ativos e são o gate duro**. `--admin` deixa de ser necessário para mergear com
-CI verde, porque não há mais review bloqueando.
+da configuração de proteção da branch.
 
-**AUTO-MERGE PERMITIDO (CI verde é gate suficiente, sem revisão adicional):**
+**No MVP, com o CI remoto desativado por billing lock (#101), o gate de
+qualidade é a SUÍTE LOCAL COMPLETA verde + revisão do usuário do diff em área
+crítica.** Os required status checks do GitHub voltam a ser o gate duro quando o
+billing for resolvido. Merges saem **sem `--admin`** — não há required check a
+satisfazer.
+
+**AUTO-MERGE PERMITIDO (suíte local verde é gate suficiente, sem revisão adicional):**
 - Infraestrutura, tooling, configs, CI
 - Design system, tokens, primitivos de UI
 - Documentação
 - Refactors sem mudança de comportamento
 - Upgrades de dependência
 
-**ÁREA CRÍTICA — CI verde não basta, precisa da minha revisão explícita do diff:**
+**ÁREA CRÍTICA — suíte verde não basta, precisa da minha revisão explícita do diff:**
 - **Financeiro** — qualquer coisa em `payments`, billing, split, subconta, fee,
   cobrança, assinatura, webhook de pagamento, reembolso/estorno. Erro aqui custa
   dinheiro real de terceiros.
@@ -79,10 +83,10 @@ CI verde, porque não há mais review bloqueando.
 Nessas áreas: abra o PR, apresente o diff no chat e AGUARDE minha revisão
 explícita do diff + um **"pode ir" (ou equivalente) no chat**. Isso — não um
 Approve no GitHub — é o controle humano que substitui o review de terceiro
-neste repositório solo. Sem esse sinal explícito, não mergeie mesmo com CI
-verde. Com esse sinal, mergeie **sem `--admin`** (os required checks já
-liberam o botão) — `--admin` só se algum check específico travar por razão já
-identificada e aceita nesta mesma revisão.
+neste repositório solo. Sem esse sinal explícito, não mergeie mesmo com a suíte
+local verde. Com esse sinal, mergeie **sem `--admin`** (enquanto o CI remoto
+estiver desativado não há required check a satisfazer; quando ele voltar, os
+required checks é que liberam o botão).
 
 Se uma mudança tocar área crítica E não-crítica ao mesmo tempo, trate como
 crítica.
@@ -96,7 +100,7 @@ recriável a partir das migrations. Nesse contexto:
   `prisma migrate deploy` (e `prisma migrate status`) — para validar que a
   cadeia aplica de verdade e que as colunas novas existem. Uma migration
   **aditiva** (coluna/enum/índice novos, nada removido nem alterado sobre dado
-  existente) segue a mesma regra das áreas não-críticas: CI verde basta.
+  existente) segue a mesma regra das áreas não-críticas: suíte local verde basta.
 - **CONTINUA exigindo mim, mesmo em dev:** `prisma migrate reset`, `DROP`,
   `TRUNCATE`, `DELETE` em massa, ou qualquer migration **destrutiva** (remove ou
   altera coluna com dado existente — ver bullet acima). O agente **nunca** roda
@@ -321,7 +325,7 @@ Quando cada skill deve atuar:
 - systematic-debugging — bug/erro: reproduzir → isolar → diagnosticar → corrigir.
 - using-git-worktrees / dispatching-parallel-agents / subagent-driven-development /
   finishing-a-development-branch — coordenação de sessões paralelas com territórios
-  disjuntos (branch + arquivos). NÃO substituem a política de merge #83 (CI required checks;
+  disjuntos (branch + arquivos). NÃO substituem a política de merge #83 (suíte local verde;
   área crítica = revisão do diff pelo usuário + "pode ir"; agente mergeia sem --admin).
 - supabase-postgres-best-practices — consulta pontual de padrões de RLS ao decidir
   isolamento de tenant (extensão Prisma vs RLS vs ambos). Ignorar o que for específico de Supabase.

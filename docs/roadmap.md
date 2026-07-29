@@ -224,6 +224,22 @@ página `/convite/aceitar` hoje é fechada no formato do convite de profissional
 a UI do estagiário precisa **resolver o tipo do token antes de renderizar**, que
 é o trabalho de fato deste slice.
 
+### Mobile: consumir `profileComplete` (gate de completar-perfil)
+
+O gate (D-157) está de pé na API e no web-personal (guard no shell +
+`/completar-perfil`). O app mobile ainda **não** consome `profileComplete` de
+`/me` — um profissional de clínica pré-cadastrado entra no mobile sem o gate.
+Reusar a mesma derivação do servidor: a superfície só consome, nunca recalcula.
+
+### Endereço pessoal do admin de empresa — decisão pendente
+
+O cadastro de empresa coleta o endereço do **estabelecimento**; o admin não
+informa endereço pessoal. Sob a derivação por dado do D-157 ele nasce
+`profileComplete: false`, contra a spec §5. Escolher: (a) coletar o endereço
+pessoal do admin no cadastro de empresa, ou (b) tirar o endereço do mínimo
+funcional. O comportamento atual está fixado em teste
+(`profile-complete-gate.test.ts`) para não passar despercebido.
+
 ### UI da recepção — slice próprio
 
 O seat de recepção entregou **API + contrato** (D-156, #115). Falta a UI: (a)

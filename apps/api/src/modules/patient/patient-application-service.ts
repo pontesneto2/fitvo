@@ -1,5 +1,11 @@
 import type { PasswordHasher } from '@fitvo/auth';
-import type { BondStatus, CareModality, InviteStatus } from '@fitvo/database';
+import type {
+  BiologicalSex,
+  BondStatus,
+  CareModality,
+  Gender,
+  InviteStatus,
+} from '@fitvo/database';
 import { BOND_CREATED_EVENT, type BondCreatedEvent, type Queue } from '@fitvo/queue';
 
 import type {
@@ -20,6 +26,7 @@ import {
   NotFoundError,
 } from '../../shared/http-errors';
 import { generateInviteToken, hashInviteToken } from '../../shared/invite-token';
+import type { AddressInput } from '../auth/account-repository';
 import type { RequestOrigin } from '../terms/terms-repository';
 import type { BondRecord, PatientInviteRecord, PatientRepository } from './patient-repository';
 
@@ -66,7 +73,15 @@ export interface AcceptPatientInviteInput {
   token: string;
   password: string;
   name: string;
+  socialName?: string | undefined;
+  gender?: Gender | undefined;
+  /** Sexo biologico — OBRIGATORIO no aceite do paciente (spec §3.1/§4.6). */
+  biologicalSex: BiologicalSex;
   document: string;
+  whatsapp: string;
+  /** `YYYY-MM-DD` no fio — convertido para Date no boundary do repositorio. */
+  birthDate: string;
+  address: AddressInput;
   /**
    * Origem da requisicao (IP/UA, capturada na rota — nunca informada pelo
    * cliente), necessaria para gravar o aceite inicial dos termos (D-025)
@@ -266,7 +281,19 @@ export class PatientApplicationService {
     const passwordHash = await this.hasher.hash(input.password);
     const outcome = await this.patients.acceptInvite(
       hashInviteToken(input.token),
-      { passwordHash, name: input.name, document: input.document },
+      {
+        passwordHash,
+        name: input.name,
+        socialName: input.socialName,
+        gender: input.gender,
+        biologicalSex: input.biologicalSex,
+        document: input.document,
+        whatsapp: input.whatsapp,
+        // `YYYY-MM-DD` (calendario) -> Date UTC midnight: o schema ja validou
+        // formato; aqui so a conversao para o boundary Prisma (@db.Date).
+        birthDate: new Date(`${input.birthDate}T00:00:00Z`),
+        address: input.address,
+      },
       input.origin,
     );
     if (outcome.status === 'invalid') {

@@ -1,6 +1,6 @@
 import type { BondStatus, CareModality, InviteStatus } from '@fitvo/database';
 
-import type { InMemoryAccountRepository } from '../auth/in-memory-account-repository';
+import { InMemoryAccountRepository } from '../auth/in-memory-account-repository';
 import type { InMemoryTermsRepository } from '../terms/in-memory-terms-repository';
 import { recordInitialTermsAcceptanceInMemory } from '../terms/initial-terms-acceptance';
 import type { RequestOrigin } from '../terms/terms-repository';
@@ -295,7 +295,14 @@ export class InMemoryPatientRepository implements PatientRepository {
       // `auth`) enxergam esta conta nos testes. Sem `accounts` (harness que nao
       // precisa disso), mantem o id local de sempre.
       const seeded = this.accounts
-        ? await this.accounts.seedAccount(invite.email, account.passwordHash, account.name)
+        ? await this.accounts.seedAccount(
+            invite.email,
+            account.passwordHash,
+            account.name,
+            // O aceite de paciente coleta a pessoa INTEIRA (spec §4.6) — a
+            // conta nasce completa e nunca ve o gate (spec §5).
+            InMemoryAccountRepository.profileFrom(account),
+          )
         : null;
       const stored: StoredAccount = {
         id: seeded?.id ?? this.nextId('acc'),

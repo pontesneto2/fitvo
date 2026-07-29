@@ -20,10 +20,13 @@ import {
 import {
   type AccountRecord,
   type AccountRepository,
+  type AccountWithProfileRecord,
   type AddressInput,
   type ClinicProviderInput,
   type CompanyTenantType,
+  type CompleteProfileInput,
   deriveDisplayName,
+  deriveProfileComplete,
   type TermsAcceptanceOrigin,
 } from './account-repository';
 
@@ -61,6 +64,12 @@ export interface MeResult {
   /** Nome de exibição (socialName ?? name) — derivado no servidor (spec §3.1). */
   displayName: string;
   emailVerified: boolean;
+  /**
+   * Perfil completo (spec §5) — derivado no servidor (`deriveProfileComplete`).
+   * `false` = falta o mínimo funcional e a superfície leva a pessoa para
+   * completar. As superfícies CONSOMEM; nunca refazem a conta.
+   */
+  profileComplete: boolean;
 }
 
 export interface RegisterProfessionalInput {
@@ -248,16 +257,50 @@ export class AuthApplicationService {
   /** Conta autenticada a partir do access token (Bearer). */
   async getMe(accessToken: string): Promise<MeResult> {
     const payload = await this.authCore.verifyAccessToken(accessToken);
-    const account = await this.accounts.findById(payload.sub);
+    const account = await this.accounts.findByIdWithProfile(payload.sub);
     if (!account) {
       throw new UnauthorizedError('Conta nao encontrada.');
     }
+    return this.toMeResult(account);
+  }
+
+  /**
+   * Completa os campos faltantes do perfil (spec §5) e devolve o `/me` ja
+   * recalculado — a superficie nao precisa de um segundo round-trip para saber
+   * se o gate liberou.
+   *
+   * Autenticado pelo Bearer: quem completa e o DONO da conta, sobre si mesmo.
+   * Nao ha tenantId aqui de proposito — `Account` e a PESSOA (D-044), nao o
+   * papel: a mesma conta pode ter seats em varias empresas, e o nascimento dela
+   * e um so.
+   *
+   * Idempotente: reenviar os mesmos valores nao muda nada. NAO regrava termos
+   * (completar perfil nao e novo consentimento — D-025) nem toca em
+   * documento/e-mail (identidade, nao "dado faltando").
+   */
+  async completeProfile(accessToken: string, input: CompleteProfileInput): Promise<MeResult> {
+    const payload = await this.authCore.verifyAccessToken(accessToken);
+    const existing = await this.accounts.findByIdWithProfile(payload.sub);
+    if (!existing) {
+      throw new UnauthorizedError('Conta nao encontrada.');
+    }
+    const updated = await this.accounts.completeProfile(payload.sub, input);
+    return this.toMeResult(updated);
+  }
+
+  /**
+   * Projecao de `/me` — UM lugar so. `displayName` e `profileComplete` sao
+   * ambos DERIVADOS no servidor (spec §3.1/§5); montar a resposta em dois
+   * lugares abriria espaco para um deles derivar e o outro nao.
+   */
+  private toMeResult(account: AccountWithProfileRecord): MeResult {
     return {
       id: account.id,
       email: account.email,
       name: account.name,
       displayName: deriveDisplayName(account),
       emailVerified: account.emailVerifiedAt !== null,
+      profileComplete: deriveProfileComplete(account),
     };
   }
 

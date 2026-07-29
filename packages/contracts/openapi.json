@@ -1303,6 +1303,10 @@
                     },
                     "emailVerified": {
                       "type": "boolean"
+                    },
+                    "profileComplete": {
+                      "type": "boolean",
+                      "description": "Perfil completo (spec §5) — derivado no servidor; nunca recalcular no cliente."
                     }
                   },
                   "required": [
@@ -1310,7 +1314,206 @@
                     "email",
                     "name",
                     "displayName",
-                    "emailVerified"
+                    "emailVerified",
+                    "profileComplete"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/me/complete-profile": {
+      "patch": {
+        "summary": "Completa os campos faltantes do perfil (gate pos-login — spec §5)",
+        "tags": [
+          "auth"
+        ],
+        "description": "Preenche nascimento/WhatsApp/endereco de quem foi pre-cadastrado por terceiro sem esses dados, e devolve o `/me` com `profileComplete` recalculado. Cada campo e validado com o MESMO rigor do cadastro (DV/CEP/maioridade) — nao ha versao relaxada. Campos ausentes NAO sao zerados. Nao regrava termos (D-025) nem altera documento/e-mail (identidade, nao \"dado faltando\"). Idempotente.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "whatsapp": {
+                    "type": "string",
+                    "pattern": "^\\d{11}$",
+                    "description": "WhatsApp — 11 dígitos (DDD + celular), só números (máscara é UI)."
+                  },
+                  "birthDate": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                    "description": "Data de nascimento (YYYY-MM-DD) — maioridade obrigatória (D-044)."
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "cep": {
+                        "type": "string",
+                        "pattern": "^\\d{8}$",
+                        "description": "CEP — 8 dígitos, só números (máscara é UI)."
+                      },
+                      "logradouro": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "numero": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "complemento": {
+                        "type": "string"
+                      },
+                      "bairro": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "cidade": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "AC",
+                          "AL",
+                          "AM",
+                          "AP",
+                          "BA",
+                          "CE",
+                          "DF",
+                          "ES",
+                          "GO",
+                          "MA",
+                          "MG",
+                          "MS",
+                          "MT",
+                          "PA",
+                          "PB",
+                          "PE",
+                          "PI",
+                          "PR",
+                          "RJ",
+                          "RN",
+                          "RO",
+                          "RR",
+                          "RS",
+                          "SC",
+                          "SE",
+                          "SP",
+                          "TO"
+                        ],
+                        "description": "UF do endereço."
+                      },
+                      "country": {
+                        "default": "BR",
+                        "description": "País do endereço (default BR).",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "cep",
+                      "logradouro",
+                      "numero",
+                      "bairro",
+                      "cidade",
+                      "state"
+                    ],
+                    "description": "Endereço da pessoa (D-044)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Nome civil — uso fiscal/documento; NÃO exibir quando há nome social."
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "description": "Nome de exibição (socialName ?? name) — spec §3.1."
+                    },
+                    "emailVerified": {
+                      "type": "boolean"
+                    },
+                    "profileComplete": {
+                      "type": "boolean",
+                      "description": "Perfil completo (spec §5) — derivado no servidor; nunca recalcular no cliente."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "email",
+                    "name",
+                    "displayName",
+                    "emailVerified",
+                    "profileComplete"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
                   ],
                   "additionalProperties": false
                 }
@@ -3743,16 +3946,141 @@
                   "password": {
                     "type": "string",
                     "minLength": 8,
-                    "description": "Senha em claro (mín. 8)."
+                    "allOf": [
+                      {
+                        "type": "string",
+                        "pattern": "[A-Za-z]"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "\\d"
+                      }
+                    ],
+                    "description": "Senha em claro — mín. 8, ao menos 1 letra e 1 número."
                   },
                   "name": {
                     "type": "string",
+                    "minLength": 1,
+                    "description": "Nome civil do paciente."
+                  },
+                  "socialName": {
+                    "description": "Nome social (exibido no lugar do civil quando preenchido) — spec §3.1.",
+                    "type": "string",
                     "minLength": 1
+                  },
+                  "gender": {
+                    "description": "Gênero/identidade — opcional (spec §3.1).",
+                    "type": "string",
+                    "enum": [
+                      "MULHER_CIS",
+                      "HOMEM_CIS",
+                      "MULHER_TRANS",
+                      "HOMEM_TRANS",
+                      "NAO_BINARIO",
+                      "OUTRO",
+                      "PREFIRO_NAO_INFORMAR"
+                    ]
+                  },
+                  "biologicalSex": {
+                    "type": "string",
+                    "enum": [
+                      "MALE",
+                      "FEMALE",
+                      "INTERSEX"
+                    ],
+                    "description": "Sexo biológico (spec §3.1) — base de cálculo clínico, exclusivo do paciente."
                   },
                   "document": {
                     "type": "string",
                     "pattern": "^\\d+$",
                     "description": "CPF do paciente — só dígitos (D-043)."
+                  },
+                  "whatsapp": {
+                    "type": "string",
+                    "pattern": "^\\d{11}$",
+                    "description": "WhatsApp — 11 dígitos (DDD + celular), só números (máscara é UI)."
+                  },
+                  "birthDate": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                    "description": "Data de nascimento (YYYY-MM-DD) — maioridade obrigatória (D-044)."
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "cep": {
+                        "type": "string",
+                        "pattern": "^\\d{8}$",
+                        "description": "CEP — 8 dígitos, só números (máscara é UI)."
+                      },
+                      "logradouro": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "numero": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "complemento": {
+                        "type": "string"
+                      },
+                      "bairro": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "cidade": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "AC",
+                          "AL",
+                          "AM",
+                          "AP",
+                          "BA",
+                          "CE",
+                          "DF",
+                          "ES",
+                          "GO",
+                          "MA",
+                          "MG",
+                          "MS",
+                          "MT",
+                          "PA",
+                          "PB",
+                          "PE",
+                          "PI",
+                          "PR",
+                          "RJ",
+                          "RN",
+                          "RO",
+                          "RR",
+                          "RS",
+                          "SC",
+                          "SE",
+                          "SP",
+                          "TO"
+                        ],
+                        "description": "UF do endereço."
+                      },
+                      "country": {
+                        "default": "BR",
+                        "description": "País do endereço (default BR).",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "cep",
+                      "logradouro",
+                      "numero",
+                      "bairro",
+                      "cidade",
+                      "state"
+                    ],
+                    "description": "Endereço da pessoa (D-044)."
                   },
                   "acceptedTerms": {
                     "type": "object",
@@ -3783,7 +4111,11 @@
                   "token",
                   "password",
                   "name",
+                  "biologicalSex",
                   "document",
+                  "whatsapp",
+                  "birthDate",
+                  "address",
                   "acceptedTerms"
                 ]
               }

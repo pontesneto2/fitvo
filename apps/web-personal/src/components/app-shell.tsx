@@ -3,7 +3,7 @@
 import { Avatar, Button, Icon, Logo, SideNav } from '@fitvo/ui-web';
 import { LayoutDashboard, LogOut } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 
 import { useMe } from '@/lib/use-me';
 
@@ -23,7 +23,34 @@ const NAV_ITEMS = [
 export function AppShell({ children }: { readonly children: ReactNode }): ReactNode {
   const router = useRouter();
   const pathname = usePathname();
-  const { data: me } = useMe();
+  const { data: me, isSuccess } = useMe();
+
+  /**
+   * GATE DE COMPLETAR-PERFIL (spec §5). Quem foi pre-cadastrado por terceiro
+   * sem o minimo funcional cai em `/completar-perfil` antes de ver o painel.
+   *
+   * O valor vem DERIVADO do servidor (`profileComplete` em `/me`) — a UI so o
+   * consome, nunca refaz a conta; duas derivacoes divergiriam e passariam a
+   * discordar sobre quem esta bloqueado.
+   *
+   * `isSuccess` e a guarda contra o falso positivo: enquanto o /me nao
+   * respondeu, `me` e `undefined` e redirecionar ali mandaria TODO MUNDO para
+   * a tela de completar a cada carregamento.
+   *
+   * Este e o gate de UX. Nao substitui autorizacao: a API continua sendo a
+   * fonte de verdade sobre o que cada conta pode fazer.
+   */
+  useEffect(() => {
+    if (isSuccess && me && !me.profileComplete) {
+      router.replace('/completar-perfil');
+    }
+  }, [isSuccess, me, router]);
+
+  // Enquanto o redirect nao acontece, nao pinta o painel para quem esta
+  // bloqueado — evita o flash da tela que a pessoa ainda nao pode usar.
+  if (isSuccess && me && !me.profileComplete) {
+    return null;
+  }
 
   async function onLogout(): Promise<void> {
     await fetch('/api/auth/logout', { method: 'POST' });

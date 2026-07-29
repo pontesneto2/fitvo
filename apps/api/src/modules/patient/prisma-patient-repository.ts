@@ -231,8 +231,25 @@ export class PrismaPatientRepository implements PatientRepository {
             email: invite.email,
             passwordHash: account.passwordHash,
             name: account.name,
+            socialName: account.socialName ?? null,
+            gender: account.gender ?? null,
+            // Sexo biologico: NOT NULL com default NOT_INFORMED no banco, mas
+            // OBRIGATORIO no contrato do aceite (spec §3.1/§4.6) — o paciente
+            // nasce com ele informado, nunca no default.
+            biologicalSex: account.biologicalSex,
             document: account.document,
+            // Paciente e SEMPRE pessoa fisica (spec §4.6): CPF, sem xor.
             documentType: 'CPF',
+            whatsapp: account.whatsapp,
+            birthDate: account.birthDate,
+            addressStreet: account.address.logradouro,
+            addressNumber: account.address.numero,
+            addressComplement: account.address.complemento ?? null,
+            addressDistrict: account.address.bairro,
+            addressCity: account.address.cidade,
+            addressState: account.address.state,
+            addressZipCode: account.address.cep,
+            addressCountry: account.address.country,
             patientProfile: { create: {} },
           },
           select: { id: true, patientProfile: { select: { id: true } } },

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { hashInviteToken } from '../../shared/invite-token';
 import { buildTestHarness, type TestHarness } from '../../testing/build-test-app';
+import { validPatientAcceptBody } from '../../testing/patient-account-fixture';
 import { validProfessionalRegistration } from '../../testing/professional-registration-fixture';
 
 const PRO_TENANT = 'pro_tenant_1';
@@ -58,14 +59,7 @@ function accept(app: FastifyInstance, token: string, overrides: Record<string, u
   return app.inject({
     method: 'POST',
     url: '/v1/patients/invites/accept',
-    payload: {
-      token,
-      password: 'senha-forte-456',
-      name: 'Novo Paciente',
-      document: '98765432100',
-      acceptedTerms: { termsOfUse: true, privacyPolicy: true },
-      ...overrides,
-    },
+    payload: { token, ...validPatientAcceptBody, name: 'Novo Paciente', ...overrides },
   });
 }
 

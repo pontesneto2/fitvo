@@ -1,4 +1,5 @@
 import type { TestHarness } from './build-test-app';
+import { validPatientAcceptBody } from './patient-account-fixture';
 import { validProfessionalRegistration } from './professional-registration-fixture';
 
 const FIXTURE_TENANT = 'pro_tenant_patient_fixture';
@@ -42,11 +43,11 @@ export async function createPatientViaInvite(
     method: 'POST',
     url: '/v1/patients/invites/accept',
     payload: {
+      ...validPatientAcceptBody,
       token,
       password: patient.password,
       name: patient.name,
       document: patient.document,
-      acceptedTerms: { termsOfUse: true, privacyPolicy: true },
     },
   });
   return { accountId: acceptRes.json().patient.accountId };

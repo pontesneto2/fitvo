@@ -37,6 +37,12 @@ export interface Me {
   /** Nome de exibição (socialName ?? name) — derivado no servidor (spec §3.1). */
   readonly displayName: string;
   readonly emailVerified: boolean;
+  /**
+   * Perfil completo (spec §5) — DERIVADO no servidor. `false` manda a pessoa
+   * para `/completar-perfil`. Nunca recalcular aqui: a conta é uma só, no
+   * servidor (mesma doutrina do `displayName`).
+   */
+  readonly profileComplete: boolean;
 }
 
 /** Espelha o `loginSchema` da API. Mensagens em pt-BR para o formulario. */
@@ -150,6 +156,27 @@ const addressFormSchema = z.object({
   cidade: z.string().trim().min(1, 'Informe a cidade.'),
   state: brazilianStateInput,
 });
+
+/**
+ * Formulário de COMPLETAR PERFIL (spec §5) — valida os valores MASCARADOS que
+ * o RHF guarda; a normalização para o fio acontece no submit. Reusa as mesmas
+ * peças do cadastro (`addressFormSchema`, contagem de dígitos do WhatsApp,
+ * maioridade) — não é uma versão relaxada: um dado que não serviria no cadastro
+ * também não serve aqui.
+ *
+ * Diferente do contrato do servidor (`completeProfileSchema`, onde tudo é
+ * opcional para permitir preenchimento parcial), aqui os três são
+ * OBRIGATÓRIOS: esta tela existe para destravar o app, e destravar exige os
+ * três. Enviar menos deixaria a pessoa presa no mesmo lugar.
+ */
+export const completeProfileFormSchema = z.object({
+  whatsapp: z
+    .string()
+    .refine((v) => onlyDigits(v).length === 11, { message: 'Informe um WhatsApp valido.' }),
+  birthDate: z.string().refine(isAtLeastEighteen, { message: 'Voce precisa ter 18 anos ou mais.' }),
+  address: addressFormSchema,
+});
+export type CompleteProfileFormInput = z.infer<typeof completeProfileFormSchema>;
 
 /**
  * Schema do FORMULÁRIO de cadastro (ADR-0015). Valida os valores MASCARADOS que

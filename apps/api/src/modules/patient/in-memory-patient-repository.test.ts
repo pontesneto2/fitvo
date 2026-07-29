@@ -2,6 +2,7 @@ import type { CareModality } from '@fitvo/database';
 import { describe, expect, it } from 'vitest';
 
 import { hashInviteToken } from '../../shared/invite-token';
+import { validNewPatientAccount } from '../../testing/patient-account-fixture';
 import { InMemoryPatientRepository } from './in-memory-patient-repository';
 import type { CreatePatientInviteInput, NewPatientAccount } from './patient-repository';
 
@@ -9,11 +10,7 @@ const TENANT = 'tenant_a';
 const OTHER_TENANT = 'tenant_b';
 const SPECIALTY = 'spec_training';
 
-const NEW_ACCOUNT: NewPatientAccount = {
-  passwordHash: 'hash',
-  name: 'Paciente',
-  document: '12345678901',
-};
+const NEW_ACCOUNT: NewPatientAccount = validNewPatientAccount();
 
 const ORIGIN = { ipAddress: '127.0.0.1', userAgent: 'vitest' };
 

@@ -194,7 +194,13 @@ export function patientRoutes(service: PatientApplicationService): FastifyPlugin
             token: request.body.token,
             password: request.body.password,
             name: request.body.name,
+            socialName: request.body.socialName,
+            gender: request.body.gender,
+            biologicalSex: request.body.biologicalSex,
             document: request.body.document,
+            whatsapp: request.body.whatsapp,
+            birthDate: request.body.birthDate,
+            address: request.body.address,
             origin: inviteAcceptOrigin(request),
           }),
         );

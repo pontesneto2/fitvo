@@ -10,7 +10,7 @@ import {
   strongPassword,
   whatsapp,
 } from './auth';
-import { isValidCnpj, isValidCpf } from './document';
+import { cpfXorCnpjRefine, documentDigits } from './document';
 import { specialtyCodeSchema } from './specialty';
 
 /**
@@ -137,32 +137,16 @@ export const internAcceptInviteSchema = z
     name: z.string().min(1).describe('Nome civil do estagiário.'),
     socialName,
     gender: genderSchema.optional().describe('Gênero/identidade — opcional (spec §3.1).'),
-    document: z
-      .string()
-      .regex(/^\d+$/, 'Documento deve conter apenas dígitos.')
-      .describe('CPF ou CNPJ, só dígitos (D-043).'),
+    document: documentDigits,
     documentType: z.enum(['CPF', 'CNPJ']),
     whatsapp,
     birthDate,
     address: addressSchema,
     acceptedTerms,
   })
-  .superRefine((data, ctx) => {
-    // CPF-xor-CNPJ com dígito verificador REAL (D-043/spec §3) — mesma regra do
-    // cadastro do autônomo. O tipo declarado decide o algoritmo e o tamanho.
-    const valid =
-      data.documentType === 'CPF' ? isValidCpf(data.document) : isValidCnpj(data.document);
-    if (!valid) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['document'],
-        message:
-          data.documentType === 'CPF'
-            ? 'CPF inválido (11 dígitos + dígito verificador).'
-            : 'CNPJ inválido (14 dígitos + dígito verificador).',
-      });
-    }
-  });
+  // CPF-xor-CNPJ com dígito verificador REAL (D-043/spec §3) — mesma regra do
+  // cadastro do autônomo, e literalmente a mesma peça (`document.ts`).
+  .superRefine(cpfXorCnpjRefine);
 
 // ---- Response ----
 

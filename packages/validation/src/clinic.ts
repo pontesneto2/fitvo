@@ -7,6 +7,7 @@ import {
   companyRegistrationShape,
   medicalSpecialtySchema,
 } from './company-registration';
+import { cpfXorCnpjRefine, documentDigits } from './document';
 import { type SpecialtyCode, specialtyCodeSchema } from './specialty';
 
 /**
@@ -80,14 +81,21 @@ export const clinicCreateInviteSchema = z
  * reinforma especialidade/conselho — esses vêm do convite. Reusa o `acceptedTerms`
  * de auth (literal(true)×2) — mesmo gate irrepresentável do cadastro.
  */
-export const clinicAcceptInviteSchema = z.object({
-  token: z.string().min(1).describe('Token de uso unico recebido no convite.'),
-  password: z.string().min(8).describe('Senha em claro (mín. 8).'),
-  name: z.string().min(1),
-  document: z.string().min(11).max(18).describe('CPF ou CNPJ do profissional (D-043).'),
-  documentType: z.enum(['CPF', 'CNPJ']),
-  acceptedTerms,
-});
+export const clinicAcceptInviteSchema = z
+  .object({
+    token: z.string().min(1).describe('Token de uso unico recebido no convite.'),
+    password: z.string().min(8).describe('Senha em claro (mín. 8).'),
+    name: z.string().min(1),
+    document: documentDigits,
+    documentType: z.enum(['CPF', 'CNPJ']),
+    acceptedTerms,
+  })
+  // CPF-xor-CNPJ com dígito verificador REAL (D-043/spec §3). Até aqui este
+  // aceite validava o documento SÓ por comprimento (`min(11).max(18)`) — uma
+  // porta de nascimento de conta por onde entrava CPF com DV inválido,
+  // enquanto autônomo/estagiário/empresa já exigiam o DV. Mesma peça
+  // compartilhada dos demais fluxos, em `document.ts`.
+  .superRefine(cpfXorCnpjRefine);
 
 /**
  * Cadastro PÚBLICO de CLÍNICA (spec §1/§2/§4.2 · ADR-0015/D-139) — nasce

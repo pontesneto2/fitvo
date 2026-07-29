@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { isValidCnpj, isValidCpf } from './document';
+import { cpfXorCnpjRefine, documentDigits } from './document';
 
 /**
  * Contrato de autenticação (D-032) — FONTE ÚNICA.
@@ -205,10 +205,7 @@ export const registerProfessionalSchema = z
      * `.superRefine` abaixo): CPF ⇒ 11 díg + DV; CNPJ ⇒ 14 díg + DV. Aqui só a
      * disciplina de "apenas dígitos"; a validade real do DV é o refine.
      */
-    document: z
-      .string()
-      .regex(/^\d+$/, 'Documento deve conter apenas dígitos.')
-      .describe('CPF ou CNPJ, só dígitos (D-043).'),
+    document: documentDigits,
     documentType: z.enum(['CPF', 'CNPJ']),
     whatsapp,
     birthDate,
@@ -223,24 +220,9 @@ export const registerProfessionalSchema = z
     councilState: brazilianStateSchema.describe('UF do conselho profissional (D-126).'),
     acceptedTerms,
   })
-  .superRefine((data, ctx) => {
-    // CPF-xor-CNPJ com dígito verificador REAL (D-043). O tipo declarado
-    // determina qual algoritmo e qual tamanho valem — um número bem formado do
-    // tipo errado (CPF com 14 díg, CNPJ com 11) ou com DV inválido é 400 antes
-    // de qualquer escrita. "Bem formado" ≠ "existe na Receita" — só o DV.
-    const valid =
-      data.documentType === 'CPF' ? isValidCpf(data.document) : isValidCnpj(data.document);
-    if (!valid) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['document'],
-        message:
-          data.documentType === 'CPF'
-            ? 'CPF inválido (11 dígitos + dígito verificador).'
-            : 'CNPJ inválido (14 dígitos + dígito verificador).',
-      });
-    }
-  });
+  // CPF-xor-CNPJ com dígito verificador REAL (D-043) — regra compartilhada, em
+  // `document.ts`. Ver a nota daquele módulo sobre por que ela não é copiada.
+  .superRefine(cpfXorCnpjRefine);
 
 export const loginSchema = z.object({
   email,

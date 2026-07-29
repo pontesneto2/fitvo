@@ -93,7 +93,7 @@ describe('aceite de termos no cadastro (D-025)', () => {
         token: 'token-nao-importa-falha-antes-de-resolver',
         password: 'senha-forte-123',
         name: 'Paciente',
-        document: '12345678901',
+        document: '52998224725',
         acceptedTerms: { termsOfUse: true },
       },
     });
@@ -116,7 +116,7 @@ describe('aceite de termos no cadastro (D-025)', () => {
         token: 'token-nao-importa-falha-antes-de-resolver',
         password: 'senha-forte-123',
         name: 'Paciente',
-        document: '12345678901',
+        document: '52998224725',
       },
     });
     expect(response.statusCode).toBe(400);

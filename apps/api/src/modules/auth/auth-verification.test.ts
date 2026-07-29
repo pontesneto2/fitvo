@@ -10,7 +10,7 @@ const patient = {
   email: 'ana@fitvo.dev',
   password: 'senha-forte-123',
   name: 'Ana',
-  document: '12345678901',
+  document: '52998224725',
   acceptedTerms: { termsOfUse: true, privacyPolicy: true },
 };
 

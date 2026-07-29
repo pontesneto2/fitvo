@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { acceptedTerms } from './auth';
+import { cpfOnlyRefine, documentDigits } from './document';
 
 /**
  * Contrato de paciente/vínculo (D-006/D-052/D-032) — fonte única. Nomes
@@ -33,18 +34,24 @@ export const patientCreateInviteSchema = z.object({
   modality,
 });
 
-export const patientAcceptInviteSchema = z.object({
-  token: z.string().min(1).describe('Token de uso unico recebido no convite.'),
-  password: z.string().min(8).describe('Senha em claro (mín. 8).'),
-  name: z.string().min(1),
-  document: z.string().min(11).max(14).describe('CPF do paciente (D-043).'),
-  /**
-   * Aceite dos termos (D-025). Unico caminho de nascimento de conta de
-   * paciente (D-135 — ADR-0015): sem o autocadastro, o aceite de convite
-   * precisa capturar o consentimento inicial que antes vinha do cadastro.
-   */
-  acceptedTerms,
-});
+export const patientAcceptInviteSchema = z
+  .object({
+    token: z.string().min(1).describe('Token de uso unico recebido no convite.'),
+    password: z.string().min(8).describe('Senha em claro (mín. 8).'),
+    name: z.string().min(1),
+    document: documentDigits.describe('CPF do paciente — só dígitos (D-043).'),
+    /**
+     * Aceite dos termos (D-025). Unico caminho de nascimento de conta de
+     * paciente (D-135 — ADR-0015): sem o autocadastro, o aceite de convite
+     * precisa capturar o consentimento inicial que antes vinha do cadastro.
+     */
+    acceptedTerms,
+  })
+  // CPF e SÓ CPF, com dígito verificador (spec §4.6: "CPF — exatamente 11 · DV
+  // real"). Antes daqui o campo era `min(11).max(14)`: aceitava 14 dígitos (um
+  // CNPJ, que paciente não tem) e qualquer DV inválido. Sem `documentType` —
+  // paciente é sempre pessoa física, não há xor a oferecer.
+  .superRefine(cpfOnlyRefine);
 
 // ---- Response ----
 export const patientInviteViewSchema = z.object({

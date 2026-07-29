@@ -54,7 +54,7 @@ function createInvite(
   });
 }
 
-function accept(app: FastifyInstance, token: string) {
+function accept(app: FastifyInstance, token: string, overrides: Record<string, unknown> = {}) {
   return app.inject({
     method: 'POST',
     url: '/v1/patients/invites/accept',
@@ -64,6 +64,7 @@ function accept(app: FastifyInstance, token: string) {
       name: 'Novo Paciente',
       document: '98765432100',
       acceptedTerms: { termsOfUse: true, privacyPolicy: true },
+      ...overrides,
     },
   });
 }
@@ -429,5 +430,48 @@ describe('fluxo de paciente e vinculo (E2E via inject)', () => {
     expect(bad.statusCode).toBe(400);
     expect(bad.json().errors).toBeTruthy();
     await harness.app.close();
+  });
+});
+
+/**
+ * Gate de DOCUMENTO no aceite do paciente (D-043 / spec §4.6: "CPF —
+ * exatamente 11 · DV real"). Este aceite validava `min(11).max(14)`: aceitava
+ * um CNPJ de 14 dígitos (que paciente não tem) e qualquer dígito verificador
+ * inválido. Como o autocadastro de paciente não existe (D-135), este é o ÚNICO
+ * caminho de nascimento de conta de paciente — a porta tinha que ser a mais
+ * apertada, e era a mais frouxa.
+ */
+describe('aceite de convite de paciente — CPF com DV real (D-043 / spec §4.6)', () => {
+  async function acceptWithDocument(document: string): Promise<number> {
+    const harness = await buildTestHarness();
+    try {
+      const pro = await setupProfessional(harness);
+      const invited = await createInvite(harness.app, pro.token, 'dv-paciente@fitvo.dev');
+      expect(invited.statusCode).toBe(201);
+      const res = await accept(harness.app, invited.json().token, { document });
+      return res.statusCode;
+    } finally {
+      await harness.app.close();
+    }
+  }
+
+  it('CPF com digito verificador invalido -> 400 (antes passava)', async () => {
+    expect(await acceptWithDocument('52998224724')).toBe(400);
+  });
+
+  it('CPF de digitos repetidos -> 400', async () => {
+    expect(await acceptWithDocument('11111111111')).toBe(400);
+  });
+
+  it('CPF com mascara -> 400 (no fio vao SO digitos — spec §3)', async () => {
+    expect(await acceptWithDocument('529.982.247-25')).toBe(400);
+  });
+
+  it('CNPJ valido de 14 digitos -> 400 (paciente e SEMPRE pessoa fisica)', async () => {
+    expect(await acceptWithDocument('11222333000181')).toBe(400);
+  });
+
+  it('CPF valido -> 201', async () => {
+    expect(await acceptWithDocument('52998224725')).toBe(201);
   });
 });

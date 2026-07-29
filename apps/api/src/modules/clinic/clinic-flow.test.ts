@@ -329,3 +329,57 @@ describe('fluxo de clinica e convites (E2E via inject)', () => {
     await harness.app.close();
   });
 });
+
+/**
+ * Gate de DOCUMENTO no aceite (D-043 / spec §3: "Documento SEMPRE DV real +
+ * xor"). Este aceite validava o documento **só por comprimento**
+ * (`min(11).max(18)`) enquanto autônomo, estagiário e cadastro de empresa já
+ * exigiam o dígito verificador — uma porta de nascimento de conta por onde
+ * entrava CPF inválido. O 400 vem do Zod na borda HTTP, antes de qualquer
+ * escrita: nenhuma conta chega a existir.
+ */
+describe('aceite de convite de clinica — documento com DV real (D-043)', () => {
+  async function acceptWithDocument(
+    document: string,
+    documentType: 'CPF' | 'CNPJ' = 'CPF',
+  ): Promise<number> {
+    const harness = await buildTestHarness();
+    try {
+      const admin = await setupAdmin(harness);
+      const invited = await createInvite(harness.app, admin.token, 'dv@fitvo.dev');
+      expect(invited.statusCode).toBe(201);
+      const res = await accept(harness.app, invited.json().token, { document, documentType });
+      return res.statusCode;
+    } finally {
+      await harness.app.close();
+    }
+  }
+
+  it('CPF com digito verificador invalido -> 400 (antes passava)', async () => {
+    expect(await acceptWithDocument('52998224724')).toBe(400);
+  });
+
+  it('CPF de digitos repetidos -> 400', async () => {
+    expect(await acceptWithDocument('11111111111')).toBe(400);
+  });
+
+  it('CPF com mascara -> 400 (no fio vao SO digitos — spec §3)', async () => {
+    expect(await acceptWithDocument('529.982.247-25')).toBe(400);
+  });
+
+  it('CNPJ com digito verificador invalido -> 400', async () => {
+    expect(await acceptWithDocument('11222333000180', 'CNPJ')).toBe(400);
+  });
+
+  it('CPF declarado com 14 digitos (formato de CNPJ) -> 400 (xor)', async () => {
+    expect(await acceptWithDocument('11222333000181')).toBe(400);
+  });
+
+  it('CPF valido -> 201', async () => {
+    expect(await acceptWithDocument('52998224725')).toBe(201);
+  });
+
+  it('CNPJ valido -> 201 (profissional PJ)', async () => {
+    expect(await acceptWithDocument('11222333000181', 'CNPJ')).toBe(201);
+  });
+});

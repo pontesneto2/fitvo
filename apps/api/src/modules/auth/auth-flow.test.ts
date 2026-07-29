@@ -51,7 +51,7 @@ describe('fluxo de autenticacao (E2E via inject)', () => {
       email: 'ana@fitvo.dev',
       password: 'senha-forte-123',
       name: 'Ana',
-      document: '12345678901',
+      document: '52998224725',
     });
 
     const bad = await harness.app.inject({

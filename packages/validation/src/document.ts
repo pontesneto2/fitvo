@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 /**
  * Validação de documento da PESSOA (CPF/CNPJ) — D-043.
  *
@@ -9,6 +11,14 @@
  * As funções recebem a string CRUA (com ou sem máscara) e normalizam para
  * dígitos internamente — a normalização de armazenamento (só dígitos) é
  * responsabilidade do schema Zod que as consome.
+ *
+ * Além dos predicados, este módulo é a FONTE ÚNICA das peças Zod de documento
+ * (`documentDigits`, `cpfXorCnpjRefine`, `cpfOnlyRefine`). Elas nasceram
+ * duplicadas literalmente entre o cadastro do autônomo e o aceite do
+ * estagiário, e a duplicação cobrou o preço previsto: os aceites de clínica e
+ * de paciente ficaram para trás validando **só comprimento**, deixando entrar
+ * CPF com dígito verificador inválido — contra a spec §3 ("Documento SEMPRE DV
+ * real + xor"). Com uma peça só, um schema novo não tem como nascer frouxo.
  */
 
 /** Mantém só os dígitos de uma string (remove máscara, espaços, pontuação). */
@@ -69,4 +79,71 @@ export function isValidCnpj(value: string): boolean {
   const dv1 = mod11CheckDigit(nums.slice(0, 12), 5);
   const dv2 = mod11CheckDigit(nums.slice(0, 13), 6);
   return dv1 === nums[12] && dv2 === nums[13];
+}
+
+// ---------------------------------------------------------------------------
+// Peças Zod compartilhadas — a validação de documento em UM lugar só.
+// ---------------------------------------------------------------------------
+
+/**
+ * Documento no fio: **só dígitos** (a máscara é assunto da UI — spec §3
+ * "armazenar só dígitos, mascarar na UI"). Aqui só a disciplina de formato; a
+ * validade do DV é responsabilidade dos refines abaixo, porque depende de
+ * OUTRO campo (`documentType`) e refine cross-field não cabe num campo.
+ */
+export const documentDigits = z
+  .string()
+  .regex(/^\d+$/, 'Documento deve conter apenas dígitos.')
+  .describe('CPF ou CNPJ, só dígitos (D-043).');
+
+/** Mensagem única por tipo — mesma redação em todos os fluxos. */
+function invalidDocumentMessage(documentType: 'CPF' | 'CNPJ'): string {
+  return documentType === 'CPF'
+    ? 'CPF inválido (11 dígitos + dígito verificador).'
+    : 'CNPJ inválido (14 dígitos + dígito verificador).';
+}
+
+/**
+ * **CPF-xor-CNPJ com dígito verificador REAL** (D-043 / spec §3) — para quem
+ * pode ser pessoa física OU jurídica: autônomo, profissional de clínica,
+ * estagiário, recepção.
+ *
+ * O tipo DECLARADO decide o algoritmo e o tamanho: um número bem formado do
+ * tipo errado (CPF com 14 dígitos, CNPJ com 11) ou com DV inválido é 400 antes
+ * de qualquer escrita. "Bem formado" ≠ "existe na Receita" — só o DV.
+ *
+ * Uso: `.superRefine(cpfXorCnpjRefine)` sobre um objeto com `document` +
+ * `documentType`.
+ */
+export function cpfXorCnpjRefine(
+  data: { document: string; documentType: 'CPF' | 'CNPJ' },
+  ctx: z.RefinementCtx,
+): void {
+  const valid =
+    data.documentType === 'CPF' ? isValidCpf(data.document) : isValidCnpj(data.document);
+  if (!valid) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['document'],
+      message: invalidDocumentMessage(data.documentType),
+    });
+  }
+}
+
+/**
+ * **CPF e SÓ CPF**, com dígito verificador (spec §4.6: paciente informa "CPF —
+ * exatamente 11 · DV real"). Sem `documentType`: o paciente é sempre pessoa
+ * física, então não há xor a fazer — oferecer a escolha seria representar um
+ * estado que a regra não admite.
+ *
+ * Uso: `.superRefine(cpfOnlyRefine)` sobre um objeto com `document`.
+ */
+export function cpfOnlyRefine(data: { document: string }, ctx: z.RefinementCtx): void {
+  if (!isValidCpf(data.document)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['document'],
+      message: invalidDocumentMessage('CPF'),
+    });
+  }
 }

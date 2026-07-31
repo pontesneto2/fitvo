@@ -1,7 +1,7 @@
 # ADR-0009 — Domínio de Treino
 
-**Status:** Aceito (revisado jul/2026 — incorpora contribuições do ADR-0018, superseded)
-**Decisões cobertas:** D-079 a D-092, D-105, D-164 a D-167
+**Status:** Aceito (revisado jul/2026 — incorpora contribuições do ADR-0018, superseded; adendo de biblioteca de catálogo D-168 a D-171)
+**Decisões cobertas:** D-079 a D-092, D-105, D-164 a D-171
 
 > **Revisão de jul/2026.** O [ADR-0018](0018-dominio-treino.md) redecidiu este mesmo
 > domínio sem consultar este ADR, gerando conflito de filosofia (prescrição por
@@ -348,6 +348,76 @@ há entidade nova de indicador, há índices planejados.
   janela de histórico) é slice futuro com mesa própria. O que este D fixa é o
   **contorno**: sugerir sim, impor nunca.
 
+---
+
+> As quatro decisões a seguir entraram como **adendo de biblioteca de catálogo**
+> (jul/2026, decisão de mesa). O tenant isolation (ADR-0017) expôs que a
+> biblioteca de exercícios escopa por **profissional**, não por tenant — faltava
+> a regra de **produto**: o que vira base comum compartilhada vs. o que fica
+> privado. A mesma regra vale para o catálogo de nutrição (`Food`/`FoodGroup`,
+> ADR-0013) — este ADR fixa o critério; o [ADR-0013](0013-dominio-nutricao.md)
+> referencia, não duplica.
+
+### D-168 — Critério de classificação da biblioteca: dado sobre o MUNDO vs. sobre PESSOA/MÉTODO
+
+- A pergunta que classifica qualquer item de biblioteca (`Exercise`, e por
+  extensão `Food`/`FoodGroup` — ADR-0013): **este dado é sobre o MUNDO, ou sobre
+  uma PESSOA/o MÉTODO do profissional?**
+  - **Comum (compartilhável):** fato genérico que não pertence a ninguém —
+    "supino inclinado trabalha peitoral superior", "banana prata tem 98 kcal por
+    100g".
+  - **Sensível/privado (nunca vira base comum):** dado ligado a uma pessoa
+    específica (a ficha do aluno, a avaliação do paciente — já escopado por
+    vínculo, D-079/ADR-0001) ou o **método proprietário** do profissional (um
+    protocolo autoral que ele considera PI).
+- **Caso-limite, e é a inteligência da separação:** o mesmo item é comum ou
+  sensível conforme o contexto. O exercício "supino inclinado" (o item da
+  biblioteca) é **comum**; "prescrevi 4×10 de supino inclinado ao João"
+  (`WorkoutItem`/`WorkoutSet` do vínculo do João) é **sensível**. A biblioteca
+  contribui o **exercício**, nunca a prescrição/carga/contexto de uso num aluno
+  — a mesma fronteira que o D-089 já traça entre "o que o exercício é" (Exercise)
+  e "o que foi prescrito" (WorkoutSet/WorkoutItem).
+
+### D-169 — Base comum cresce por anti-duplicação normalizada na entrada
+
+- Item comum entra na base **só se não existir equivalente**; se já existe, o
+  profissional **usa o existente** — não sobrepõe, não duplica. O primeiro
+  cadastro fixa o registro; os próximos reutilizam. Previne o inchaço de base
+  (o problema do "mil registros de arroz com macros divergentes").
+- **Requisito técnico real, não "nome igual":** a comparação de "já existe" é
+  **normalizada** — case-insensitive, acento-insensível, espaço/hífen-insensível
+  ("supino reto", "Supino Reto", "supino-reto" são o **mesmo** item). Igualdade
+  literal de string **não** satisfaz esta decisão.
+- Ao detectar um item similar, o fluxo ideal oferece o existente ("já existe
+  'supino reto' — é este?") em vez de criar cego — refinamento de UX do slice de
+  biblioteca, não bloqueante desta decisão.
+
+### D-170 — Dado privado nunca vira base comum; default seguro
+
+- Dado sobre uma pessoa (ficha, avaliação, prescrição) é escopado por vínculo —
+  nunca entra na biblioteca comum, nunca é visível a outro profissional. Já
+  garantido pelo tenant isolation (ADR-0017) e pelo D-079 (isolamento por
+  vínculo).
+- Método proprietário do profissional fica privado por **marcação explícita**:
+  ao criar um item que é método dele (ex.: um protocolo autoral de exercícios em
+  sequência), o profissional o marca como privado — reaproveita o estado
+  `PRIVATE` que o D-089 já reafirma do D-064 (ADR-0006).
+- **Default seguro:** na dúvida entre comum e método proprietário, o item
+  **permanece com o profissional**. Ele opta ativamente por contribuir; o
+  sistema nunca promove um item a comum por conta própria.
+
+### D-171 — Biblioteca escopa por profissional, não por tenant — dimensão por-clínica é decisão futura
+
+- Reafirma o comportamento já modelado (D-089, `PLATFORM`/`PRIVATE` por
+  `ownerProfessionalProfileId`) como **decisão de produto explícita**, não só
+  detalhe de schema: numa clínica com múltiplos profissionais, o item privado de
+  um não é visível aos demais por padrão — coerente com D-168/D-170 (o método é
+  PI de quem o criou, não da clínica).
+- **Fica registrado como comportamento correto do MVP.** Se no futuro se decidir
+  que uma clínica pode ter uma biblioteca **comum interna** (compartilhada entre
+  seus profissionais, distinta da base global `PLATFORM`), isso é uma dimensão a
+  mais — **decisão futura em adendo próprio**, não redecidida aqui.
+
 ## Gaps conhecidos (decisão de produto pendente — não modelar sem ADR)
 
 Registrados aqui para ficarem **visíveis, não esquecidos**. Nenhum é bloqueante
@@ -479,3 +549,9 @@ aprovação.
 - A análise de forma (D-088) e a avaliação (D-087) tornam o app **nativo**
   (câmera real, offline) um requisito, não um luxo — coerente com D-098
   (ADR-0010).
+- **Biblioteca (D-168–D-171):** não adiciona entidade nem coluna nova — é regra
+  de produto sobre o que já existe (`Exercise.status PLATFORM/PRIVATE`,
+  `ownerProfessionalProfileId`). O requisito real fica para o slice futuro de
+  biblioteca: a **anti-duplicação normalizada** (D-169) é trabalho de
+  implementação de verdade (unaccent + lower + trim + colapso de espaço/hífen),
+  não checagem de string igual.

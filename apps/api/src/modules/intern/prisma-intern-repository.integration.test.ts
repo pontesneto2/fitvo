@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import {
   type InternArea,
+  type Prisma,
   prisma as extendedPrisma,
   PrismaClient,
   runWithTenantContext,
@@ -27,6 +28,21 @@ const prisma = new PrismaClient();
 const accounts = new PrismaAccountRepository(prisma);
 const repo = new PrismaInternRepository(prisma);
 const ORIGIN = { ipAddress: '127.0.0.1', userAgent: 'vitest-integration' };
+
+/**
+ * `prisma` aqui e cru (sem a extension de tenant). `internProfile` tem RLS
+ * (D-152, ADR-0017 Slice 3/3) -- leituras/escritas diretas neste client, fora
+ * de `repo.acceptInvite` (que ja seta a sessao sozinho via
+ * `setRlsTenantSession`), precisam bater a variavel de sessao manualmente na
+ * MESMA mini-transacao.
+ */
+async function withTenantSession<T>(tenantId: string, op: Prisma.PrismaPromise<T>): Promise<T> {
+  const [, result] = await prisma.$transaction([
+    prisma.$executeRaw`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`,
+    op,
+  ]);
+  return result;
+}
 
 let trainingSpecialtyId = '';
 let nutritionSpecialtyId = '';
@@ -170,16 +186,24 @@ describe('InternProfile — estagiário SEM responsável é irrepresentável (sc
     // o BANCO ainda recusaria? É isso que torna o estado irrepresentável, e não
     // apenas "não construível pelo nosso código".
     await expect(
-      prisma.$executeRawUnsafe(
-        `INSERT INTO "intern_profile" ("id","accountId","tenantId","area","updatedAt")
-         VALUES ($1,$2,$3,'EDUCACAO_FISICA',now())`,
-        `ip_${randomUUID().slice(0, 8)}`,
-        account.id,
+      withTenantSession(
         tenantId,
+        prisma.$executeRawUnsafe(
+          `INSERT INTO "intern_profile" ("id","accountId","tenantId","area","updatedAt")
+           VALUES ($1,$2,$3,'EDUCACAO_FISICA',now())`,
+          `ip_${randomUUID().slice(0, 8)}`,
+          account.id,
+          tenantId,
+        ),
       ),
     ).rejects.toThrow();
 
-    expect(await prisma.internProfile.count({ where: { accountId: account.id } })).toBe(0);
+    expect(
+      await withTenantSession(
+        tenantId,
+        prisma.internProfile.count({ where: { accountId: account.id } }),
+      ),
+    ).toBe(0);
   });
 
   it('o banco RECUSA um responsável inexistente (FK)', async () => {
@@ -197,14 +221,17 @@ describe('InternProfile — estagiário SEM responsável é irrepresentável (sc
     });
 
     await expect(
-      prisma.internProfile.create({
-        data: {
-          account: { connect: { id: account.id } },
-          tenant: { connect: { id: tenantId } },
-          area: 'EDUCACAO_FISICA',
-          supervisor: { connect: { id: 'pp_inexistente' } },
-        },
-      }),
+      withTenantSession(
+        tenantId,
+        prisma.internProfile.create({
+          data: {
+            account: { connect: { id: account.id } },
+            tenant: { connect: { id: tenantId } },
+            area: 'EDUCACAO_FISICA',
+            supervisor: { connect: { id: 'pp_inexistente' } },
+          },
+        }),
+      ),
     ).rejects.toThrow();
   });
 
@@ -322,21 +349,27 @@ describe('D-143 — a ÁREA decide qual conselho supervisiona', () => {
       supervisorProfessionalProfileId: professionalProfileId,
     });
 
-    const persisted = await prisma.account.findUniqueOrThrow({
-      where: { email },
-      select: {
-        internProfile: {
-          select: {
-            area: true,
-            tenantId: true,
-            supervisorProfessionalProfileId: true,
-            supervisor: {
-              select: { specialties: { select: { specialty: { select: { code: true } } } } },
+    // internProfile tem RLS (D-152) -- o include ANINHADO passa pelo join,
+    // que TAMBEM e filtrado pela policy; sem a sessao setada aqui, viria null
+    // mesmo a linha existindo.
+    const persisted = await withTenantSession(
+      tenantId,
+      prisma.account.findUniqueOrThrow({
+        where: { email },
+        select: {
+          internProfile: {
+            select: {
+              area: true,
+              tenantId: true,
+              supervisorProfessionalProfileId: true,
+              supervisor: {
+                select: { specialties: { select: { specialty: { select: { code: true } } } } },
+              },
             },
           },
         },
-      },
-    });
+      }),
+    );
     expect(persisted.internProfile).toMatchObject({
       area: 'NUTRICAO',
       tenantId,
@@ -407,7 +440,12 @@ describe('D-143 — a ÁREA decide qual conselho supervisiona', () => {
       select: { type: true },
     });
     expect(tenant.type).toBe('CLINIC');
-    expect(await prisma.internProfile.count({ where: { tenantId, area: 'NUTRICAO' } })).toBe(1);
+    expect(
+      await withTenantSession(
+        tenantId,
+        prisma.internProfile.count({ where: { tenantId, area: 'NUTRICAO' } }),
+      ),
+    ).toBe(1);
   });
 
   it('a listagem por área projeta o conselho DAQUELA área, não outro do mesmo profissional', async () => {
@@ -446,28 +484,32 @@ describe('aceite do estagiário (Fase B) contra Postgres real', () => {
     });
 
     // Tudo lido do BANCO — a propagação é o que está sob teste.
-    const persisted = await prisma.account.findUniqueOrThrow({
-      where: { email },
-      select: {
-        name: true,
-        document: true,
-        whatsapp: true,
-        birthDate: true,
-        addressCity: true,
-        addressState: true,
-        // Estagiário NÃO é profissional: nenhum perfil profissional nasce aqui.
-        professionalProfile: { select: { id: true } },
-        internProfile: {
-          select: {
-            tenantId: true,
-            supervisorProfessionalProfileId: true,
-            supervisor: {
-              select: { specialties: { select: { councilDocument: true } } },
+    // internProfile tem RLS (D-152): o include aninhado precisa da sessao.
+    const persisted = await withTenantSession(
+      tenantId,
+      prisma.account.findUniqueOrThrow({
+        where: { email },
+        select: {
+          name: true,
+          document: true,
+          whatsapp: true,
+          birthDate: true,
+          addressCity: true,
+          addressState: true,
+          // Estagiário NÃO é profissional: nenhum perfil profissional nasce aqui.
+          professionalProfile: { select: { id: true } },
+          internProfile: {
+            select: {
+              tenantId: true,
+              supervisorProfessionalProfileId: true,
+              supervisor: {
+                select: { specialties: { select: { councilDocument: true } } },
+              },
             },
           },
         },
-      },
-    });
+      }),
+    );
     expect(persisted.professionalProfile).toBeNull();
     expect(persisted).toMatchObject({
       name: 'Estagiario Real',
@@ -499,7 +541,12 @@ describe('aceite do estagiário (Fase B) contra Postgres real', () => {
     const outcome = await repo.acceptInvite(hashInviteToken(token), internAccount(), ORIGIN);
 
     expect(outcome).toMatchObject({ status: 'accepted', accountId: existing.id, created: false });
-    expect(await prisma.internProfile.count({ where: { accountId: existing.id } })).toBe(1);
+    expect(
+      await withTenantSession(
+        tenantId,
+        prisma.internProfile.count({ where: { accountId: existing.id } }),
+      ),
+    ).toBe(1);
     // Continua 2: nenhum evento novo para quem já havia consentido.
     const depois = await prisma.termsAcceptanceEvent.count({ where: { accountId: existing.id } });
     expect(depois).toBe(2);
@@ -519,7 +566,12 @@ describe('aceite do estagiário (Fase B) contra Postgres real', () => {
 
     expect(outcome.status).toBe('conflict');
     const account = await prisma.account.findUniqueOrThrow({ where: { email } });
-    expect(await prisma.internProfile.count({ where: { accountId: account.id } })).toBe(1);
+    expect(
+      await withTenantSession(
+        tenantId,
+        prisma.internProfile.count({ where: { accountId: account.id } }),
+      ),
+    ).toBe(1);
   });
 
   it('token de uso ÚNICO: o segundo aceite do mesmo convite é inválido', async () => {

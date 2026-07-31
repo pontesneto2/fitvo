@@ -1,4 +1,4 @@
-import { prisma } from '@fitvo/database';
+import { prisma, webhookPrisma } from '@fitvo/database';
 import {
   BILLING_QUEUE,
   type BondCreatedEvent,
@@ -54,7 +54,9 @@ const sharingWorker = queueFactory.createWorker<BondCreatedEvent>(SHARING_QUEUE,
 const rulerTicks = queueFactory.createQueue<RulerTickEvent>(BILLING_QUEUE);
 const rulerReminders = queueFactory.createQueue<SubscriptionReminderEvent>(BILLING_QUEUE);
 const rulerService = new CollectionRulerService(
-  new PrismaCollectionRulerRepository(prisma),
+  // role fitvo_webhook (D-155, ADR-0017 Slice 3/3): varredura de TODAS as
+  // subscriptions nao-terminais, sem filtro de tenant -- nunca o client padrao.
+  new PrismaCollectionRulerRepository(webhookPrisma),
   rulerReminders,
 );
 

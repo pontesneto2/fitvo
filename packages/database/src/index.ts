@@ -1,5 +1,8 @@
 import { PrismaClient } from './generated/client';
-import { tenantIsolationQueryExtension } from './tenant-isolation-extension';
+import {
+  registerRlsBatchExecutor,
+  tenantIsolationQueryExtension,
+} from './tenant-isolation-extension';
 
 /**
  * @fitvo/database — client Prisma singleton.
@@ -41,6 +44,17 @@ export const prisma: PrismaClient = basePrisma.$extends({
   query: tenantIsolationQueryExtension,
 }) as unknown as PrismaClient;
 
+/**
+ * Auto-referencia: o cliente extendido bate SET LOCAL (RLS) + query numa
+ * unica transacao pro caminho avulso (fora de `$transaction` explicito) --
+ * ver `runRlsScopedStandalone` em tenant-isolation-extension.ts. Precisa vir
+ * DEPOIS de `prisma` existir (import circular seria necessario pra
+ * referenciar de dentro do proprio arquivo da extension).
+ */
+registerRlsBatchExecutor(prisma as unknown as Parameters<typeof registerRlsBatchExecutor>[0]);
+
 export * from './generated/client';
+export * from './rls-session';
 export * from './tenant-context';
 export * from './tenant-isolation-extension';
+export * from './webhook-client';

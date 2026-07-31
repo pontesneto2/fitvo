@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { PrismaClient } from '@fitvo/database';
+import { type Prisma, PrismaClient } from '@fitvo/database';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { hashInviteToken } from '../../shared/invite-token';
@@ -22,6 +22,21 @@ const prisma = new PrismaClient();
 const accounts = new PrismaAccountRepository(prisma);
 const repo = new PrismaReceptionRepository(prisma);
 const ORIGIN = { ipAddress: '127.0.0.1', userAgent: 'vitest-integration' };
+
+/**
+ * `prisma` aqui e cru (sem a extension de tenant). `internProfile`/
+ * `receptionProfile` tem RLS (D-152, ADR-0017 Slice 3/3) -- leituras/escritas
+ * diretas neste client, fora de `repo.acceptInvite` (que ja seta a sessao
+ * sozinho via `setRlsTenantSession`), precisam bater a variavel de sessao
+ * manualmente na MESMA mini-transacao.
+ */
+async function withTenantSession<T>(tenantId: string, op: Prisma.PrismaPromise<T>): Promise<T> {
+  const [, result] = await prisma.$transaction([
+    prisma.$executeRaw`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`,
+    op,
+  ]);
+  return result;
+}
 
 let trainingSpecialtyId = '';
 
@@ -124,27 +139,31 @@ describe('PrismaReceptionRepository — seat de recepção contra Postgres real 
     const outcome = await repo.acceptInvite(hashInviteToken(token), receptionAccount(), ORIGIN);
     expect(outcome).toMatchObject({ status: 'accepted', tenantId, created: true });
 
-    const account = await prisma.account.findUniqueOrThrow({
-      where: { email },
-      select: {
-        id: true,
-        name: true,
-        socialName: true,
-        gender: true,
-        document: true,
-        documentType: true,
-        whatsapp: true,
-        birthDate: true,
-        addressStreet: true,
-        addressNumber: true,
-        addressComplement: true,
-        addressCity: true,
-        addressState: true,
-        addressZipCode: true,
-        receptionProfile: { select: { tenantId: true } },
-        termsAcceptanceEvents: { select: { type: true } },
-      },
-    });
+    // receptionProfile tem RLS (D-152): o include aninhado precisa da sessao.
+    const account = await withTenantSession(
+      tenantId,
+      prisma.account.findUniqueOrThrow({
+        where: { email },
+        select: {
+          id: true,
+          name: true,
+          socialName: true,
+          gender: true,
+          document: true,
+          documentType: true,
+          whatsapp: true,
+          birthDate: true,
+          addressStreet: true,
+          addressNumber: true,
+          addressComplement: true,
+          addressCity: true,
+          addressState: true,
+          addressZipCode: true,
+          receptionProfile: { select: { tenantId: true } },
+          termsAcceptanceEvents: { select: { type: true } },
+        },
+      }),
+    );
 
     // MAPEAMENTO: os campos de pessoa chegam mesmo — é o que o double não vê.
     expect(account).toMatchObject({
@@ -184,7 +203,12 @@ describe('PrismaReceptionRepository — seat de recepção contra Postgres real 
     expect(memberships).toBe(0);
     // E nenhum perfil que atende nasceu junto.
     expect(await prisma.professionalProfile.count({ where: { accountId: account.id } })).toBe(0);
-    expect(await prisma.internProfile.count({ where: { accountId: account.id } })).toBe(0);
+    expect(
+      await withTenantSession(
+        tenantId,
+        prisma.internProfile.count({ where: { accountId: account.id } }),
+      ),
+    ).toBe(0);
   });
 
   it('conta JÁ existente (multi-papel — D-041): cria só o seat, sem regravar termos', async () => {
@@ -202,7 +226,10 @@ describe('PrismaReceptionRepository — seat de recepção contra Postgres real 
 
     // Remove o seat para simular "conta existe, mas ainda não é recepção" — o
     // ramo `existing` sem conflito.
-    await prisma.receptionProfile.deleteMany({ where: { accountId: account.id } });
+    await withTenantSession(
+      tenantId,
+      prisma.receptionProfile.deleteMany({ where: { accountId: account.id } }),
+    );
 
     const second = await createInvite(tenantId, email);
     const outcome = await repo.acceptInvite(hashInviteToken(second), receptionAccount(), ORIGIN);
@@ -212,7 +239,12 @@ describe('PrismaReceptionRepository — seat de recepção contra Postgres real 
     expect(await prisma.termsAcceptanceEvent.count({ where: { accountId: account.id } })).toBe(
       eventsBefore,
     );
-    expect(await prisma.receptionProfile.count({ where: { accountId: account.id } })).toBe(1);
+    expect(
+      await withTenantSession(
+        tenantId,
+        prisma.receptionProfile.count({ where: { accountId: account.id } }),
+      ),
+    ).toBe(1);
   });
 
   it('recusa segundo seat na mesma conta (1:1 — @unique no accountId)', async () => {

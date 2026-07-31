@@ -76,12 +76,36 @@ interface TenantGraph {
   planId: string;
 }
 
-/** Seed isolado por chamada: o banco e compartilhado e nao e limpo entre execucoes. */
+/**
+ * Seed isolado por chamada: o banco e compartilhado e nao e limpo entre
+ * execucoes.
+ *
+ * Roda DENTRO de `runScoped(tenant.id, ...)` a partir da criacao do tenant
+ * (D-152/Slice 3): 10 dos 26 modelos aqui tambem tem RLS (bond, internProfile,
+ * receptionProfile, paymentAccount, subscription, charge, encounter,
+ * medicalRecord, prescription, anamnesis) -- sem a variavel de sessao setada
+ * (o que so acontece com um contexto de tenant aberto, batido automaticamente
+ * pela extension no caminho avulso), o Postgres bloqueia a ESCRITA nessas
+ * tabelas assim que RLS estiver ligado e a conexao de teste for um role sem
+ * BYPASSRLS. Sem RLS ligado (ou com o role privilegiado de antes do Slice 3),
+ * isto e estritamente equivalente ao seed anterior -- so muda de conexao
+ * implicita, nao de resultado.
+ */
 async function seedTenantGraph(label: string): Promise<TenantGraph> {
   const id = `${label}-${randomUUID().slice(0, 8)}`;
   const tenant = await prisma.tenant.create({ data: { type: 'CLINIC', name: `Tenant ${id}` } });
   const specialty = await prisma.specialty.findFirstOrThrow({ where: { code: 'TRAINING' } });
 
+  return runScoped(tenant.id, () => seedTenantGraphScoped(id, tenant.id, specialty.id));
+}
+
+async function seedTenantGraphScoped(
+  id: string,
+  tenantId: string,
+  specialtyId: string,
+): Promise<TenantGraph> {
+  const tenant = { id: tenantId };
+  const specialty = { id: specialtyId };
   const proAccount = await prisma.account.create({
     data: {
       email: `pro-${id}@e2e.dev`,
@@ -637,11 +661,17 @@ describe('tenant-isolation-extension (D-151) — bateria de vazamento contra Pos
   });
 
   it('sem contexto de tenant aberto, a query roda sem injecao (comportamento identico a antes do slice)', async () => {
+    // workoutPlan (bucket A, SEM RLS -- ver RLS_SCOPED_MODELS em
+    // tenant-isolation-extension.ts): exemplo que isola o comportamento da
+    // Camada 2 (extension) do da Camada 3 (RLS, Slice 3/3). `bond` tem AMBAS,
+    // e sem contexto aberto o RLS sozinho ja bloquearia a leitura -- o teste
+    // de "sem contexto em modelo COM RLS" mora em
+    // tenant-rls.integration.test.ts (fluxo-excecao), nao aqui.
     expect(getTenantContext()).toBeUndefined();
     const a = await seedTenantGraph('a');
 
-    const found = await prisma.bond.findUnique({ where: { id: a.bondId } });
-    expect(found?.id).toBe(a.bondId);
+    const found = await prisma.workoutPlan.findUnique({ where: { id: a.workoutPlanId } });
+    expect(found?.id).toBe(a.workoutPlanId);
   });
 
   it('a extension so escopa o where/data do modelo RAIZ — include de relacao aninhada (bucket E) nunca cruza tenant, por correlacao de FK', async () => {

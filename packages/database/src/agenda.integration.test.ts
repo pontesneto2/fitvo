@@ -67,15 +67,26 @@ async function seedAgenda() {
       type: 'FIRST_VISIT',
     },
   });
-  const bond = await prisma.bond.create({
-    data: {
-      tenantId: tenant.id,
-      patientProfileId: patient.patientProfile!.id,
-      professionalProfileId,
-      specialtyId: specialty.id,
-      modality: 'PRESENCIAL',
-    },
-  });
+  // `prisma` aqui e um PrismaClient CRU (sem a extension de tenant, de
+  // proposito -- este arquivo testa o EXCLUDE do Postgres, nao isolamento).
+  // `bond` tem RLS (D-152, Slice 3/3): sem a extension, ninguem seta a
+  // variavel de sessao sozinho -- bate manualmente na MESMA mini-transacao
+  // do create (SET LOCAL nao sobreviveria a um round-trip separado).
+  // `appointment` (usado no resto do arquivo) NAO tem RLS, e a FK contra
+  // `bond` nao e afetada por RLS (checagem de integridade referencial do
+  // Postgres nao passa pelas policies da tabela referenciada).
+  const [, bond] = await prisma.$transaction([
+    prisma.$executeRaw`SELECT set_config('app.current_tenant_id', ${tenant.id}, true)`,
+    prisma.bond.create({
+      data: {
+        tenantId: tenant.id,
+        patientProfileId: patient.patientProfile!.id,
+        professionalProfileId,
+        specialtyId: specialty.id,
+        modality: 'PRESENCIAL',
+      },
+    }),
+  ]);
 
   const book = (startsAt: string, endsAt: string, over?: { professionalProfileId?: string }) =>
     prisma.appointment.create({

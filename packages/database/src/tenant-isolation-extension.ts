@@ -222,16 +222,129 @@ function applyTenantScope(
   );
 }
 
+/**
+ * Subconjunto dos modelos bucket A que TAMBEM tem Postgres RLS (D-152, ADR-0017
+ * Slice 3/3) -- "as 10 confirmadas" menos `TermsAcceptanceEvent` (nao entrou:
+ * nao tem coluna tenantId, ver migration do RLS). Usado so para decidir se a
+ * query precisa da variavel de sessao `app.current_tenant_id` setada na MESMA
+ * transacao (sem isso, a policy RLS bloqueia leitura E escrita nestas tabelas).
+ *
+ * PascalCase de proposito -- `params.model` no hook `$allOperations` vem no
+ * nome do MODELO Prisma (`InternProfile`), NAO na chave camelCase usada pela
+ * config do `$extends` logo abaixo (`internProfile`). Confundir os dois casing
+ * faz o `.has(model)` nunca bater e a Camada 3 nunca ativar -- achado rodando
+ * a bateria de testes contra Postgres real com RLS ligado (o `.has()` sempre
+ * falso silenciosamente deixava passar sem SET, e a policy rejeitava a
+ * escrita). Verificado empiricamente contra a versao instalada (^6.1.0).
+ */
+const RLS_SCOPED_MODELS = new Set<string>([
+  'Bond',
+  'InternProfile',
+  'ReceptionProfile',
+  'PaymentAccount',
+  'Subscription',
+  'Charge',
+  'Encounter',
+  'MedicalRecord',
+  'Prescription',
+  'Anamnesis',
+]);
+
+/**
+ * Cliente com `$transaction`/`$executeRaw` usado SO para bater a variavel de
+ * sessao do RLS (`SET LOCAL`/`set_config`) e a query num UNICO round-trip
+ * transacional, quando a chamada NAO esta dentro de um `$transaction(async
+ * (tx) => ...)` explicito (ver `isInsideInteractiveTransaction` abaixo).
+ * Registrado por `registerRlsBatchExecutor` (index.ts) DEPOIS de o client ser
+ * construido -- import circular seria necessario para referenciar `prisma`
+ * diretamente aqui, ja que `index.ts` importa DESTE arquivo.
+ */
+interface RlsBatchExecutor {
+  $executeRaw: (
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ) => { [Symbol.iterator]?: never } & Promise<number>;
+  $transaction: <T extends readonly unknown[]>(ops: readonly [...T]) => Promise<T>;
+}
+
+let rlsBatchExecutor: RlsBatchExecutor | undefined;
+
+/** Chamado uma vez, em `index.ts`, com o proprio client extendido (auto-referencia). */
+export function registerRlsBatchExecutor(executor: RlsBatchExecutor): void {
+  rlsBatchExecutor = executor;
+}
+
+/**
+ * `true` quando a chamada corrente roda DENTRO de um `prisma.$transaction(async
+ * (tx) => {...})` interativo ja aberto pelo app. Sinal vem de
+ * `__internalParams.transaction.kind === 'itx'` -- campo INTERNO do Prisma
+ * (nao documentado publicamente, mas tipado em `runtime/library.d.ts` como
+ * `PrismaPromiseInteractiveTransaction`), verificado empiricamente contra a
+ * versao instalada (^6.1.0) antes de confiar nele: `kind` e `'itx'` SO quando a
+ * operacao roda via `tx.model.op()` de uma transacao interativa; ausente numa
+ * chamada avulsa (`prisma.model.op()`). Reverificar ao atualizar o Prisma.
+ *
+ * Por que isto importa pro RLS (D-153): dentro de um `$transaction` explicito,
+ * o proprio dev ja emitiu o `SET LOCAL` manualmente no topo do callback (ver
+ * `setRlsTenantSession`) -- reusando a MESMA transacao/conexao. Se o hook
+ * tentasse "ajudar" abrindo OUTRA mini-transacao pra bater o SET com a query
+ * (como faz no caminho avulso, abaixo), essa nova transacao rodaria numa
+ * conexao DIFERENTE da `tx` corrente -- exatamente o anti-padrao que o D-153
+ * ja proibiu pro Layer 2 (Slice 2), agora tambem valeria pro Layer 3.
+ */
+function isInsideInteractiveTransaction(internalParams: unknown): boolean {
+  const transaction = (internalParams as { transaction?: { kind?: string } } | undefined)
+    ?.transaction;
+  return transaction?.kind === 'itx';
+}
+
+/**
+ * Caminho AVULSO (fora de `$transaction` explicito) pra modelo com RLS: bate o
+ * `SET LOCAL` (via `set_config(..., true)` -- `true` = `is_local`) e a query
+ * real na MESMA transacao implicita, usando a forma em ARRAY do
+ * `$transaction` (nao a interativa) -- e o padrao oficial do Prisma pra RLS
+ * por sessao, e aqui e seguro: como NAO estamos dentro de nenhuma transacao
+ * de negocio existente (D-153 so se aplica a transacoes explicitas do app),
+ * abrir esta mini-transacao nao quebra atomicidade de nada.
+ */
+async function runRlsScopedStandalone(
+  tenantId: string,
+  queryPromise: Promise<unknown>,
+): Promise<unknown> {
+  if (!rlsBatchExecutor) {
+    throw new Error(
+      'tenant-isolation-extension: RLS batch executor nao registrado. ' +
+        'Chame registerRlsBatchExecutor() ao construir o client (@fitvo/database/src/index.ts) ' +
+        'antes de qualquer query em modelo com RLS.',
+    );
+  }
+  const [, result] = await rlsBatchExecutor.$transaction([
+    rlsBatchExecutor.$executeRaw`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`,
+    queryPromise,
+  ] as const);
+  return result;
+}
+
 async function tenantScopedAllOperations(params: {
+  model?: string;
   operation: string;
   args: AllOperationsArgs;
   query: (args: AllOperationsArgs) => Promise<unknown>;
+  __internalParams?: unknown;
 }): Promise<unknown> {
   const tenantId = getTenantContext();
   if (!tenantId) {
     return params.query(params.args);
   }
-  return params.query(applyTenantScope(params.operation, params.args, tenantId));
+  const scopedArgs = applyTenantScope(params.operation, params.args, tenantId);
+
+  if (!params.model || !RLS_SCOPED_MODELS.has(params.model)) {
+    return params.query(scopedArgs);
+  }
+  if (isInsideInteractiveTransaction(params.__internalParams)) {
+    return params.query(scopedArgs);
+  }
+  return runRlsScopedStandalone(tenantId, params.query(scopedArgs));
 }
 
 /**

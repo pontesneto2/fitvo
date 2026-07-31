@@ -1,5 +1,9 @@
 import type { ChargeStatus, PrismaClient, SubscriptionStatus } from '@fitvo/database';
-import { Prisma, prisma as defaultPrisma } from '@fitvo/database';
+import {
+  Prisma,
+  prisma as defaultPrisma,
+  webhookPrisma as defaultWebhookPrisma,
+} from '@fitvo/database';
 
 import type {
   BillingRepository,
@@ -50,7 +54,15 @@ const CHARGE_PROJECTION = {
 
 /** Implementacao Prisma (infra) do repositorio de billing (ADR-0004). */
 export class PrismaBillingRepository implements BillingRepository {
-  constructor(private readonly db: PrismaClient = defaultPrisma) {}
+  constructor(
+    private readonly db: PrismaClient = defaultPrisma,
+    // Conexao SEPARADA, role fitvo_webhook (D-155, ADR-0017 Slice 3/3): SO usada
+    // pelas 2 atualizacoes por id externo do Asaas abaixo, que rodam sem
+    // tenantId conhecido a priori (webhook nao tem sessao/tenant aberto, e ler
+    // a linha pra descobrir o tenant TAMBEM e bloqueado pelo RLS sem sessao --
+    // problema da galinha e o ovo). Nunca usar `webhookDb` fora destes 2 metodos.
+    private readonly webhookDb: PrismaClient = defaultWebhookPrisma,
+  ) {}
 
   async isTenantOwnerOrAdmin(accountId: string, tenantId: string): Promise<boolean> {
     // Dono/admin (default documentado — ADR-0004): admin de clinica
@@ -154,7 +166,7 @@ export class PrismaBillingRepository implements BillingRepository {
     asaasSubscriptionId: string,
     status: SubscriptionStatus,
   ): Promise<boolean> {
-    const result = await this.db.subscription.updateMany({
+    const result = await this.webhookDb.subscription.updateMany({
       where: { asaasSubscriptionId },
       data: { status },
     });
@@ -170,7 +182,10 @@ export class PrismaBillingRepository implements BillingRepository {
   }
 
   async updateChargeStatusByAsaasId(asaasChargeId: string, status: ChargeStatus): Promise<boolean> {
-    const result = await this.db.charge.updateMany({ where: { asaasChargeId }, data: { status } });
+    const result = await this.webhookDb.charge.updateMany({
+      where: { asaasChargeId },
+      data: { status },
+    });
     return result.count > 0;
   }
 

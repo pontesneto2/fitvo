@@ -1,7 +1,7 @@
 # ADR-0011 — Modalidade de Atendimento e Anamnese
 
-**Status:** Aceito
-**Decisões cobertas:** D-101 a D-104
+**Status:** Aceito (adendo jul/2026 — regras e fluxos transversais, D-172 a D-178)
+**Decisões cobertas:** D-101 a D-104, D-172 a D-178
 **Revisa:** D-094 (ADR-0010) — ver D-102
 
 ## Contexto
@@ -322,6 +322,169 @@ antropometria só é construível quando o `Assessment` for tipado, mas isso **n
 bloqueia a tipagem da anamnese** (D-103), que está completa sem ele — justamente
 porque a medida não vive lá.
 
+---
+
+> As sete decisões a seguir entraram como **adendo de regras e fluxos da
+> anamnese multi-área** (jul/2026, decisão de mesa). Não criam ADR novo — a
+> anamnese já tem casa aqui. Mobiliam o que faltava: obrigatoriedade,
+> reaproveitamento entre vínculos do mesmo aluno, versionamento, integração com
+> a linha do tempo, e o tratamento de sinal de risco (PAR-Q) com proteção
+> jurídica. **Não decidem campos** — os campos por módulo (treino/nutrição/
+> nutrologia) seguem em mesa própria, sobre estas regras.
+
+### D-172 — Trava de entrada condicionada à modalidade (reusa `AnamnesisStatus`)
+
+- **`ONLINE`:** o aluno/paciente **não acessa** o treino/plano até a anamnese
+  estar **completa** — o profissional precisa dela para prescrever (limitações,
+  doenças, nível, tempo/dia, local de treino). A trava bloqueia **ambos os
+  lados**: o aluno não vê treino, o profissional não prescreve sem anamnese.
+- **`PRESENCIAL`/`HÍBRIDO`:** comportamento **já decidido** pelo D-101/D-102 —
+  o profissional preenche na consulta e destrava; o aluno pode não ter tocado no
+  app. Este D **não redecide** esse caso, só explicita que a trava "aluno
+  preenche primeiro" é exclusiva do fluxo `ONLINE`.
+- **Reusa o `AnamnesisStatus`** (`PENDING`/`ANSWERED`) já existente no schema —
+  não cria gate novo nem enum novo. Consistente com o D-093 (ADR-0010): fonte
+  única de verdade é o próprio registro de anamnese.
+
+### D-173 — Obrigatoriedade por área + "NÃO SE APLICA" como resposta válida
+
+- Campos obrigatórios são definidos **por área/módulo** (núcleo vale para todas
+  as áreas; treino, nutrição e nutrologia têm os seus — taxonomia do D-103).
+- **Três estados de resposta, não dois:** respondido / em branco / **não se
+  aplica**. "Não se aplica" é resposta **válida e explícita**, distinta de "em
+  branco" (não respondido).
+- **Regra anti-mascaramento:** um campo que pode não se aplicar ao perfil do
+  aluno **não pode ser obrigatório-forçado** — forçar resposta onde não se
+  aplica faz o aluno responder qualquer coisa só para passar, poluindo o dado
+  clínico. "Não se aplica" satisfaz a obrigatoriedade sem mascarar. Clinicamente,
+  "não tenho" (não se aplica) ≠ "não sei/não respondi" (em branco) — a
+  distinção é a mesma que as **perguntas condicionais** do D-103 já pressupõem
+  (pular bloco ≠ não ter respondido o bloco).
+
+### D-174 — Reaproveitamento de campos entre vínculos do mesmo aluno (auto-preenchido com confirmação)
+
+- O aluno pode ter vínculos em áreas diferentes (personal + nutricionista = dois
+  vínculos, duas anamneses — mantém o `@unique bondId` do D-094/ADR-0010).
+  Campos **comuns** (alergia, medicação, condições, objetivo geral, contato de
+  emergência) **não são redigitados**: vêm **auto-preenchidos** da resposta
+  anterior do próprio aluno.
+- **Não é compartilhamento entre profissionais** — o D-102/D-016 (ADR-0003)
+  **rejeitou** isso, por privacidade. É o **aluno** reaproveitando o **próprio**
+  dado entre as anamneses dele; o profissional continua vendo só a anamnese do
+  seu vínculo. A dimensão do reuso é o **titular** (o aluno), não o vínculo.
+- **Auto-preenchido exige confirmação, nunca é assumido:** o aluno vê "você
+  informou alergia a dipirona (respondido em jan/2026) — ainda é verdade?" e
+  confirma ou edita. Dado clínico auto-preenchido e não confirmado é perigoso —
+  a condição pode ter mudado. Auto-preenche para não redigitar; exige
+  confirmação para não propagar dado velho.
+- É um **auxílio** (traz auto-preenchido), não uma fusão — o aluno pode
+  responder anamneses diferentes por área normalmente.
+- **Requisito de implementação:** o reaproveitamento precisa ser bem
+  implementado para não gerar sensação de repetição — o aluno nunca deve sentir
+  que respondeu a mesma coisa duas vezes. Fica registrado como requisito de UX
+  forte para o slice, não resolvido por este D.
+
+### D-175 — Anamnese versionada (uma ativa por vínculo + histórico append-only)
+
+- "A anamnese é uma" (por vínculo, D-094) e "grava versão nova por cima" se
+  reconciliam por **versionamento**: há **uma anamnese ATIVA por vínculo** (o
+  `@unique bondId` do D-094 vale para a ativa), e cada mudança gera uma **nova
+  versão**, com a anterior preservada como histórico — **append-only**, mesma
+  disciplina de dado clínico que não se apaga (D-089/ADR-0009) e da derivação
+  congelada do D-102.
+- Toda versão carrega **log/auditoria**: o que mudou, por quem (autoria por
+  seção — D-102), quando.
+
+### D-176 — Dois gatilhos de nova versão (revisão por evento, não por tempo)
+
+- **Automático:** a cada troca de plano/protocolo, o sistema apresenta a
+  anamnese **completa** ao aluno e pergunta "algo mudou?".
+  - **Mudou** → o aluno edita → grava nova versão (`vN+1`, com log) →
+    profissional é informado.
+  - **Não mudou** → o aluno salva → registra-se "revisada, sem mudança"
+    (também logado — prova de que foi revisada naquele ciclo).
+- **Manual:** o aluno pode abrir "informar mudança na saúde" (ex.: nova lesão)
+  **a qualquer momento**, fora do ciclo de troca de plano → gera nova versão →
+  profissional informado.
+- Resolve a validade da anamnese **sem validade dura por tempo**: revisão por
+  **evento** (novo ciclo de plano), não expiração por calendário. Complementa a
+  atualização cadastral periódica do D-095 (ADR-0010), que é sobre dado
+  cadastral, não clínico.
+
+### D-177 — A anamnese alimenta a linha do tempo/feed de evolução do aluno
+
+- Cada versão da anamnese, cada "revisada sem mudança" e cada mudança informada
+  (nova lesão, nova condição) é um **evento** na linha do tempo/feed de
+  acompanhamento do aluno/paciente (roadmap de produto).
+- O profissional acompanha a evolução clínica pela linha do tempo, com a
+  anamnese como uma das fontes de evento — junto de execuções de treino
+  (D-086/ADR-0009), avaliações e demais marcos.
+
+### D-178 — Sinais de risco (PAR-Q): alerta forte ao profissional + ciência do aluno (reusa D-025) + texto jurídico RASCUNHO
+
+- Um sinal de risco na anamnese (ex.: PAR-Q positivo para condição cardíaca, ou
+  condição grave declarada) **alerta fortemente o profissional** — registrado,
+  de modo que ele não possa alegar desconhecimento. **Não bloqueia** o treino
+  automaticamente (o profissional é o responsável técnico e decide a conduta),
+  mas o alerta e a ciência ficam gravados.
+- **Dupla ciência, ambas gravadas — reusa o mecanismo de consentimento (D-025,
+  ADR-0002), não cria caminho novo:**
+  - **Ao profissional:** alerta forte, registrado (ele viu o sinal de risco).
+  - **Ao aluno:** a plataforma avisa de forma clara em sinais sensíveis (ex.:
+    "você indicou uma condição cardíaca — recomendamos avaliação/liberação
+    médica antes de iniciar atividade física") e registra a **ciência** do
+    aluno (foi avisado, reconheceu o risco, optou por prosseguir por conta
+    própria) — com timestamp, versão do texto e hash do teor, **mesmo padrão
+    probatório do D-025**.
+- **Amarração jurídica — RASCUNHO, pendente de validação por advogado, NÃO é
+  texto final.** O objetivo é que o aluno esteja ciente dos próprios riscos, que
+  a plataforma comprove que avisou, e que a responsabilidade técnica pela
+  conduta permaneça com o profissional habilitado — protegendo o FITVO
+  (ferramenta, não presta serviço de saúde) e dando ao profissional o registro
+  de que informou.
+
+  > ⚠️ **Rascunho de produto, não aconselhamento jurídico.** Um advogado
+  > especializado em responsabilidade civil em saúde e LGPD **deve** revisar e
+  > ajustar antes de qualquer uso em produção. Produto de saúde com triagem de
+  > risco cardiovascular (PAR-Q) tem exposição legal real; a redação com peso
+  > legal é do advogado.
+  >
+  > **Aviso de risco ao aluno (rascunho, exibido quando há sinal de risco na
+  > anamnese, com aceite registrado):**
+  >
+  > "As informações que você forneceu indicam um possível fator de risco para a
+  > prática de atividade física (por exemplo, condição cardíaca, pressão alta,
+  > dor no peito ou outra situação de saúde). Antes de iniciar ou continuar
+  > qualquer programa de exercícios, recomendamos fortemente que você procure um
+  > médico e obtenha liberação para atividade física.
+  >
+  > O FITVO é uma plataforma de tecnologia que conecta você a profissionais
+  > habilitados e organiza as informações do seu acompanhamento. O FITVO não
+  > presta serviços médicos, não substitui avaliação médica e não é responsável
+  > pela prescrição ou pela sua decisão de praticar atividade física.
+  >
+  > A responsabilidade técnica pela orientação de treino é do profissional
+  > habilitado que o acompanha. A decisão de iniciar ou continuar atividade
+  > física, ciente dos riscos que você informou, é sua.
+  >
+  > Ao prosseguir, você declara que: (i) leu e compreendeu este aviso; (ii) está
+  > ciente dos riscos relacionados às informações de saúde que forneceu; (iii)
+  > foi orientado a buscar liberação médica; e (iv) assume, por sua livre
+  > decisão, a responsabilidade por prosseguir sem essa liberação, caso opte por
+  > não obtê-la."
+  >
+  > [ ] Li, compreendi e estou ciente. Desejo prosseguir.
+  >
+  > **Registro probatório do aceite** (reusa D-025): versão exata do texto,
+  > timestamp, hash do teor, identificação do aluno, e o sinal de risco
+  > específico que disparou o aviso.
+  >
+  > **Alerta ao profissional (registrado):** o profissional recebe e vê o sinal
+  > de risco de forma destacada ao acessar a anamnese; o registro guarda que o
+  > alerta foi exibido e quando o profissional o visualizou. A conduta
+  > (prescrever, pedir liberação médica, recusar) é decisão registrada do
+  > profissional.
+
 ## Impacto de modelagem
 
 Sinalizado para decisão de sequenciamento — **nada implementado por este ADR**.
@@ -358,6 +521,24 @@ Sinalizado para decisão de sequenciamento — **nada implementado por este ADR*
    então não há merge por campo e o `Json` não quebra o sync como quebraria no
    treino; mas o conteúdo da refeição fica **opaco no device** (sem consulta
    local, sem filtro). Mais um motivo para fechar o D-063 de nutrição.
+6. **Versionamento (D-175/D-176) implica histórico próprio.** `Anamnesis` como
+   linha única mutável não expressa "uma ativa + histórico append-only" — pede
+   uma chave de versão (ex.: `version`, `isActive`) por vínculo, com as versões
+   anteriores preservadas, não sobrescritas. A autoria por seção (D-102) e o log
+   de "revisada sem mudança" (D-176) vivem por versão.
+7. **Reaproveitamento (D-174) implica dado ancorado no titular, não no
+   vínculo.** Os campos comuns auto-preenchíveis precisam de uma leitura "última
+   resposta do aluno para este campo, em qualquer vínculo dele" — consulta por
+   conta/paciente, não só por `bondId`. Não é campo novo em `Anamnesis`; é
+   consulta cross-vínculo restrita ao próprio titular.
+8. **Linha do tempo (D-177)** consome eventos de anamnese (nova versão,
+   "revisada sem mudança", mudança pontual) como mais uma fonte — mesmo padrão
+   de evento que execuções de treino e avaliações já alimentam; não é entidade
+   nova aqui, é a anamnese publicando no feed que já existe no roadmap.
+9. **Ciência de risco (D-178) reusa o mecanismo de aceite do D-025** (versão de
+   texto + timestamp + hash) — não cria tabela de consentimento nova, associa o
+   aceite ao sinal de risco específico que o disparou e à versão da anamnese
+   (D-175) em que ele apareceu.
 
 ## Alternativas consideradas
 
@@ -446,3 +627,13 @@ Sinalizado para decisão de sequenciamento — **nada implementado por este ADR*
 - **Perguntas condicionais** são requisito de produto com efeito de modelagem: os
   campos precisam ser opcionais no banco (a maioria não se aplica à maioria) sem
   que "não respondido" e "respondido como não" colapsem no mesmo `null`.
+- **O adendo (D-172–D-178) não decide campos por módulo** — local de treino,
+  tempo/sessão, histórico esportivo, suplementos (treino); Bristol, histórico de
+  peso, comportamento alimentar, preferências (nutrição); perfil/histórico
+  hormonal, catálogo de exames (nutrologia) seguem em **mesa de campos**
+  própria, sobre as regras aqui fixadas.
+- **O texto jurídico do D-178 é RASCUNHO** — pendência explícita de validação
+  por advogado antes de qualquer uso em produção. Não tratar como texto final.
+- A anamnese tipada + o adendo continuam sendo **dado clínico**: qualquer
+  implementação exige revisão humana obrigatória (Política de Merge,
+  CLAUDE.md), como o resto do domínio clínico.

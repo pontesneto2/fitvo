@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@fitvo/database';
-import { prisma as defaultPrisma } from '@fitvo/database';
+import { prisma as defaultPrisma, setRlsTenantSession } from '@fitvo/database';
 
 import { recordInitialTermsAcceptance } from '../terms/initial-terms-acceptance';
 import type { RequestOrigin } from '../terms/terms-repository';
@@ -58,6 +58,10 @@ export class PrismaReceptionRepository implements ReceptionRepository {
       if (!invite || invite.status !== 'PENDING' || invite.expiresAt.getTime() <= Date.now()) {
         return { status: 'invalid' };
       }
+
+      // Mesmo racional de PrismaInternRepository.acceptInvite: sem ALS aberto
+      // (D-150), o RLS (D-152) bloqueia receptionProfile sem a sessao setada.
+      await setRlsTenantSession(tx, invite.tenantId);
 
       const existing = await tx.account.findUnique({
         where: { email: invite.email },

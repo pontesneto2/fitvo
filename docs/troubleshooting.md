@@ -866,3 +866,80 @@ estado**; a regra cobre as duas formas.)
 > Checkbox vazio (ou "estrutura pronta") em ADR aceito é **ambiguidade
 > permanente**: descreva a decisão no ADR, o progresso no roadmap, e nunca
 > misture os dois.
+
+---
+
+## 20. RLS (D-152, ADR-0017 Slice 3/3): dois roles de banco, nunca um só
+
+**Sintoma**
+
+Testes de integração passam mesmo com uma policy RLS quebrada, ou o app
+conecta e nada muda de comportamento depois de habilitar `ENABLE ROW LEVEL
+SECURITY` numa tabela.
+
+**Causa**
+
+RLS só protege se a conexão **não** for superuser nem tiver `BYPASSRLS`
+(Postgres ignora toda policy para essas conexões, silenciosamente — sem erro,
+sem aviso). O role de dev local (`fitvo`) é superuser desde sempre (usado por
+migrations, seeds, `db:studio`). Se a app/testes continuarem conectando como
+`fitvo`, o RLS existe no schema mas nunca roda — "RLS de teatro".
+
+**Solução**
+
+Dois roles, dois papeis, nunca compartilhados:
+
+- `fitvo` (privilegiado, superuser): **só** para `prisma migrate`/`db:studio`
+  (`packages/database/.env`). Só ele pode criar/alterar policy.
+- `fitvo_app` (sem `BYPASSRLS`/`SUPERUSER`): runtime da API e do worker
+  (`apps/api/.env`, `apps/worker/.env`, var `DATABASE_URL`). CRUD normal nas
+  tabelas, sujeito a TODAS as policies de tenant.
+- `fitvo_webhook` (idem, sem bypass): runtime SÓ do webhook Asaas e da régua de
+  cobrança do worker (var `WEBHOOK_DATABASE_URL`) — os dois únicos fluxos que
+  legitimamente atravessam tenant (atualizam `charge`/`subscription` por id
+  externo, sem `tenantId` conhecido a priori). Autorizado por uma policy
+  PERMISSIVA adicional, só nessas 2 tabelas, só nos comandos que usa
+  (`SELECT`/`UPDATE`) — nunca um GRANT amplo.
+
+Criar os dois roles é DDL fora de migration do Prisma (CREATE ROLE não viaja
+em `migration.sql` — é passo de infra por ambiente, não schema). Rode uma vez
+por ambiente:
+
+```sql
+CREATE ROLE fitvo_app WITH LOGIN PASSWORD '<gerada>'
+  NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
+GRANT USAGE ON SCHEMA public TO fitvo_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fitvo_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO fitvo_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE fitvo IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO fitvo_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE fitvo IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO fitvo_app;
+
+CREATE ROLE fitvo_webhook WITH LOGIN PASSWORD '<gerada>'
+  NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
+GRANT USAGE ON SCHEMA public TO fitvo_webhook;
+GRANT SELECT, UPDATE ON charge, subscription TO fitvo_webhook;
+```
+
+**Rodando `test:integration` (`packages/database`) contra o role certo**
+
+O pacote não carrega `.env` para os testes (só o Prisma CLI carrega `.env`
+automaticamente, para migrations) — `vitest` usa o que estiver exportado no
+shell. Exporte ANTES de rodar:
+
+```bash
+export DATABASE_URL="postgresql://fitvo_app:<senha>@localhost:5434/fitvo?schema=public"
+export WEBHOOK_DATABASE_URL="postgresql://fitvo_webhook:<senha>@localhost:5434/fitvo?schema=public"
+pnpm --filter @fitvo/database test:integration
+```
+
+`tenant-rls.integration.test.ts` verifica o role ANTES de rodar (consulta
+`pg_roles.rolbypassrls`/`rolsuper`) e lança erro claro se detectar um role
+privilegiado — prefere falhar alto a dar falso-verde. Os blocos que dependem
+de `WEBHOOK_DATABASE_URL` pulam (`describe.skipIf`) se a var não estiver
+setada, em vez de quebrar quem não precisa deles.
+
+**Se um teste/fluxo quebrar depois de trocar para `fitvo_app`:** é o role
+revelando onde o código assumia privilégio de superuser — reporte e conceda o
+GRANT específico que faltou. Nunca volte pro role privilegiado como atalho.

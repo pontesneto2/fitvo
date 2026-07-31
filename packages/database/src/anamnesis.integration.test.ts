@@ -26,6 +26,24 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
+/**
+ * `prisma` aqui e cru (sem a extension de tenant, de proposito -- este
+ * arquivo testa MAPEAMENTO, nao isolamento). `bond` e `anamnesis` tem RLS
+ * (D-152, ADR-0017 Slice 3/3); sem a extension ninguem seta a variavel de
+ * sessao sozinho -- bate manualmente na MESMA mini-transacao de cada
+ * create/update/read nessas 2 tabelas (SET LOCAL nao sobrevive a um
+ * round-trip separado). `anamnesisGoal`/`anamnesisParq`/`account` NAO tem
+ * RLS (filhos sem tenantId proprio, FORA do escopo seletivo do D-152) --
+ * chamadas nelas continuam diretas.
+ */
+async function withTenantSession<T>(tenantId: string, op: Prisma.PrismaPromise<T>): Promise<T> {
+  const [, result] = await prisma.$transaction([
+    prisma.$executeRaw`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`,
+    op,
+  ]);
+  return result;
+}
+
 /** Seed isolado por teste: o banco e compartilhado e nao e limpo entre execucoes. */
 async function seedBond() {
   const id = randomUUID().slice(0, 8);
@@ -55,15 +73,18 @@ async function seedBond() {
     select: { id: true, patientProfile: { select: { id: true } } },
   });
 
-  const bond = await prisma.bond.create({
-    data: {
-      tenantId: tenant.id,
-      patientProfileId: patient.patientProfile!.id,
-      professionalProfileId: pro.professionalProfile!.id,
-      specialtyId: specialty.id,
-      modality: 'HIBRIDO',
-    },
-  });
+  const bond = await withTenantSession(
+    tenant.id,
+    prisma.bond.create({
+      data: {
+        tenantId: tenant.id,
+        patientProfileId: patient.patientProfile!.id,
+        professionalProfileId: pro.professionalProfile!.id,
+        specialtyId: specialty.id,
+        modality: 'HIBRIDO',
+      },
+    }),
+  );
 
   return { id, tenant, specialty, proAccountId: pro.id, patientAccountId: patient.id, bond };
 }
@@ -81,9 +102,10 @@ const PARQ_ANSWERS = {
 describe('anamnese tipada — mapeamento contra Postgres real (ADR-0011)', () => {
   it('D-102: autoria HIBRIDA por secao — paciente declara, profissional afere, na MESMA anamnese', async () => {
     const s = await seedBond();
-    const anamnesis = await prisma.anamnesis.create({
-      data: { tenantId: s.tenant.id, bondId: s.bond.id },
-    });
+    const anamnesis = await withTenantSession(
+      s.tenant.id,
+      prisma.anamnesis.create({ data: { tenantId: s.tenant.id, bondId: s.bond.id } }),
+    );
 
     await prisma.anamnesisGoal.create({
       data: {
@@ -104,13 +126,16 @@ describe('anamnese tipada — mapeamento contra Postgres real (ADR-0011)', () =>
       },
     });
 
-    const loaded = await prisma.anamnesis.findUniqueOrThrow({
-      where: { id: anamnesis.id },
-      include: {
-        goal: { include: { authoredByAccount: { select: { email: true } } } },
-        parq: { include: { authoredByAccount: { select: { email: true } } } },
-      },
-    });
+    const loaded = await withTenantSession(
+      s.tenant.id,
+      prisma.anamnesis.findUniqueOrThrow({
+        where: { id: anamnesis.id },
+        include: {
+          goal: { include: { authoredByAccount: { select: { email: true } } } },
+          parq: { include: { authoredByAccount: { select: { email: true } } } },
+        },
+      }),
+    );
 
     expect(loaded.goal?.authoredBy).toBe('PATIENT');
     expect(loaded.parq?.authoredBy).toBe('PROFESSIONAL');
@@ -123,9 +148,10 @@ describe('anamnese tipada — mapeamento contra Postgres real (ADR-0011)', () =>
 
   it('D-103: secao ausente = LINHA ausente (com a relacao no include — senao passa por vacuidade)', async () => {
     const s = await seedBond();
-    const anamnesis = await prisma.anamnesis.create({
-      data: { tenantId: s.tenant.id, bondId: s.bond.id },
-    });
+    const anamnesis = await withTenantSession(
+      s.tenant.id,
+      prisma.anamnesis.create({ data: { tenantId: s.tenant.id, bondId: s.bond.id } }),
+    );
     await prisma.anamnesisParq.create({
       data: {
         anamnesisId: anamnesis.id,
@@ -136,13 +162,16 @@ describe('anamnese tipada — mapeamento contra Postgres real (ADR-0011)', () =>
       },
     });
 
-    const loaded = await prisma.anamnesis.findUniqueOrThrow({
-      where: { id: anamnesis.id },
-      // `lifestyle` PRECISA estar aqui. Sem ela viria `undefined` SEMPRE — a
-      // assercao falaria da forma da query, nao do banco, e passaria identica se
-      // a linha existisse (docs/troubleshooting.md §6).
-      include: { parq: true, lifestyle: true },
-    });
+    const loaded = await withTenantSession(
+      s.tenant.id,
+      prisma.anamnesis.findUniqueOrThrow({
+        where: { id: anamnesis.id },
+        // `lifestyle` PRECISA estar aqui. Sem ela viria `undefined` SEMPRE — a
+        // assercao falaria da forma da query, nao do banco, e passaria identica se
+        // a linha existisse (docs/troubleshooting.md §6).
+        include: { parq: true, lifestyle: true },
+      }),
+    );
 
     expect(loaded.lifestyle).toBeNull(); // `null` = perguntei e nao existe
     expect(loaded.parq).not.toBeNull(); // ancora: prova que o include funciona
@@ -150,9 +179,10 @@ describe('anamnese tipada — mapeamento contra Postgres real (ADR-0011)', () =>
 
   it('D-102: onDelete Restrict — apagar a conta do autor NAO pode apagar a autoria do documento clinico', async () => {
     const s = await seedBond();
-    const anamnesis = await prisma.anamnesis.create({
-      data: { tenantId: s.tenant.id, bondId: s.bond.id },
-    });
+    const anamnesis = await withTenantSession(
+      s.tenant.id,
+      prisma.anamnesis.create({ data: { tenantId: s.tenant.id, bondId: s.bond.id } }),
+    );
     await prisma.anamnesisParq.create({
       data: {
         anamnesisId: anamnesis.id,
@@ -163,9 +193,12 @@ describe('anamnese tipada — mapeamento contra Postgres real (ADR-0011)', () =>
       },
     });
 
+    // account.delete NAO toca bond/anamnesis (o Restrict vem da FK de
+    // anamnesisParq -> account, tabela SEM RLS) -- nao precisa de sessao.
     await expect(prisma.account.delete({ where: { id: s.proAccountId } })).rejects.toThrow();
 
-    // A secao sobreviveu com o autor intacto.
+    // A secao sobreviveu com o autor intacto. anamnesisParq tambem nao tem
+    // RLS (filho sem tenantId proprio) -- leitura direta, sem sessao.
     const parq = await prisma.anamnesisParq.findUniqueOrThrow({
       where: { anamnesisId: anamnesis.id },
     });
@@ -174,18 +207,25 @@ describe('anamnese tipada — mapeamento contra Postgres real (ADR-0011)', () =>
 
   it('D-094: uma anamnese por vinculo (unique em bondId)', async () => {
     const s = await seedBond();
-    await prisma.anamnesis.create({ data: { tenantId: s.tenant.id, bondId: s.bond.id } });
+    await withTenantSession(
+      s.tenant.id,
+      prisma.anamnesis.create({ data: { tenantId: s.tenant.id, bondId: s.bond.id } }),
+    );
 
     await expect(
-      prisma.anamnesis.create({ data: { tenantId: s.tenant.id, bondId: s.bond.id } }),
+      withTenantSession(
+        s.tenant.id,
+        prisma.anamnesis.create({ data: { tenantId: s.tenant.id, bondId: s.bond.id } }),
+      ),
     ).rejects.toThrow();
   });
 
   it('D-093: o gate fecha com a secao preenchida pelo PROFISSIONAL (nao exige acao do paciente)', async () => {
     const s = await seedBond();
-    const anamnesis = await prisma.anamnesis.create({
-      data: { tenantId: s.tenant.id, bondId: s.bond.id },
-    });
+    const anamnesis = await withTenantSession(
+      s.tenant.id,
+      prisma.anamnesis.create({ data: { tenantId: s.tenant.id, bondId: s.bond.id } }),
+    );
     expect(anamnesis.status).toBe('PENDING');
 
     await prisma.anamnesisParq.create({
@@ -197,10 +237,13 @@ describe('anamnese tipada — mapeamento contra Postgres real (ADR-0011)', () =>
         authoredAt: new Date(),
       },
     });
-    const gated = await prisma.anamnesis.update({
-      where: { id: anamnesis.id },
-      data: { status: 'ANSWERED', answeredAt: new Date() },
-    });
+    const gated = await withTenantSession(
+      s.tenant.id,
+      prisma.anamnesis.update({
+        where: { id: anamnesis.id },
+        data: { status: 'ANSWERED', answeredAt: new Date() },
+      }),
+    );
 
     expect(gated.status).toBe('ANSWERED');
   });

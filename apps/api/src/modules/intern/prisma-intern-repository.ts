@@ -1,5 +1,5 @@
 import type { InternArea, PrismaClient, SpecialtyCode, TenantType } from '@fitvo/database';
-import { prisma as defaultPrisma } from '@fitvo/database';
+import { prisma as defaultPrisma, setRlsTenantSession } from '@fitvo/database';
 import { SUPERVISOR_SPECIALTY_CODES_BY_AREA } from '@fitvo/validation';
 
 import { recordInitialTermsAcceptance } from '../terms/initial-terms-acceptance';
@@ -193,6 +193,15 @@ export class PrismaInternRepository implements InternRepository {
       if (!invite || invite.status !== 'PENDING' || invite.expiresAt.getTime() <= Date.now()) {
         return { status: 'invalid' };
       }
+
+      // Aceite de convite roda SEM contexto de tenant aberto (D-150 --
+      // tenant-context-hook.ts nao abre ALS pra esta rota). O RLS (D-152) bloqueia
+      // leitura E escrita em `internProfile`/`bond` sem a variavel de sessao
+      // setada -- aqui ja sabemos o tenantId (do convite), entao setamos
+      // explicitamente na MESMA transacao antes de qualquer escrita nessas
+      // tabelas. Nao afrouxa a policy: so cobre o caso em que o app ja
+      // resolveu o tenant certo por outra via (o convite).
+      await setRlsTenantSession(tx, invite.tenantId);
 
       const existing = await tx.account.findUnique({
         where: { email: invite.email },

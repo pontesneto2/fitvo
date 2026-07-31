@@ -3,6 +3,8 @@
 **Status:** Aceito
 **Decisões cobertas:** D-112 a D-121, D-133, D-134
 **Revisa:** D-104 (ADR-0011) — ver D-118
+**Referencia:** D-168 a D-171 (ADR-0009) — comum vs. sensível e anti-duplicação
+da biblioteca, aplicado a `Food`/`FoodGroup` (ver D-117)
 
 ## Contexto
 
@@ -117,6 +119,14 @@ batata equivalem para manter o alvo.
   D-064). O Dietbox tem ~15.000 alimentos, de múltiplas tabelas, e permite ao
   nutricionista adicionar alimento ou preparação que não encontre — é a **escala
   de referência**.
+- **Comum vs. sensível e anti-duplicação: mesma regra do treino, não redecidida
+  aqui.** O critério de classificação (dado sobre o mundo vs. sobre pessoa/método
+  — D-168), a anti-duplicação normalizada na entrada (D-169), o default seguro
+  para dado privado (D-170) e o escopo por `ownerProfessionalProfileId` (D-171)
+  — todos fixados no [ADR-0009](0009-dominio-treino.md) — valem **igualmente**
+  para `Food`/`FoodGroup`: o alimento genérico é comum (ex.: "banana prata = 98
+  kcal"), o uso dele numa prescrição do paciente é sensível (escopado por
+  vínculo). Este ADR **referencia**, não duplica o texto.
 - **Templates:** modelos da plataforma + modelos próprios do profissional
   (refeições e planos salvos, reutilizáveis entre pacientes). Mesmo padrão da
   clonagem de treino (D-090) e mesmo alvo: a **dor #1**, tempo de montagem.

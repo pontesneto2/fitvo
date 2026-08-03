@@ -455,13 +455,15 @@ tratar os dois no mesmo slice, já que o trabalho difícil é o mesmo.
   lacunas identificadas depois de o ADR-0011 fechar a taxonomia. Nenhuma é
   bloqueante; entram por decisão sua, não por iniciativa do agente.
 
-  *Núcleo / módulo treino:*
-  - **Local de treino** (academia / casa / box / ar livre) — determina o que
-    pode ser prescrito.
-  - **Tempo por sessão** (30/45/60/90/120 min) — hoje há dias/semana, não
-    duração.
-  - **Histórico esportivo** (modalidades praticadas).
-  - **Suplementos em uso** — campo de **texto livre** (decisão do responsável).
+  *Núcleo / módulo treino:* **FECHADO — adendo D-187–D-190 (ADR-0011,
+  jul/2026).** ~~Local de treino~~ virou **contextos de treino** (D-187:
+  lista de locais + equipamentos, não campo único — o aluno pode treinar em
+  mais de um lugar). ~~Tempo por sessão~~ fechado junto com frequência
+  semanal como **orçamento de treino** (D-188). ~~Histórico esportivo~~
+  fechado (D-189). ~~Suplementos em uso~~ fechado como catálogo + livre, com
+  sinal clínico para substância que exige acompanhamento médico — inclui o
+  caso "esteroides" (D-190, reusa o alerta do D-178). Resta apenas
+  implementação (schema + telas), não decisão de campo.
 
   *Módulo nutrição (quando o domínio fechar):*
   - **Escala de Bristol** — instrumento clínico para o "hábito intestinal" que o

@@ -1,7 +1,8 @@
 # ADR-0011 — Modalidade de Atendimento e Anamnese
 
-**Status:** Aceito (adendo jul/2026 — regras e fluxos transversais, D-172 a D-178)
-**Decisões cobertas:** D-101 a D-104, D-172 a D-178
+**Status:** Aceito (adendo jul/2026 — regras e fluxos transversais, D-172 a
+D-178; adendo jul/2026 — campos do módulo treino, D-187 a D-190)
+**Decisões cobertas:** D-101 a D-104, D-172 a D-178, D-187 a D-190
 **Revisa:** D-094 (ADR-0010) — ver D-102
 
 ## Contexto
@@ -485,6 +486,92 @@ porque a medida não vive lá.
   > (prescrever, pedir liberação médica, recusar) é decisão registrada do
   > profissional.
 
+---
+
+> As quatro decisões a seguir entraram como **adendo de campos do módulo
+> treino da anamnese** (jul/2026, decisão de mesa). Estendem o D-103 (módulo
+> treino) — não o reescrevem. Fecham os itens que o roadmap listava como
+> abertos no módulo treino: local de treino, tempo por sessão, histórico
+> esportivo e suplementos (esteroides incluído, como sinal clínico via
+> D-178). Princípio de decisão: cada campo só existe se a
+> prescrição/periodização usa o dado — campo que o profissional não usa para
+> decidir nada é fricção sem retorno.
+
+### D-187 — Contextos de treino (local + equipamentos), lista múltipla e extensível
+
+O aluno não treina "num lugar" — pode treinar em vários, e cada sessão do
+plano pode ser em um contexto diferente (ex.: 3x academia + 2x casa). A
+anamnese captura o **inventário de contextos disponíveis**; o domínio de
+treino (ADR-0009) depois aloca cada sessão a um contexto.
+
+- A anamnese guarda uma **lista de contextos** (0, 1 ou N — o aluno adiciona
+  quantos tiver). Cada contexto tem:
+  - **Tipo de local** (enum extensível): academia (comercial), academia de
+    condomínio/prédio, casa, ar livre (parque/praça/rua), studio/box
+    (crossfit/funcional/pilates), academia de hotel, local de trabalho,
+    quadra/campo, piscina, outro (livre).
+  - **Equipamentos disponíveis** naquele contexto (checklist, catálogo fixo +
+    "outro" livre): peso livre (halteres fixos, halteres ajustáveis,
+    barras+anilhas, kettlebell, anilhas avulsas, barra olímpica/W); máquinas
+    (máquinas guiadas, cabos/polia, leg press/máquinas de perna, smith);
+    cardio (esteira, bike/spinning, elíptico, remo ergômetro, escada);
+    funcional/peso corporal (barra fixa, paralelas, elásticos/faixas,
+    TRX/suspensão, bola suíça, corda naval, caixa de salto, colchonete,
+    nenhum); outro (campo livre).
+  - **Disponibilidade** (opcional): quantos dias/semana o aluno acessa aquele
+    contexto — alimenta a distribuição do plano.
+- **Presets rápidos** para reduzir fricção: "Academia completa" (marca tudo),
+  "Casa básica" (halteres + elásticos + colchonete), "Só peso corporal"
+  (nada) — o aluno parte do preset e ajusta.
+- **Catálogo fixo + "outro" livre:** o catálogo permite ao sistema (e à
+  futura sugestão de exercícios) saber o que é prescritível; o "outro" cobre
+  o caso raro sem travar.
+- **Conexão com o treino (ADR-0009):** o contexto é inventário na anamnese;
+  na prescrição, cada `Workout` é alocado a um contexto, e só usa exercícios
+  possíveis naquele local/equipamento.
+
+### D-188 — Orçamento de treino: frequência semanal + tempo por sessão
+
+O volume prescritível depende de quanto tempo o aluno tem — captura os dois
+juntos, um sem o outro não basta:
+
+- **Frequência semanal:** quantos dias/semana o aluno pode treinar.
+- **Tempo médio por sessão:** faixas (até 30 min / 30–45 / 45–60 / 60–90 /
+  +90).
+- Juntos formam o "orçamento de treino" — o personal distribui o volume
+  total dentro dele. Conecta com a disponibilidade por contexto (D-187).
+
+### D-189 — Histórico esportivo
+
+Informa repertório motor e ponto de partida — complementa o nível de treino
+já existente (`INICIANTE`/`INTERMEDIARIO`/`AVANCADO`/`ATLETA`): o nível diz
+o quão avançado; o histórico diz de onde vem.
+
+- **Esporte(s) já praticado(s):** catálogo + livre.
+- **Tempo de prática** de cada um.
+- **Ainda pratica?** (ativo/inativo).
+- Relevante para lesões prévias (liga com `AnamnesisInjury`) e preferências
+  de treino.
+
+### D-190 — Suplementos: registro factual + sinal clínico para substância de acompanhamento
+
+Relevante ao nutricionista (mais que ao personal) e à segurança
+(interações).
+
+- **Suplementos em uso:** catálogo dos comuns (whey, creatina, cafeína,
+  BCAA, pré-treino, vitaminas, ômega-3, hipercalórico...) + "outro" livre.
+  Registro **sem julgamento** — só o fato.
+- **Distinção por natureza** (o sistema classifica internamente):
+  - **Uso comum** (whey, creatina...) → registro simples.
+  - **Substância que exige acompanhamento médico** (hormônios,
+    anabolizantes/esteroides, termogênicos fortes) → além do registro,
+    dispara um **sinal ao profissional** (mesma classe do alerta de risco
+    D-178) — **não bloqueia, não julga**; informa o profissional para
+    avaliar. O aluno responde honestamente sem se sentir julgado; o
+    profissional recebe o sinal onde é clinicamente relevante.
+- Isso fecha o item "uso de esteroides anabólicos" que o D-103 listava no
+  módulo treino: tratado como sinal, não como campo isolado e acusatório.
+
 ## Impacto de modelagem
 
 Sinalizado para decisão de sequenciamento — **nada implementado por este ADR**.
@@ -539,6 +626,15 @@ Sinalizado para decisão de sequenciamento — **nada implementado por este ADR*
    texto + timestamp + hash) — não cria tabela de consentimento nova, associa o
    aceite ao sinal de risco específico que o disparou e à versão da anamnese
    (D-175) em que ele apareceu.
+10. **Contextos de treino (D-187) pedem entidade filha, não array/enum
+    único.** É lista (0..N) com tipo de local + checklist de equipamentos +
+    disponibilidade por item — não cabe em coluna escalar de `Anamnesis`.
+    Equipamentos e tipos de local viram catálogo (enum ou tabela de
+    referência, a definir na implementação), com campo livre de escape
+    ("outro"). Orçamento (D-188) e histórico esportivo (D-189) são campos
+    simples do módulo treino; suplementos (D-190) é lista curta (catálogo +
+    livre) com uma flag de classificação (comum × acompanhamento médico) que
+    dispara o mesmo sinal do D-178.
 
 ## Alternativas consideradas
 
@@ -627,11 +723,17 @@ Sinalizado para decisão de sequenciamento — **nada implementado por este ADR*
 - **Perguntas condicionais** são requisito de produto com efeito de modelagem: os
   campos precisam ser opcionais no banco (a maioria não se aplica à maioria) sem
   que "não respondido" e "respondido como não" colapsem no mesmo `null`.
-- **O adendo (D-172–D-178) não decide campos por módulo** — local de treino,
-  tempo/sessão, histórico esportivo, suplementos (treino); Bristol, histórico de
-  peso, comportamento alimentar, preferências (nutrição); perfil/histórico
-  hormonal, catálogo de exames (nutrologia) seguem em **mesa de campos**
-  própria, sobre as regras aqui fixadas.
+- **O adendo de regras (D-172–D-178) não decidiu campos por módulo.** O
+  módulo treino foi fechado pelo adendo seguinte (D-187–D-190): contextos de
+  treino, orçamento (frequência+tempo/sessão), histórico esportivo e
+  suplementos. Nutrição (Bristol, histórico de peso, comportamento alimentar,
+  preferências) e nutrologia (perfil/histórico hormonal, catálogo de exames)
+  seguem em **mesa de campos** própria, sobre as regras aqui fixadas.
+- **O adendo de campos do módulo treino (D-187–D-190) estende o D-103, não o
+  reescreve.** Contextos de treino são modelados como **lista** (não campo
+  único), porque o aluno pode treinar em mais de um lugar. O sinal de
+  substância que exige acompanhamento médico (D-190) reusa o mecanismo de
+  alerta do D-178 — não cria caminho novo.
 - **O texto jurídico do D-178 é RASCUNHO** — pendência explícita de validação
   por advogado antes de qualquer uso em produção. Não tratar como texto final.
 - A anamnese tipada + o adendo continuam sendo **dado clínico**: qualquer

@@ -29,6 +29,7 @@ o formato: contexto, decisão, alternativas consideradas, consequências.
 | [0016](0016-storage-arquivos.md) | Armazenamento de arquivos (storage) |
 | [0017](0017-tenant-isolation.md) | Isolamento de tenant — defense in depth (blocker go-live #1) |
 | [0018](0018-dominio-treino.md) | ~~Domínio de treino: prescrição, periodização e execução~~ — **Superseded por [0009](0009-dominio-treino.md)** |
+| [0019](0019-comunicacao-notificacoes.md) | Comunicação e notificações — presença, eventos e calibragem (consolida ADR-0005/0010/0012) |
 
 ## Mapa D-número → ADR
 
@@ -57,8 +58,9 @@ sem repetir o número. **A tabela é a autoridade sobre a cobertura**, não o `g
 | D-144 – D-149 | [0016](0016-storage-arquivos.md) | Armazenamento de arquivos (adapter S3, bucket privado, arquivo como recurso do bond) |
 | D-150 – D-155 | [0017](0017-tenant-isolation.md) | Isolamento de tenant (AsyncLocalStorage + Prisma extension + RLS seletivo) |
 | ~~D-158 – D-163~~ | [0018](0018-dominio-treino.md) | ~~Domínio de treino: prescrição, periodização e execução~~ — **SUPERSEDED por [0009](0009-dominio-treino.md); estas decisões NÃO estão em vigor.** O arquivo é registro histórico (pesquisa competitiva jul/2026) |
+| D-179 – D-186 | [0019](0019-comunicacao-notificacoes.md) | Comunicação e notificações (D-179: cobertura evento+ausência multi-nicho; D-180: check-in como sinal único de presença; D-181: categorias acompanhamento/transacional/marketing; D-182: calibragem de push; D-183: `NotificationPreference`; D-184: `PushToken`; D-185: worker de ausência; D-186: novos tipos de `NotificationType` — consolida ADR-0005/0010/0012, jul/2026) |
 
-**Cobertura:** D-001 a D-178, sem lacunas. **D-158 – D-163 estão cobertas pelo
+**Cobertura:** D-001 a D-186, sem lacunas. **D-158 – D-163 estão cobertas pelo
 ADR-0018, que é `Superseded`** — os números existem e não são reutilizáveis, mas
 as decisões não valem; o que sobreviveu delas foi reincorporado ao ADR-0009 como
 D-164 – D-167. **D-168 – D-171 são adendo de biblioteca de catálogo** (comum vs.
@@ -73,6 +75,11 @@ de medicina (D-122–D-132) porque nasceram depois — a numeração é cronoló
 não temática, e por isso a linha do 0013 não é contígua. Algumas decisões
 aparecem em dois ADRs (D-025 em 0002/0004/0005; D-050 em 0003/0004; D-054 em
 0001/0003) — é intencional: a decisão tem consequência nos dois temas.
+**ADR-0019 consolida o tema de comunicação/notificação antes disperso em
+ADR-0005 (D-022–D-028, D-031–D-036), ADR-0010 (D-096/D-097) e ADR-0012
+(D-107/D-108)** — não redecide esses D antigos, só referencia e adiciona os
+eixos novos (ausência, preferências, categorias, calibragem de push) em ADR
+próprio.
 
 **Revisões** — uma decisão pode ser revisada por outra mais nova. O ADR original
 recebe um ponteiro; o `Status` no topo de cada ADR e o campo `Revisa:` são a

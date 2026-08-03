@@ -1454,6 +1454,28 @@ model WorkoutPlan {
   releaseAt    DateTime?         @db.Timestamptz(3) // liberacao programada (UTC — D-084); nulo = imediata
   goal         String? // objetivo capturado na montagem do plano (D-095)
 
+  /// PLANO FIXO (D-105): plano que roda POR CIMA dos demais — alongamento/
+  /// mobilidade que o aluno faz sempre, independente de ser dia de A ou B.
+  /// Coexiste permanentemente com os planos variaveis; NAO e alternativa a eles.
+  ///
+  /// EIXO PROPRIO, nao um valor de `organization`: um plano fixo continua sendo
+  /// LETTER ou WEEKDAY internamente (ele tem treinos). O que `isFixed` diz e se
+  /// ele COMPETE pelo tempo do aluno (D-079) ou roda por cima — e disso decorre
+  /// a regra que o D-105 justifica: plano fixo NAO conta como "o treino de hoje"
+  /// na aderencia (D-092), senao o alongamento infla o indicador de quem nao
+  /// treinou. A regra vive na camada de dominio, nao no banco.
+  isFixed Boolean @default(false)
+
+  /// Dias em que o plano fixo vale (D-105 — "todo dia, ou nos dias escolhidos
+  /// pelo profissional"). Lista VAZIA = todo dia; e o default seguro e o caso
+  /// mais comum. Enum em vez de Int 1..7 para que o dia invalido seja
+  /// irrepresentavel (mesmo racional do `Weekday` do `Workout`).
+  ///
+  /// So tem significado quando `isFixed` — num plano variavel a distribuicao
+  /// pelos dias ja e do TREINO (`Workout.weekday`, D-080). Invariante de
+  /// dominio, nao do banco.
+  fixedWeekdays Weekday[]
+
   /// Linhagem da clonagem (D-090). DELIBERADAMENTE SEM RELATION: o plano de
   /// origem pertence a OUTRO vinculo, e uma relacao criaria um caminho de join
   /// que vazaria dado de outro paciente. E ponteiro de auditoria, nao rota de

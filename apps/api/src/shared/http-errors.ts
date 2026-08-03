@@ -278,6 +278,59 @@ export class MuscleGroupUnavailableError extends AppError {
   }
 }
 
+/**
+ * O treino nao casa com a organizacao do PLANO (D-080 — ADR-0009): plano LETTER
+ * exige `label` (A/B/C) e nao aceita `weekday`; plano WEEKDAY exige `weekday` e
+ * nao aceita `label`. A coerencia e invariante de DOMINIO, nao do banco — as
+ * duas colunas existem em `Workout` e so o plano diz qual vale. 422:
+ * bem-formado, mas viola pre-condicao de negocio.
+ */
+export class PlanOrganizationMismatchError extends AppError {
+  readonly status = 422;
+  readonly problemType = 'https://fitvo.dev/problems/plan-organization-mismatch';
+  readonly title = 'Treino incoerente com a organizacao do plano';
+  constructor(message: string) {
+    super(message);
+    this.name = 'PlanOrganizationMismatchError';
+  }
+}
+
+/**
+ * Grupo de conjugados malformado (D-082 — ADR-0009): itens do MESMO
+ * `supersetGroup` precisam ter a mesma contagem de series, porque a RODADA N do
+ * bi/tri-set/circuito e a serie de ordem N de cada item. Com contagens
+ * diferentes, a rodada 3 existiria para um exercicio e nao para o outro — o
+ * conjugado nao teria como ser executado.
+ *
+ * INVARIANTE DE DOMINIO explicitamente citada no ADR; o banco nao a expressa
+ * (nao ha constraint que compare contagem entre linhas irmas).
+ */
+export class SupersetSetCountMismatchError extends AppError {
+  readonly status = 422;
+  readonly problemType = 'https://fitvo.dev/problems/superset-set-count-mismatch';
+  readonly title = 'Conjugado com contagem de series divergente';
+  constructor(message = 'Todos os itens de um conjugado precisam ter a mesma contagem de series.') {
+    super(message);
+    this.name = 'SupersetSetCountMismatchError';
+  }
+}
+
+/**
+ * O plano esta num estado que nao aceita a operacao pedida (D-083/D-084/D-165 —
+ * ADR-0009). Ex.: editar a prescricao de um plano ARCHIVED, ou liberar um plano
+ * que ja foi liberado. Nao e "nao encontrado" (o plano existe e e do chamador) e
+ * nao e falta de permissao — e conflito com o estado atual do recurso.
+ */
+export class WorkoutPlanStateConflictError extends AppError {
+  readonly status = 409;
+  readonly problemType = 'https://fitvo.dev/problems/workout-plan-state-conflict';
+  readonly title = 'Estado do plano nao permite a operacao';
+  constructor(message: string) {
+    super(message);
+    this.name = 'WorkoutPlanStateConflictError';
+  }
+}
+
 /** Plano inexistente ou inativo no catalogo da plataforma (Fluxo A — ADR-0004). */
 export class PlanNotFoundError extends AppError {
   readonly status = 404;

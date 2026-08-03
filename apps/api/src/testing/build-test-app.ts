@@ -33,6 +33,8 @@ import { InMemorySpecialtyRepository } from '../modules/specialty/in-memory-spec
 import { SpecialtyApplicationService } from '../modules/specialty/specialty-application-service';
 import { InMemoryTermsRepository } from '../modules/terms/in-memory-terms-repository';
 import { TermsApplicationService } from '../modules/terms/terms-application-service';
+import { InMemoryWorkoutRepository } from '../modules/workout/in-memory-workout-repository';
+import { WorkoutApplicationService } from '../modules/workout/workout-application-service';
 import { FakeAuthEmailSender } from './fake-auth-email-sender';
 
 /** Dependências in-memory + os repositórios expostos para arranjo nos testes. */
@@ -51,6 +53,7 @@ export interface TestDependencies {
   specialty: InMemorySpecialtyRepository;
   nutrition: InMemoryNutritionRepository;
   exerciseLibrary: InMemoryExerciseLibraryRepository;
+  workout: InMemoryWorkoutRepository;
   queue: InMemoryQueueFactory;
 }
 
@@ -81,6 +84,8 @@ export interface TestHarness {
   nutrition: InMemoryNutritionRepository;
   /** Biblioteca de exercicios em memoria (ADR-0009) — expoe `seedProfessional`/`seedPlatformExercise`/`discontinueMuscleGroup`. */
   exerciseLibrary: InMemoryExerciseLibraryRepository;
+  /** Prescricao de treino em memoria (ADR-0009) — expoe `seedProfessional`/`seedPatient`/`seedBond`. */
+  workout: InMemoryWorkoutRepository;
   /** Fabrica de filas em memoria — coleta os eventos publicados (ex.: bond.created). */
   queue: InMemoryQueueFactory;
 }
@@ -202,6 +207,10 @@ export function buildTestDependencies(): TestDependencies {
   // musculares semeado (mesmo conteudo da migracao de producao — D-164).
   const exerciseLibrary = new InMemoryExerciseLibraryRepository();
   const exerciseLibraryService = new ExerciseLibraryApplicationService(exerciseLibrary, authCore);
+  // Prescricao de treino (ADR-0009) — cada slice semeia o proprio mundo
+  // (profissional/paciente/vinculo), isolado do modulo patient.
+  const workout = new InMemoryWorkoutRepository();
+  const workoutService = new WorkoutApplicationService(workout, authCore);
   return {
     deps: {
       logLevel: 'silent',
@@ -218,6 +227,7 @@ export function buildTestDependencies(): TestDependencies {
       specialtyService,
       nutritionService,
       exerciseLibraryService,
+      workoutService,
     },
     emails,
     accounts,
@@ -232,6 +242,7 @@ export function buildTestDependencies(): TestDependencies {
     specialty,
     nutrition,
     exerciseLibrary,
+    workout,
     queue,
   };
 }
@@ -254,6 +265,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     specialty,
     nutrition,
     exerciseLibrary,
+    workout,
     queue,
   } = buildTestDependencies();
   const app = await buildApp(deps);
@@ -272,6 +284,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     specialty,
     nutrition,
     exerciseLibrary,
+    workout,
     queue,
   };
 }

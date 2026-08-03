@@ -20,6 +20,7 @@ import { patientRoutes } from './modules/patient/patient-routes';
 import { receptionRoutes } from './modules/reception/reception-routes';
 import { specialtyRoutes } from './modules/specialty/specialty-routes';
 import { termsRoutes } from './modules/terms/terms-routes';
+import { workoutRoutes } from './modules/workout/workout-routes';
 import { registerErrorHandler } from './shared/error-handler';
 import { zodAwareTransform } from './shared/openapi-transform';
 import { createTenantContextHook } from './shared/tenant-context-hook';
@@ -39,8 +40,9 @@ function firstHeader(value: string | string[] | undefined): string | undefined {
  *   webhook publico do Asaas), o catalogo fixo de especialidades
  *   (/v1/specialties — publico, so-leitura, D-047) e nutricao (/v1/nutrition
  *   — montagem do plano alimentar, ADR-0013) e a biblioteca de exercicios
- *   (/v1/exercise-library — escopada por profissional, ADR-0009); /health e
- *   /docs (Swagger, D-032/D-034).
+ *   (/v1/exercise-library — escopada por profissional, ADR-0009) e a
+ *   prescricao de treino (/v1/workout — plano/treino/item/serie por vinculo,
+ *   ADR-0009); /health e /docs (Swagger, D-032/D-034).
  */
 export async function buildApp(
   deps: AppDependencies,
@@ -109,6 +111,7 @@ export async function buildApp(
   await app.register(exerciseLibraryRoutes(deps.exerciseLibraryService), {
     prefix: '/v1/exercise-library',
   });
+  await app.register(workoutRoutes(deps.workoutService), { prefix: '/v1/workout' });
 
   if (deps.onClose) {
     const { onClose } = deps;

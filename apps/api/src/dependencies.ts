@@ -35,6 +35,8 @@ import { PrismaSpecialtyRepository } from './modules/specialty/prisma-specialty-
 import { SpecialtyApplicationService } from './modules/specialty/specialty-application-service';
 import { PrismaTermsRepository } from './modules/terms/prisma-terms-repository';
 import { TermsApplicationService } from './modules/terms/terms-application-service';
+import { PrismaWorkoutRepository } from './modules/workout/prisma-workout-repository';
+import { WorkoutApplicationService } from './modules/workout/workout-application-service';
 import type { AccessTokenVerifier } from './shared/auth-context';
 
 /** Dependencias injetadas na app (permite trocar por fakes nos testes). */
@@ -56,6 +58,7 @@ export interface AppDependencies {
   specialtyService: SpecialtyApplicationService;
   nutritionService: NutritionApplicationService;
   exerciseLibraryService: ExerciseLibraryApplicationService;
+  workoutService: WorkoutApplicationService;
   onClose?: () => Promise<void>;
 }
 
@@ -216,6 +219,14 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     authCore,
   );
 
+  // authCore satisfaz AccessTokenVerifier — a prescricao de treino reusa o
+  // mesmo verificador. O escopo e DUPLO (tenant + vinculo, D-166/D-079) e vive
+  // no repositorio: nenhum predicado aceita so o id do recurso.
+  const workoutService = new WorkoutApplicationService(
+    new PrismaWorkoutRepository(prisma),
+    authCore,
+  );
+
   return {
     logLevel: env.LOG_LEVEL,
     corsOrigin: env.CORS_ORIGIN,
@@ -231,6 +242,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     specialtyService,
     nutritionService,
     exerciseLibraryService,
+    workoutService,
     onClose: async () => {
       await queueFactory.close();
       await redis.quit();

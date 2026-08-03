@@ -1310,7 +1310,8 @@ enum AttendanceStatus {
 /// inventar. O texto exibido vive no i18n (D-066), nunca no enum.
 enum NotificationType {
   WORKOUT_DAY // dia de treino
-  PLAN_EXPIRING // plano vencendo (D-083)
+  PLAN_EXPIRING // plano vencendo/vencido (D-083)
+  NEW_PLAN_AVAILABLE // plano liberado — agendado (D-084) ou novo (D-186 — ADR-0019)
   ATTENDANCE_UNANSWERED // mensagem sem resposta (D-096)
   INVITE_RECEIVED // convite recebido
   CHARGE // cobranca

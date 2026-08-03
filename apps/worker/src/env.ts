@@ -7,6 +7,10 @@ const workerEnvSchema = baseEnvSchema.extend({
   // diario (24h); a cadencia diaria acerta cada marco do cronograma uma vez.
   // Configuravel por ambiente.
   COLLECTION_RULER_INTERVAL_MS: z.coerce.number().int().positive().default(86_400_000),
+  // Intervalo da varredura das reguas de plano de treino (D-083 vencimento;
+  // D-084 liberacao agendada — ADR-0009). Default diario, mesmo raciocinio da
+  // regua de cobranca. Configuravel por ambiente.
+  PLAN_LIFECYCLE_RULER_INTERVAL_MS: z.coerce.number().int().positive().default(86_400_000),
 });
 
 export type WorkerEnv = z.infer<typeof workerEnvSchema>;

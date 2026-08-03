@@ -29,6 +29,8 @@ RESPONSÁVEL** (decisão que só você pode tomar), **BLOQUEADO — TERCEIROS**
 | 10 | Design tokens (`brand-tokens` populado: cor, tipografia, elevação, ícones Lucide, densidade) | #18 (aberto) | Ver EM ANDAMENTO — aguardando revisão/merge. |
 | 11 | Cola de framework (`ui-web` preset Tailwind + CSS vars; `ui-mobile` ThemeProvider) | #18 (aberto) | |
 | 12 | Primitivos de UI §1–§18 (Button, Input/Field/Textarea, Checkbox/Radio/Switch, Select/Combobox, Card, Badge, Tabs, Menu lateral, Breadcrumb, Modal, Toast, Tooltip, estados de tela, Tabela, Avatar) + `Logo` (wordmark fechado, mark provisório) | #18 (aberto) | 227 testes (`brand-tokens` 18 + `ui-web` 127 + `ui-mobile` 82). Consolidado de uma branch de trabalho local que não tinha PR nem push — risco de perda eliminado. |
+| 13 | Isolamento de tenant sistêmico — as 3 camadas (D-150 AsyncLocalStorage, D-151 Prisma Client extension, D-152 Postgres RLS seletivo — **ADR-0017**) | #121, #122, #127 | Fecha o achado #1 (mais grave) do inventário de promessas-sem-gate — vazamento cross-tenant agora tem gate sistêmico, não só disciplina manual. |
+| 14 | Bloco 1 de treino — taxonomia de grupo muscular (`MuscleGroup`, D-164), retrofit de `tenantId` nas tabelas do domínio e biblioteca de exercícios comum vs. sensível (D-168–D-171 — **ADR-0009**) | #131 | Schema + retrofit; segue a ordem "tenant isolation antes de treino" (D-166). |
 
 ## EM ANDAMENTO
 
@@ -182,8 +184,9 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
     escopo delimitado (planos ativos + execuções pendentes), criptografia local
     obrigatória, tombstones (`deletedAt`) + `updatedAt` indexado nas tabelas
     sincronizáveis. **Exige development build** (adeus Expo Go). Depende do item
-    12 (mobile) e do item 2 (treino tipado — merge por campo exige colunas, não
-    `Json`).
+    12 (mobile) e do domínio de treino ter dado tipado, não `Json`, para o merge
+    por campo funcionar — colunas tipadas já existem (`WorkoutPlan`/`WorkoutSet`,
+    D-081, ver FEITO #14); resta a API/slice de execução.
 13. **Testes ao vivo das integrações** (Asaas sandbox, IA real, FCM, e-mail,
     SMS, Daily) — hoje todos gated por ausência de credenciais no ambiente.
     Rodar exige as credenciais reais (ver BLOQUEADO — TERCEIROS).
@@ -253,23 +256,19 @@ tratar os dois no mesmo slice, já que o trabalho difícil é o mesmo.
 
 ## BLOQUEADO — RESPONSÁVEL (decisão que só você pode tomar)
 
-- **⚠️ ISOLAMENTO DE TENANT SISTÊMICO — pré-requisito ANTES de qualquer cliente
-  real. PRIORIDADE ALTA.** Achado **#1 e mais grave** do inventário de
+- **⚠️ ISOLAMENTO DE TENANT SISTÊMICO — RESOLVIDO (ADR-0017, PRs #121/#122/#127
+  — ver FEITO #13).** Era o achado **#1 e mais grave** do inventário de
   promessas-sem-gate (`docs/promessas-sem-gate.md`, #73): o isolamento de tenant
-  **não tem gate sistêmico**. Hoje, o que impede um tenant de ver dados de outro
-  é **disciplina** (o dev lembrar do escopo de `tenantId`) — **nada REPROVA** uma
-  query que esqueça. Num SaaS multi-tenant com dado de saúde, é o vazamento mais
-  caro possível: um `findMany` sem escopo e a Clínica A vê os pacientes da
-  Clínica B.
-  - **Criticidade:** bloqueia o go-live. Não urgente sem clientes, mas é a
-    PRIMEIRA coisa a resolver antes de qualquer pessoa real entrar.
-  - **Soluções conhecidas (decisão do responsável, a definir):** Prisma extension
-    que injeta `tenantId` automaticamente em toda query; RLS no Postgres (já
-    cogitado no ADR-0001); ou os dois (RLS no banco + extension na aplicação). O
-    objetivo é tornar o vazamento **IRREPRESENTÁVEL**, não confiar em disciplina.
-  - **Relacionado:** os itens AUDITAR 4 e 5 do mesmo mapa (admin puro não vê dado
-    clínico; leitura só com consentimento) são da **mesma família** — falta o gate
-    que prova o **BLOQUEIO**, não só o caminho feliz.
+  **não tinha gate sistêmico** — o que impedia um tenant de ver dados de outro
+  era só **disciplina** (o dev lembrar do escopo de `tenantId`), e nada
+  REPROVAVA uma query que esquecesse. Fechado em três camadas: **D-150**
+  (contexto de tenant via AsyncLocalStorage), **D-151** (Prisma Client extension
+  injeta `tenantId` em toda query) e **D-152** (Postgres RLS seletivo nas
+  tabelas mais sensíveis — `bond`, dado de saúde, financeiro, vínculo de
+  supervisão/recepção). Detalhe completo em `docs/adr/0017-tenant-isolation.md`.
+  - **Relacionado, ainda não fechado:** os itens AUDITAR 4 e 5 do mesmo mapa
+    (admin puro não vê dado clínico; leitura só com consentimento) são da
+    **mesma família** — mesmo gate sistêmico, alvo diferente.
 - **⚠️ OBRIGAÇÕES ENFRAQUECIDAS NA DESTILAÇÃO — definir como enforçar. Área
   crítica (auth + LGPD).** Auditoria ADR × histórico bruto (D-001–D-073, palavra
   de força a palavra de força; a **classe** do defeito está em
@@ -390,14 +389,18 @@ tratar os dois no mesmo slice, já que o trabalho difícil é o mesmo.
   provedores (fora do controle do código) e de coordenar a migração do modelo
   `Notification` que o ADR-0005 já descreveu (ver `docs/adr/0010-fluxo-aluno-gates-atendimento.md:243`).
   Efeito hoje: nenhuma notificação sai de fato do sistema — tudo vira log.
-- **Entrega via adapter de notificações ainda não conectada (D-028).** Três call
-  sites aguardam o mesmo adapter: `apps/worker/src/index.ts:73`,
-  `apps/worker/src/sharing/overlap-detection-service.ts:54` e
-  `apps/worker/src/billing/collection-ruler-service.ts:56` — todos com
-  `TODO(D-028): deliver via notifications adapter`. Mesma dependência do item
-  anterior (D-027): o adapter real não existe ainda, então o worker calcula a
-  notificação (motor de compartilhamento, cobrança) mas não a entrega de verdade.
-  Decidido, não implementado — mesmo bloqueio (credenciais de provedor).
+- **Entrega via adapter de notificações — parcialmente conectada (D-028).** As
+  reguas de plano de treino (D-083 vencimento; D-084 liberação — ADR-0009)
+  passaram a ENTREGAR de verdade pelo canal in-app (mock — `buildDefaultDispatcher`,
+  `apps/worker/src/index.ts`): não era gap de credencial, era só plugar o
+  adapter que já existia. **Dois call sites continuam com o TODO original**
+  — `apps/worker/src/sharing/overlap-detection-service.ts` e
+  `apps/worker/src/billing/collection-ruler-service.ts` (`TODO(D-028): deliver
+  via notifications adapter`) — porque, diferente do plano de treino, o
+  **destinatário não está decidido** (quem recebe a sugestão de sobreposição:
+  paciente ou profissional? quem recebe o lembrete de cobrança: qual conta do
+  tenant?). Não é bloqueio de credencial nestes dois — é decisão de produto que
+  o agente não deve inventar; plugar exige essa resposta primeiro.
 - **Campos clínicos `detail Json?` — decisão de produto ainda aberta (D-063).**
   Diferente da nutrição (**D-063 FECHADO** ali — ver ADR-0013), os domínios de
   atendimento/prontuário/receita/avaliação ainda guardam conteúdo fino num `Json?`
@@ -456,7 +459,7 @@ tratar os dois no mesmo slice, já que o trabalho difícil é o mesmo.
   bloqueante; entram por decisão sua, não por iniciativa do agente.
 
   *Núcleo / módulo treino:* **FECHADO — adendo D-187–D-190 (ADR-0011,
-  jul/2026).** ~~Local de treino~~ virou **contextos de treino** (D-187:
+  jul/2026, PR #130).** ~~Local de treino~~ virou **contextos de treino** (D-187:
   lista de locais + equipamentos, não campo único — o aluno pode treinar em
   mais de um lugar). ~~Tempo por sessão~~ fechado junto com frequência
   semanal como **orçamento de treino** (D-188). ~~Histórico esportivo~~

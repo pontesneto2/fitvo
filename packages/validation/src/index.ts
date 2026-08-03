@@ -15,6 +15,7 @@ export * from './clinic';
 export * from './consent';
 export * from './document';
 export * from './errors';
+export * from './exercise-library';
 export * from './intern';
 export * from './nutrition';
 export * from './patient';

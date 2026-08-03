@@ -12,20 +12,33 @@ import { getTenantContext } from './tenant-context';
  *
  * clinicMembership, professionalProfile, professionalInvite, internProfile,
  * internInvite, receptionProfile, receptionInvite, patientInvite, bond,
- * paymentAccount, subscription, charge, workoutPlan, workout, workoutSession,
- * formAnalysis, mealPlan, mealLog, encounter, medicalRecord, prescription,
- * anamnesis, assessment, progressPhoto, attendance, appointment.
+ * paymentAccount, subscription, charge, workoutPlan, workout, workoutItem,
+ * workoutSet, workoutSession, setLog, workoutRating, formAnalysis, mealPlan,
+ * mealLog, encounter, medicalRecord, prescription, anamnesis, assessment,
+ * progressPhoto, attendance, appointment.
  *
  * O QUE FICA DE FORA DE PROPOSITO (nao e omissao — ver auditoria completa no PR
  * do slice):
  * - GLOBAL (catalogo da plataforma, sem tenantId): Specialty, TermsDocument,
- *   TermsVersion, Plan, PlanPrice.
- * - MISTO GLOBAL/DONO (Exercise/Food/FoodGroup): NAO tem coluna tenantId —
- *   escopam por `ownerProfessionalProfileId`/`visibility`, dimensao diferente
- *   de tenant. Diverge do texto original da ADR-0017 (D-152 citava
- *   "Exercise/MuscleGroup com tenantId NULL"; `MuscleGroup` nunca foi criado no
- *   schema real — ADR-0018 do dominio de treino evoluiu o design). Reportado
- *   no PR; nao e um gap deste slice, e um limite do proprio schema.
+ *   TermsVersion, Plan, PlanPrice, MuscleGroup (catalogo de grupo muscular —
+ *   D-164; a base comum e legitimamente sem dono).
+ * - MISTO GLOBAL/DONO (Exercise/Food/FoodGroup): escopam por
+ *   `ownerProfessionalProfileId`/`visibility` (D-171), dimensao DIFERENTE de
+ *   tenant. `Exercise` PASSOU a ter coluna `tenantId` (D-166 — retrofit do
+ *   dominio de treino), mas ela e NULAVEL: NULL = item PLATFORM, global,
+ *   visivel a TODOS os tenants (D-089). E por isso que Exercise continua FORA
+ *   desta lista, agora por um motivo mais forte do que "nao tem a coluna":
+ *   `applyTenantScope` sobrescreve `tenantId` INCONDICIONALMENTE
+ *   (scopeFilterWhere faz `AND tenantId = <ctx>`; scopeCreateData/UpdateData
+ *   forcam o valor). Ela nao sabe expressar "tenantId = <ctx> OU tenantId IS
+ *   NULL". Incluir `exercise` aqui APAGARIA a biblioteca compartilhada da
+ *   plataforma de todas as buscas e tornaria impossivel criar item PLATFORM sob
+ *   contexto aberto. O filtro da biblioteca (PLATFORM + PRIVATE do proprio
+ *   profissional) e responsabilidade EXPLICITA do repositorio da biblioteca
+ *   (prisma-exercise-library-repository.ts), que e onde o D-171 mora. O
+ *   `tenantId` do Exercise e rastro/defesa em profundidade, nao o eixo de
+ *   visibilidade. Coberto por teste: ver tenant-isolation-extension.integration.test.ts.
+ *   (Food/FoodGroup seguem sem coluna tenantId — fora do escopo do slice de treino.)
  * - SEM TENANT / cross-tenant por design ou por conta/titular: Account,
  *   PlatformAdmin, Tenant, PatientProfile (paciente tem vinculos em varios
  *   tenants), Consent (por patientProfileId, ADR-0003 — cruza tenant de
@@ -33,16 +46,22 @@ import { getTenantContext } from './tenant-context';
  *   accountId), WebhookEvent (ledger global Asaas), Notification (por
  *   accountId).
  * - FILHO escopado TRANSITIVAMENTE via FK do pai (sem tenantId proprio; a
- *   extension NAO PODE injetar o que nao existe como coluna): ~28 modelos
- *   (WorkoutItem, WorkoutSet, SetLog, WorkoutRating, ProfessionalSpecialty,
+ *   extension NAO PODE injetar o que nao existe como coluna): ProfessionalSpecialty,
  *   toda a arvore de Anamnesis*, Meal/MealPlanItem/MealLogItem/FoodGroupMember,
  *   AttendanceMessage/Rating, ProfessionalService/AgendaSettings/
- *   AvailabilityRule/Exception — ver auditoria completa no PR). O isolamento
- *   destes depende 100% do app ja validar o id do pai antes de ler/escrever —
- *   responsabilidade PRE-EXISTENTE, inalterada por este slice.
+ *   AvailabilityRule/Exception, ExerciseSecondaryMuscleGroup (juncao de
+ *   catalogo global — nao ha tenant a escopar) — ver auditoria completa no PR.
+ *   O isolamento destes depende 100% do app ja validar o id do pai antes de
+ *   ler/escrever — responsabilidade PRE-EXISTENTE.
+ *
+ *   REDUZIDO pelo D-166 (ADR-0009): WorkoutItem, WorkoutSet, SetLog e
+ *   WorkoutRating SAIRAM deste balde. Eram filhos de dado de vinculo escopados
+ *   so pela FK do pai; ganharam coluna `tenantId` propria (NOT NULL) e entraram
+ *   na lista de cima. O escopo transitivo continua valendo como camada
+ *   redundante — nao removemos nenhum filtro por pai.
  *
  * RACIOCINIO SOBRE RELACAO ANINHADA (nota de implementacao do ADR-0017): quando
- * o modelo RAIZ da query e um dos 26 acima, injetar tenantId no `where` RAIZ e
+ * o modelo RAIZ da query e um dos 30 acima, injetar tenantId no `where` RAIZ e
  * SUFICIENTE mesmo com filtro de relacao aninhada (`some`/`every`/`is`/objeto),
  * porque toda travessia de relacao do Prisma e correlacionada por FK a LINHA
  * RAIZ ja escopada — nao existe travessia que "escape" para linha de outro
@@ -90,7 +109,11 @@ const TENANT_SCOPED_MODELS = [
   'charge',
   'workoutPlan',
   'workout',
+  'workoutItem',
+  'workoutSet',
   'workoutSession',
+  'setLog',
+  'workoutRating',
   'formAnalysis',
   'mealPlan',
   'mealLog',
@@ -104,7 +127,7 @@ const TENANT_SCOPED_MODELS = [
   'appointment',
 ] as const;
 
-/** Nomes dos 26 modelos bucket A — exportado so para os testes conferirem cobertura 1:1 com a lista literal do `query` abaixo. */
+/** Nomes dos 30 modelos bucket A — exportado so para os testes conferirem cobertura 1:1 com a lista literal do `query` abaixo. */
 export type TenantScopedModel = (typeof TENANT_SCOPED_MODELS)[number];
 export { TENANT_SCOPED_MODELS };
 
@@ -369,7 +392,11 @@ export const tenantIsolationQueryExtension = {
   charge: { $allOperations: tenantScopedAllOperations },
   workoutPlan: { $allOperations: tenantScopedAllOperations },
   workout: { $allOperations: tenantScopedAllOperations },
+  workoutItem: { $allOperations: tenantScopedAllOperations },
+  workoutSet: { $allOperations: tenantScopedAllOperations },
   workoutSession: { $allOperations: tenantScopedAllOperations },
+  setLog: { $allOperations: tenantScopedAllOperations },
+  workoutRating: { $allOperations: tenantScopedAllOperations },
   formAnalysis: { $allOperations: tenantScopedAllOperations },
   mealPlan: { $allOperations: tenantScopedAllOperations },
   mealLog: { $allOperations: tenantScopedAllOperations },

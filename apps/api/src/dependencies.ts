@@ -21,6 +21,8 @@ import { ClinicApplicationService } from './modules/clinic/clinic-application-se
 import { PrismaClinicRepository } from './modules/clinic/prisma-clinic-repository';
 import { ConsentApplicationService } from './modules/consent/consent-application-service';
 import { PrismaConsentRepository } from './modules/consent/prisma-consent-repository';
+import { ExerciseLibraryApplicationService } from './modules/exercise-library/exercise-library-application-service';
+import { PrismaExerciseLibraryRepository } from './modules/exercise-library/prisma-exercise-library-repository';
 import { InternApplicationService } from './modules/intern/intern-application-service';
 import { PrismaInternRepository } from './modules/intern/prisma-intern-repository';
 import { NutritionApplicationService } from './modules/nutrition/nutrition-application-service';
@@ -53,6 +55,7 @@ export interface AppDependencies {
   billingService: BillingApplicationService;
   specialtyService: SpecialtyApplicationService;
   nutritionService: NutritionApplicationService;
+  exerciseLibraryService: ExerciseLibraryApplicationService;
   onClose?: () => Promise<void>;
 }
 
@@ -205,6 +208,14 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     authCore,
   );
 
+  // authCore satisfaz AccessTokenVerifier — a biblioteca de exercicios reusa o
+  // mesmo verificador para o guard de perfil profissional. O escopo da
+  // biblioteca e por PROFISSIONAL (D-171), aplicado dentro do repositorio.
+  const exerciseLibraryService = new ExerciseLibraryApplicationService(
+    new PrismaExerciseLibraryRepository(prisma),
+    authCore,
+  );
+
   return {
     logLevel: env.LOG_LEVEL,
     corsOrigin: env.CORS_ORIGIN,
@@ -219,6 +230,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     billingService,
     specialtyService,
     nutritionService,
+    exerciseLibraryService,
     onClose: async () => {
       await queueFactory.close();
       await redis.quit();

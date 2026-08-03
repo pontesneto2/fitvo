@@ -2,16 +2,16 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { getTenantContext, prisma, runWithTenantContext } from './index';
+import { getTenantContext, normalizeLibraryItemName, prisma, runWithTenantContext } from './index';
 
 /**
  * Integracao — bateria de VAZAMENTO da extension de isolamento de tenant
  * (D-151 — ADR-0017, Slice 2/3), contra Postgres real. Este e o coracao do
  * slice: prova que, com o contexto de tenant aberto (D-150), NENHUMA leitura,
  * escrita, atualizacao ou remocao de um modelo bucket-A cruza tenant — para
- * CADA UM dos 26 modelos escopados, nao so uma amostra.
+ * CADA UM dos 30 modelos escopados, nao so uma amostra.
  *
- * Semeia DOIS grafos de tenant completos (A e B) cobrindo os 26 modelos bucket
+ * Semeia DOIS grafos de tenant completos (A e B) cobrindo os 30 modelos bucket
  * A (mais as dependencias bucket-E minimas: Meal, ProfessionalSpecialty,
  * ProfessionalService). Cada checagem de vazamento usa `id: { in: [rowA,
  * rowB] }` no `where` — NAO um `findMany()` cru — porque o banco e
@@ -59,7 +59,11 @@ interface TenantGraph {
   chargeId: string;
   workoutPlanId: string;
   workoutId: string;
+  workoutItemId: string;
+  workoutSetId: string;
   workoutSessionId: string;
+  setLogId: string;
+  workoutRatingId: string;
   formAnalysisId: string;
   mealPlanId: string;
   mealLogId: string;
@@ -81,7 +85,7 @@ interface TenantGraph {
  * execucoes.
  *
  * Roda DENTRO de `runScoped(tenant.id, ...)` a partir da criacao do tenant
- * (D-152/Slice 3): 10 dos 26 modelos aqui tambem tem RLS (bond, internProfile,
+ * (D-152/Slice 3): 10 dos 30 modelos aqui tambem tem RLS (bond, internProfile,
  * receptionProfile, paymentAccount, subscription, charge, encounter,
  * medicalRecord, prescription, anamnesis) -- sem a variavel de sessao setada
  * (o que so acontece com um contexto de tenant aberto, batido automaticamente
@@ -247,6 +251,27 @@ async function seedTenantGraphScoped(
   const workout = await prisma.workout.create({
     data: { tenantId: tenant.id, bondId: bond.id, planId: workoutPlan.id, title: `Treino A ${id}` },
   });
+  // Biblioteca (bucket C — D-171): a extension NAO toca `exercise`, entao o
+  // tenantId aqui e passado EXPLICITAMENTE. Item do proprio tenant, PRIVATE.
+  const muscleGroup = await prisma.muscleGroup.findFirstOrThrow({ where: { code: 'PEITO' } });
+  const exercise = await prisma.exercise.create({
+    data: {
+      tenantId: tenant.id,
+      ownerProfessionalProfileId: professionalProfileId,
+      primaryMuscleGroupId: muscleGroup.id,
+      name: `Supino ${id}`,
+      nameNormalized: normalizeLibraryItemName(`Supino ${id}`),
+      visibility: 'PRIVATE',
+    },
+  });
+
+  const workoutItem = await prisma.workoutItem.create({
+    data: { tenantId: tenant.id, workoutId: workout.id, exerciseId: exercise.id, position: 0 },
+  });
+  const workoutSet = await prisma.workoutSet.create({
+    data: { tenantId: tenant.id, workoutItemId: workoutItem.id, position: 0, reps: 12 },
+  });
+
   const workoutSession = await prisma.workoutSession.create({
     data: {
       tenantId: tenant.id,
@@ -256,6 +281,19 @@ async function seedTenantGraphScoped(
       performedAt: new Date(),
     },
   });
+  const setLog = await prisma.setLog.create({
+    data: {
+      tenantId: tenant.id,
+      sessionId: workoutSession.id,
+      workoutSetId: workoutSet.id,
+      done: true,
+      actualReps: 10,
+    },
+  });
+  const workoutRating = await prisma.workoutRating.create({
+    data: { tenantId: tenant.id, sessionId: workoutSession.id, score: 5, perceivedEffort: 4 },
+  });
+
   const formAnalysis = await prisma.formAnalysis.create({
     data: { tenantId: tenant.id, bondId: bond.id, videoStorageKey: `video-${id}` },
   });
@@ -346,7 +384,11 @@ async function seedTenantGraphScoped(
     chargeId: charge.id,
     workoutPlanId: workoutPlan.id,
     workoutId: workout.id,
+    workoutItemId: workoutItem.id,
+    workoutSetId: workoutSet.id,
     workoutSessionId: workoutSession.id,
+    setLogId: setLog.id,
+    workoutRatingId: workoutRating.id,
     formAnalysisId: formAnalysis.id,
     mealPlanId: mealPlan.id,
     mealLogId: mealLog.id,
@@ -365,7 +407,7 @@ async function seedTenantGraphScoped(
 }
 
 describe('tenant-isolation-extension (D-151) — bateria de vazamento contra Postgres real', () => {
-  it('duas contas de tenants diferentes nunca vazam entre si, para os 26 modelos bucket A', async () => {
+  it('duas contas de tenants diferentes nunca vazam entre si, para os 30 modelos bucket A', async () => {
     const a = await seedTenantGraph('a');
     const b = await seedTenantGraph('b');
 
@@ -460,10 +502,34 @@ describe('tenant-isolation-extension (D-151) — bateria de vazamento contra Pos
         findMany: (ids) => prisma.workout.findMany({ where: { id: { in: ids } } }),
       },
       {
+        model: 'workoutItem',
+        idA: a.workoutItemId,
+        idB: b.workoutItemId,
+        findMany: (ids) => prisma.workoutItem.findMany({ where: { id: { in: ids } } }),
+      },
+      {
+        model: 'workoutSet',
+        idA: a.workoutSetId,
+        idB: b.workoutSetId,
+        findMany: (ids) => prisma.workoutSet.findMany({ where: { id: { in: ids } } }),
+      },
+      {
         model: 'workoutSession',
         idA: a.workoutSessionId,
         idB: b.workoutSessionId,
         findMany: (ids) => prisma.workoutSession.findMany({ where: { id: { in: ids } } }),
+      },
+      {
+        model: 'setLog',
+        idA: a.setLogId,
+        idB: b.setLogId,
+        findMany: (ids) => prisma.setLog.findMany({ where: { id: { in: ids } } }),
+      },
+      {
+        model: 'workoutRating',
+        idA: a.workoutRatingId,
+        idB: b.workoutRatingId,
+        findMany: (ids) => prisma.workoutRating.findMany({ where: { id: { in: ids } } }),
       },
       {
         model: 'formAnalysis',
@@ -533,7 +599,7 @@ describe('tenant-isolation-extension (D-151) — bateria de vazamento contra Pos
       },
     ];
 
-    expect(checks).toHaveLength(26);
+    expect(checks).toHaveLength(30);
 
     for (const check of checks) {
       const resultAsA = await runScoped(a.tenantId, async () =>
@@ -629,27 +695,42 @@ describe('tenant-isolation-extension (D-151) — bateria de vazamento contra Pos
     expect(specialties.length).toBeGreaterThan(0);
   });
 
-  it('biblioteca MISTA (bucket C — Exercise) nao e tocada pela extension: item PLATFORM (owner nulo) visivel em qualquer contexto', async () => {
+  it('biblioteca MISTA (bucket C — Exercise) nao e tocada pela extension: item PLATFORM (tenantId NULL) visivel em qualquer contexto', async () => {
     const a = await seedTenantGraph('a');
     const b = await seedTenantGraph('b');
+    const muscleGroup = await prisma.muscleGroup.findFirstOrThrow({ where: { code: 'PEITO' } });
 
+    // Item da PLATAFORMA: tenantId NULL de proposito (D-089). E exatamente a
+    // linha que a extension APAGARIA se `exercise` entrasse em
+    // TENANT_SCOPED_MODELS (`AND tenantId = <ctx>` nunca casa com NULL).
     const platformExercise = await prisma.exercise.create({
-      data: { name: `Supino-${randomUUID().slice(0, 8)}`, visibility: 'PLATFORM' },
+      data: {
+        name: `Supino-${randomUUID().slice(0, 8)}`,
+        nameNormalized: normalizeLibraryItemName(`Supino-${randomUUID().slice(0, 8)}`),
+        primaryMuscleGroupId: muscleGroup.id,
+        visibility: 'PLATFORM',
+      },
     });
+    expect(platformExercise.tenantId).toBeNull();
+
     const ownedByA = await prisma.exercise.create({
       data: {
         name: `Exclusivo-A-${randomUUID().slice(0, 8)}`,
+        nameNormalized: normalizeLibraryItemName(`Exclusivo-A-${randomUUID().slice(0, 8)}`),
+        primaryMuscleGroupId: muscleGroup.id,
+        tenantId: a.tenantId,
         ownerProfessionalProfileId: a.professionalProfileId,
         visibility: 'PRIVATE',
       },
     });
 
-    // Sem coluna tenantId em Exercise, o contexto de tenant e IRRELEVANTE pra
-    // esta query — a extension nao intercepta este modelo. A prova aqui e que
-    // o item da plataforma aparece pra QUALQUER contexto (A ou B) e o item
-    // exclusivo do profissional de A aparece pra AMBOS tambem (owner, nao
-    // tenant, e quem decide) — confirmando que a extension nao inventou um
-    // filtro que nao deveria existir.
+    // Exercise tem coluna tenantId (D-166), mas NAO entra em
+    // TENANT_SCOPED_MODELS — o contexto de tenant e IRRELEVANTE pra esta query.
+    // A prova aqui e dupla: (1) o item da plataforma (tenantId NULL) aparece
+    // pra QUALQUER contexto — a biblioteca global NAO SUMIU; (2) o item de A
+    // tambem aparece sob o contexto de B — quem decide visibilidade e
+    // owner/visibility (D-171), aplicado pelo repositorio da biblioteca, e a
+    // extension NAO inventou um filtro por tenant que nao deveria existir.
     const asA = await runScoped(a.tenantId, async () =>
       prisma.exercise.findMany({ where: { id: { in: [platformExercise.id, ownedByA.id] } } }),
     );
@@ -658,6 +739,81 @@ describe('tenant-isolation-extension (D-151) — bateria de vazamento contra Pos
     );
     expect(asA.map((e) => e.id).sort()).toEqual([ownedByA.id, platformExercise.id].sort());
     expect(asB.map((e) => e.id).sort()).toEqual([ownedByA.id, platformExercise.id].sort());
+  });
+
+  it('criar item PLATFORM (tenantId NULL) COM contexto de tenant aberto continua possivel — a extension nao forca o tenantId em Exercise', async () => {
+    // Regressao direta do risco do D-166: se `exercise` entrasse na lista da
+    // extension, `scopeCreateData` sobrescreveria o tenantId e este item
+    // NASCERIA preso ao tenant A, nunca global.
+    const a = await seedTenantGraph('a');
+    const muscleGroup = await prisma.muscleGroup.findFirstOrThrow({ where: { code: 'COSTAS' } });
+    const name = `Remada-${randomUUID().slice(0, 8)}`;
+
+    const created = await runScoped(a.tenantId, async () =>
+      prisma.exercise.create({
+        data: {
+          name,
+          nameNormalized: normalizeLibraryItemName(name),
+          primaryMuscleGroupId: muscleGroup.id,
+          visibility: 'PLATFORM',
+        },
+      }),
+    );
+
+    expect(created.tenantId).toBeNull();
+    const readBack = await prisma.exercise.findUnique({ where: { id: created.id } });
+    expect(readBack?.tenantId).toBeNull();
+  });
+
+  it('MuscleGroup e catalogo GLOBAL (bucket B): o seed existe e o catalogo e identico em qualquer contexto', async () => {
+    const a = await seedTenantGraph('a');
+    const b = await seedTenantGraph('b');
+
+    const asA = await runScoped(a.tenantId, async () =>
+      prisma.muscleGroup.findMany({ where: { status: 'ACTIVE' }, orderBy: { code: 'asc' } }),
+    );
+    const asB = await runScoped(b.tenantId, async () =>
+      prisma.muscleGroup.findMany({ where: { status: 'ACTIVE' }, orderBy: { code: 'asc' } }),
+    );
+
+    expect(asA.length).toBeGreaterThanOrEqual(16);
+    expect(asA.map((g) => g.code)).toEqual(asB.map((g) => g.code));
+    expect(asA.map((g) => g.code)).toEqual(expect.arrayContaining(['PEITO', 'TRICEPS', 'GLUTEO']));
+  });
+
+  it('grupo muscular primario + secundarios persistem no exercicio (D-164)', async () => {
+    const a = await seedTenantGraph('a');
+    const [peito, triceps, ombro] = await Promise.all([
+      prisma.muscleGroup.findFirstOrThrow({ where: { code: 'PEITO' } }),
+      prisma.muscleGroup.findFirstOrThrow({ where: { code: 'TRICEPS' } }),
+      prisma.muscleGroup.findFirstOrThrow({ where: { code: 'OMBRO' } }),
+    ]);
+    const name = `Supino inclinado-${randomUUID().slice(0, 8)}`;
+
+    const created = await prisma.exercise.create({
+      data: {
+        tenantId: a.tenantId,
+        ownerProfessionalProfileId: a.professionalProfileId,
+        name,
+        nameNormalized: normalizeLibraryItemName(name),
+        primaryMuscleGroupId: peito.id,
+        secondaryMuscleGroups: {
+          create: [{ muscleGroupId: triceps.id }, { muscleGroupId: ombro.id }],
+        },
+      },
+      include: { primaryMuscleGroup: true, secondaryMuscleGroups: true },
+    });
+
+    expect(created.primaryMuscleGroup.code).toBe('PEITO');
+    expect(created.secondaryMuscleGroups.map((s) => s.muscleGroupId).sort()).toEqual(
+      [triceps.id, ombro.id].sort(),
+    );
+
+    // "buscar por triceps" tem que achar o composto (D-164).
+    const byTriceps = await prisma.exercise.findMany({
+      where: { id: created.id, secondaryMuscleGroups: { some: { muscleGroupId: triceps.id } } },
+    });
+    expect(byTriceps.map((e) => e.id)).toEqual([created.id]);
   });
 
   it('sem contexto de tenant aberto, a query roda sem injecao (comportamento identico a antes do slice)', async () => {

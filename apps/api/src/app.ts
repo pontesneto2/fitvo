@@ -13,6 +13,7 @@ import { authRoutes } from './modules/auth/auth-routes';
 import { billingRoutes } from './modules/billing/billing-routes';
 import { clinicRoutes } from './modules/clinic/clinic-routes';
 import { consentRoutes } from './modules/consent/consent-routes';
+import { exerciseLibraryRoutes } from './modules/exercise-library/exercise-library-routes';
 import { internRoutes } from './modules/intern/intern-routes';
 import { nutritionRoutes } from './modules/nutrition/nutrition-routes';
 import { patientRoutes } from './modules/patient/patient-routes';
@@ -37,8 +38,9 @@ function firstHeader(value: string | string[] | undefined): string | undefined {
  *   NAO confundir com /v1/consents), financeiro (/v1/billing — inclui o
  *   webhook publico do Asaas), o catalogo fixo de especialidades
  *   (/v1/specialties — publico, so-leitura, D-047) e nutricao (/v1/nutrition
- *   — montagem do plano alimentar, ADR-0013); /health e /docs (Swagger,
- *   D-032/D-034).
+ *   — montagem do plano alimentar, ADR-0013) e a biblioteca de exercicios
+ *   (/v1/exercise-library — escopada por profissional, ADR-0009); /health e
+ *   /docs (Swagger, D-032/D-034).
  */
 export async function buildApp(
   deps: AppDependencies,
@@ -104,6 +106,9 @@ export async function buildApp(
   await app.register(billingRoutes(deps.billingService), { prefix: '/v1/billing' });
   await app.register(specialtyRoutes(deps.specialtyService), { prefix: '/v1/specialties' });
   await app.register(nutritionRoutes(deps.nutritionService), { prefix: '/v1/nutrition' });
+  await app.register(exerciseLibraryRoutes(deps.exerciseLibraryService), {
+    prefix: '/v1/exercise-library',
+  });
 
   if (deps.onClose) {
     const { onClose } = deps;

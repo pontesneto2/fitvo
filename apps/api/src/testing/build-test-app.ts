@@ -19,6 +19,8 @@ import { ClinicApplicationService } from '../modules/clinic/clinic-application-s
 import { InMemoryClinicRepository } from '../modules/clinic/in-memory-clinic-repository';
 import { ConsentApplicationService } from '../modules/consent/consent-application-service';
 import { InMemoryConsentRepository } from '../modules/consent/in-memory-consent-repository';
+import { ExerciseLibraryApplicationService } from '../modules/exercise-library/exercise-library-application-service';
+import { InMemoryExerciseLibraryRepository } from '../modules/exercise-library/in-memory-exercise-library-repository';
 import { InMemoryInternRepository } from '../modules/intern/in-memory-intern-repository';
 import { InternApplicationService } from '../modules/intern/intern-application-service';
 import { InMemoryNutritionRepository } from '../modules/nutrition/in-memory-nutrition-repository';
@@ -48,6 +50,7 @@ export interface TestDependencies {
   terms: InMemoryTermsRepository;
   specialty: InMemorySpecialtyRepository;
   nutrition: InMemoryNutritionRepository;
+  exerciseLibrary: InMemoryExerciseLibraryRepository;
   queue: InMemoryQueueFactory;
 }
 
@@ -76,6 +79,8 @@ export interface TestHarness {
   specialty: InMemorySpecialtyRepository;
   /** Repositorio de nutricao em memoria (ADR-0013) — expoe `seed*` para arranjar profissionais/vinculos/alimentos. */
   nutrition: InMemoryNutritionRepository;
+  /** Biblioteca de exercicios em memoria (ADR-0009) — expoe `seedProfessional`/`seedPlatformExercise`/`discontinueMuscleGroup`. */
+  exerciseLibrary: InMemoryExerciseLibraryRepository;
   /** Fabrica de filas em memoria — coleta os eventos publicados (ex.: bond.created). */
   queue: InMemoryQueueFactory;
 }
@@ -193,6 +198,10 @@ export function buildTestDependencies(): TestDependencies {
   );
   const nutrition = new InMemoryNutritionRepository();
   const nutritionService = new NutritionApplicationService(nutrition, authCore);
+  // Biblioteca de exercicios (ADR-0009). Ja nasce com o catalogo de grupos
+  // musculares semeado (mesmo conteudo da migracao de producao — D-164).
+  const exerciseLibrary = new InMemoryExerciseLibraryRepository();
+  const exerciseLibraryService = new ExerciseLibraryApplicationService(exerciseLibrary, authCore);
   return {
     deps: {
       logLevel: 'silent',
@@ -208,6 +217,7 @@ export function buildTestDependencies(): TestDependencies {
       billingService,
       specialtyService,
       nutritionService,
+      exerciseLibraryService,
     },
     emails,
     accounts,
@@ -221,6 +231,7 @@ export function buildTestDependencies(): TestDependencies {
     terms,
     specialty,
     nutrition,
+    exerciseLibrary,
     queue,
   };
 }
@@ -242,6 +253,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     terms,
     specialty,
     nutrition,
+    exerciseLibrary,
     queue,
   } = buildTestDependencies();
   const app = await buildApp(deps);
@@ -259,6 +271,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     terms,
     specialty,
     nutrition,
+    exerciseLibrary,
     queue,
   };
 }

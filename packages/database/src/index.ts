@@ -54,6 +54,7 @@ export const prisma: PrismaClient = basePrisma.$extends({
 registerRlsBatchExecutor(prisma as unknown as Parameters<typeof registerRlsBatchExecutor>[0]);
 
 export * from './generated/client';
+export * from './normalize-library-item-name';
 export * from './rls-session';
 export * from './tenant-context';
 export * from './tenant-isolation-extension';

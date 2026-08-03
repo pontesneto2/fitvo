@@ -356,7 +356,12 @@ model Tenant {
   charges          Charge[] // cobrancas paciente->profissional (Fluxo B, via split)
   workoutPlans     WorkoutPlan[] // planos de treino escopados ao tenant (ADR-0009)
   workouts         Workout[] // conteudo de treino escopado ao tenant (ADR-0006)
+  workoutItems     WorkoutItem[] // itens prescritos escopados ao tenant (D-166 — ADR-0009)
+  workoutSets      WorkoutSet[] // series prescritas escopadas ao tenant (D-166 — ADR-0009)
   workoutSessions  WorkoutSession[] // execucoes escopadas ao tenant (ADR-0009)
+  setLogs          SetLog[] // series executadas escopadas ao tenant (D-166 — ADR-0009)
+  workoutRatings   WorkoutRating[] // avaliacoes de treino escopadas ao tenant (D-166 — ADR-0009)
+  exercises        Exercise[] // biblioteca do tenant; PLATFORM tem tenantId NULL (D-166/D-089)
   formAnalyses     FormAnalysis[] // analises de forma escopadas ao tenant (ADR-0009)
   mealPlans        MealPlan[] // conteudo de nutricao escopado ao tenant (ADR-0006)
   mealLogs         MealLog[] // registros de refeicao escopados ao tenant (D-118 — ADR-0013)
@@ -1316,27 +1321,94 @@ enum NotificationType {
 
 // --- Treino ----------------------------------------------------------------
 
+/// Grupo muscular — TABELA-PAI, nao enum (D-164 — ADR-0009). O catalogo vive
+/// como LINHA: adicionar/renomear grupo e dado, nao migracao de enum. Por isso
+/// `code` e String (um enum reintroduziria exatamente a migracao que o D-164
+/// rejeita); o label exibido vive no i18n (D-066) e `name` e so o fallback
+/// pt-BR.
+///
+/// Catalogo GLOBAL da plataforma (bucket B — padrao de Specialty): SEM coluna
+/// tenantId. Todo tenant enxerga o mesmo catalogo; nao ha grupo muscular "de um
+/// tenant" (o D-166 nao pede — a base comum e legitimamente sem dono).
+///
+/// DELECAO E LOGICA (D-089, aplicado pelo D-164): grupo DISCONTINUED some da
+/// busca mas segue valido nos exercicios que ja o referenciam.
+model MuscleGroup {
+  id           String            @id @default(cuid())
+  code         String            @unique // codigo estavel (PEITO, TRICEPS...); label no i18n (D-066)
+  name         String // fallback pt-BR do label
+  displayOrder Int               @default(0) // ordem de exibicao do catalogo (atributo que so a tabela hospeda — D-164)
+  status       LibraryItemStatus @default(ACTIVE) // delecao logica (D-089)
+  createdAt    DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(3)
+
+  primaryOfExercises   Exercise[]                     @relation("ExercisePrimaryMuscleGroup")
+  secondaryOfExercises ExerciseSecondaryMuscleGroup[]
+
+  @@index([status, displayOrder]) // busca so devolve ACTIVE, na ordem do catalogo
+  @@map("muscle_group")
+}
+
+/// Grupo muscular SECUNDARIO de um exercicio (N:N — D-164). Existe como tabela
+/// de juncao propria (e nao como relacao implicita do Prisma) para carregar o
+/// @@unique e os indices explicitos: "buscar por triceps" tem que achar supino
+/// inclinado, entao o lado do grupo precisa de indice proprio.
+///
+/// O grupo PRIMARIO NAO mora aqui — e FK direta em Exercise. Um exercicio tem
+/// exatamente um dominante (D-164: agrupar por grupo dominante e calcular volume
+/// por grupo sao indicadores que o D-092 pressupoe) e N secundarios.
+model ExerciseSecondaryMuscleGroup {
+  exerciseId    String
+  muscleGroupId String
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  exercise    Exercise    @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  muscleGroup MuscleGroup @relation(fields: [muscleGroupId], references: [id], onDelete: Restrict)
+
+  @@id([exerciseId, muscleGroupId])
+  @@index([muscleGroupId]) // busca por grupo secundario (D-164)
+  @@map("exercise_secondary_muscle_group")
+}
+
 /// Item da biblioteca de exercicios (D-063/D-089/D-091 — ADR-0009). Base
 /// compartilhada da plataforma (ownerProfessionalProfileId nulo + visibility
 /// PLATFORM) OU item proprio do profissional (owner preenchido + PRIVATE por
 /// padrao). specialtyId estrutural (ex.: TRAINING).
 ///
 /// SEPARACAO DE RESPONSABILIDADE (D-089): a BIBLIOTECA guarda o que o exercicio
-/// E (nome, descricao, video); o TREINO guarda o que foi PRESCRITO (carga,
-/// serie, tecnica — em WorkoutSet). Editar a biblioteca propaga para todo o app
-/// e NUNCA reescreve a prescricao.
+/// E (nome, descricao, video, MUSCULO); o TREINO guarda o que foi PRESCRITO
+/// (carga, serie, tecnica — em WorkoutSet). Editar a biblioteca propaga para
+/// todo o app e NUNCA reescreve a prescricao.
 ///
 /// DELECAO E LOGICA (D-089): `status` DISCONTINUED tira da busca sem quebrar os
 /// treinos que ja usam o item. Nunca DELETE fisico.
 ///
-/// TAXONOMIA DE MUSCULO NAO MODELADA: o D-089 cita "musculo" como conteudo da
-/// biblioteca, mas NENHUM ADR decidiu a taxonomia (enum de grupos musculares x
-/// catalogo em tabela). Nao inventar — decisao de produto pendente.
+/// TAXONOMIA DE MUSCULO (D-164 — fecha o gap que este comentario registrava como
+/// pendente): grupo PRIMARIO obrigatorio (FK) + N SECUNDARIOS (N:N via
+/// ExerciseSecondaryMuscleGroup), catalogo em TABELA (MuscleGroup), nunca enum.
+///
+/// ESCOPO — POR PROFISSIONAL, NAO POR TENANT (D-171): quem ve o item e decidido
+/// por `ownerProfessionalProfileId` + `visibility`, nao pelo tenant. O
+/// `tenantId` e NULAVEL de proposito: NULL = item PLATFORM, global, visivel a
+/// todos os tenants (D-089); preenchido = tenant do profissional dono, gravado
+/// como rastro/defesa em profundidade (D-166 — ADR-0017). Por causa desse NULL,
+/// Exercise NAO entra em TENANT_SCOPED_MODELS: a extension sobrescreve
+/// `tenantId` incondicionalmente e apagaria a biblioteca global — ver
+/// tenant-isolation-extension.ts.
+///
+/// `nameNormalized` e a chave da ANTI-DUPLICACAO NORMALIZADA (D-169): nome sem
+/// acento, minusculo, com espaco/hifen colapsados. Coluna PERSISTIDA porque a
+/// comparacao precisa acontecer no banco (o Prisma nao tem unaccent); a
+/// normalizacao canonica vive na aplicacao (normalizeLibraryItemName), e esta
+/// coluna e sempre derivada dela — nunca preenchida a mao.
 model Exercise {
   id                         String            @id @default(cuid())
+  tenantId                   String? // NULL = item PLATFORM global (D-089); preenchido = tenant do dono (D-166)
   ownerProfessionalProfileId String? // nulo = item da plataforma; preenchido = item do profissional
   specialtyId                String? // especialidade a que o exercicio pertence (estrutural)
+  primaryMuscleGroupId       String // grupo muscular dominante — obrigatorio (D-164)
   name                       String
+  nameNormalized             String // derivado de `name` para anti-duplicacao (D-169)
   description                String? // descricao/instrucao de execucao (D-089)
   videoStorageKey            String? // video demonstrativo: chave S3 (D-091; padrao de ProgressPhoto)
   visibility                 LibraryVisibility @default(PRIVATE) // itens do profissional privados por padrao
@@ -1344,15 +1416,21 @@ model Exercise {
   createdAt                  DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt                  DateTime          @updatedAt @db.Timestamptz(3)
 
+  tenant                   Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   ownerProfessionalProfile ProfessionalProfile? @relation(fields: [ownerProfessionalProfileId], references: [id], onDelete: Cascade)
   specialty                Specialty?           @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+  primaryMuscleGroup       MuscleGroup          @relation("ExercisePrimaryMuscleGroup", fields: [primaryMuscleGroupId], references: [id], onDelete: Restrict)
+  secondaryMuscleGroups    ExerciseSecondaryMuscleGroup[]
   workoutItems             WorkoutItem[]
   formAnalyses             FormAnalysis[]
 
+  @@index([tenantId])
   @@index([ownerProfessionalProfileId])
   @@index([specialtyId])
+  @@index([primaryMuscleGroupId]) // agrupar/filtrar por grupo dominante (D-164/D-092)
   @@index([visibility])
   @@index([status]) // busca so devolve ACTIVE (D-089)
+  @@index([nameNormalized]) // anti-duplicacao normalizada na entrada (D-169)
   @@map("exercise")
 }
 
@@ -1445,8 +1523,14 @@ model Workout {
 /// INVARIANTE DE DOMINIO (nao do banco): todos os itens de um mesmo
 /// `supersetGroup` tem a mesma contagem de series. Grupo malformado = erro de
 /// validacao na aplicacao.
+///
+/// tenantId denormalizado (D-166 — ADR-0009 + ADR-0017): o item ja era escopado
+/// TRANSITIVAMENTE pelo `workoutId`, mas isso depende 100% de o app validar o
+/// pai antes de ler. Com a coluna propria, a extension de isolamento injeta o
+/// filtro sozinha (defesa em profundidade — o dev nao pode esquecer).
 model WorkoutItem {
   id            String    @id @default(cuid())
+  tenantId      String // escopo denormalizado (D-002/D-166)
   workoutId     String
   exerciseId    String? // exercicio da biblioteca (opcional; item livre permitido)
   position      Int       @default(0) // ordem estrutural dentro do treino
@@ -1457,6 +1541,7 @@ model WorkoutItem {
   updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
   deletedAt     DateTime? @db.Timestamptz(3) // tombstone: delecao logica (D-089) + pull do sync (D-099)
 
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   workout  Workout      @relation(fields: [workoutId], references: [id], onDelete: Cascade)
   exercise Exercise?    @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
   sets     WorkoutSet[]
@@ -1464,6 +1549,7 @@ model WorkoutItem {
   @@index([workoutId, position])
   @@index([workoutId, supersetGroup, supersetOrder]) // montagem/execucao do conjugado
   @@index([exerciseId])
+  @@index([tenantId])
   @@map("workout_item")
 }
 
@@ -1484,8 +1570,12 @@ model WorkoutItem {
 ///
 /// `position` = ordem da serie no exercicio E, num grupo conjugado, o indice da
 /// RODADA (D-082).
+///
+/// tenantId denormalizado (D-166) — mesmo racional do WorkoutItem: escopo que a
+/// extension injeta, em vez de depender do app validar o pai.
 model WorkoutSet {
   id            String @id @default(cuid())
+  tenantId      String // escopo denormalizado (D-002/D-166)
   workoutItemId String
   position      Int // ordem da serie; num conjugado, e o indice da rodada (D-082)
 
@@ -1508,11 +1598,13 @@ model WorkoutSet {
   updatedAt DateTime  @updatedAt @db.Timestamptz(3)
   deletedAt DateTime? @db.Timestamptz(3) // tombstone: delecao logica (D-089) + pull do sync (D-099)
 
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   workoutItem WorkoutItem @relation(fields: [workoutItemId], references: [id], onDelete: Cascade)
   setLogs     SetLog[]
 
   @@unique([workoutItemId, position]) // nao ha duas series na mesma ordem
   @@index([workoutItemId])
+  @@index([tenantId])
   @@map("workout_set")
 }
 
@@ -1566,8 +1658,11 @@ model WorkoutSession {
 /// `workoutSetId` e opcional: o aluno pode executar uma serie extra que nao
 /// estava prescrita. onDelete Restrict porque a prescricao nunca e apagada
 /// fisicamente (D-089).
+///
+/// tenantId denormalizado (D-166) — mesmo racional do WorkoutItem/WorkoutSet.
 model SetLog {
   id           String  @id @default(cuid())
+  tenantId     String // escopo denormalizado (D-002/D-166)
   sessionId    String
   workoutSetId String? // serie prescrita de referencia; nulo = serie livre do aluno
 
@@ -1585,11 +1680,13 @@ model SetLog {
   updatedAt DateTime  @updatedAt @db.Timestamptz(3)
   deletedAt DateTime? @db.Timestamptz(3) // tombstone do sync (D-099)
 
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   session    WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   workoutSet WorkoutSet?    @relation(fields: [workoutSetId], references: [id], onDelete: Restrict)
 
   @@index([sessionId])
   @@index([workoutSetId]) // evolucao de carga por exercicio (D-092)
+  @@index([tenantId])
   @@map("set_log")
 }
 
@@ -1603,8 +1700,11 @@ model SetLog {
 /// aqui so o dado.
 ///
 /// Avaliacao muito dificil/facil e sinal de ajuste para o profissional (D-092).
+///
+/// tenantId denormalizado (D-166) — mesmo racional dos demais filhos de treino.
 model WorkoutRating {
   id              String            @id @default(cuid())
+  tenantId        String // escopo denormalizado (D-002/D-166)
   sessionId       String            @unique // uma avaliacao por sessao executada (D-087)
   score           Int // nota 1 a 5 (D-087)
   perceivedEffort Int // nivel de esforco percebido (D-087)
@@ -1614,9 +1714,11 @@ model WorkoutRating {
   updatedAt       DateTime          @updatedAt @db.Timestamptz(3)
   deletedAt       DateTime?         @db.Timestamptz(3) // tombstone do sync (D-099)
 
+  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   session WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([score]) // alunos avaliando como muito dificil/facil (D-092)
+  @@index([tenantId])
   @@map("workout_rating")
 }
 

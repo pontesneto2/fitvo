@@ -230,6 +230,54 @@ export class ConsentRequiresActiveBondError extends AppError {
   }
 }
 
+/**
+ * O nome do item de biblioteca fica VAZIO depois de normalizado (D-169 —
+ * ADR-0009): "---", "  ", "___" passam num `min(1)` de string mas nao nomeiam
+ * nada, e virariam chave de anti-duplicacao vazia — casando com qualquer outro
+ * nome degenerado. 422: bem-formado, mas viola pre-condicao de negocio.
+ */
+export class InvalidLibraryItemNameError extends AppError {
+  readonly status = 422;
+  readonly problemType = 'https://fitvo.dev/problems/invalid-library-item-name';
+  readonly title = 'Nome de item invalido';
+  constructor() {
+    super('O nome precisa conter ao menos uma letra ou numero.');
+    this.name = 'InvalidLibraryItemNameError';
+  }
+}
+
+/**
+ * A RENOMEACAO colidiria com um item equivalente ja visivel na biblioteca do
+ * profissional, por nome NORMALIZADO (D-169 — ADR-0009). Na CRIACAO a colisao
+ * nao e erro (devolve-se o existente); na edicao e, porque o chamador ja tem
+ * um item e pedir "passe a se chamar como aquele outro" nao tem resolucao
+ * automatica.
+ */
+export class LibraryItemNameConflictError extends AppError {
+  readonly status = 409;
+  readonly problemType = 'https://fitvo.dev/problems/library-item-name-conflict';
+  readonly title = 'Nome ja usado na biblioteca';
+  constructor() {
+    super('Ja existe um exercicio equivalente na sua biblioteca com este nome.');
+    this.name = 'LibraryItemNameConflictError';
+  }
+}
+
+/**
+ * Grupo muscular inexistente ou DESCONTINUADO no catalogo global (D-164/D-089
+ * — ADR-0009). Descontinuado segue valido nos exercicios que ja o referenciam,
+ * mas nao pode ser escolhido para um item novo. 422: pre-condicao de negocio.
+ */
+export class MuscleGroupUnavailableError extends AppError {
+  readonly status = 422;
+  readonly problemType = 'https://fitvo.dev/problems/muscle-group-unavailable';
+  readonly title = 'Grupo muscular indisponivel';
+  constructor() {
+    super('Grupo muscular inexistente ou descontinuado.');
+    this.name = 'MuscleGroupUnavailableError';
+  }
+}
+
 /** Plano inexistente ou inativo no catalogo da plataforma (Fluxo A — ADR-0004). */
 export class PlanNotFoundError extends AppError {
   readonly status = 404;

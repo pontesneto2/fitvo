@@ -37,6 +37,11 @@ export class BullMqQueueFactory implements QueueFactory {
           // Job repetido (cron) — ex.: varredura periodica da regua (ADR-0004).
           jobOptions.repeat = { every: options.repeatEveryMs };
         }
+        if (options?.jobId !== undefined) {
+          // Dedupe nativo do BullMQ: reenfileirar o MESMO jobId enquanto o job
+          // anterior ainda existe (nao concluido/removido) e no-op.
+          jobOptions.jobId = options.jobId;
+        }
         const job = await queue.add(name, data, jobOptions);
         return job.id ?? '';
       },

@@ -15,6 +15,7 @@
   "dependencies": {
     "@fitvo/config": "workspace:*",
     "@fitvo/database": "workspace:*",
+    "@fitvo/notifications": "workspace:*",
     "@fitvo/queue": "workspace:*",
     "bullmq": "^5.80.10",
     "ioredis": "^5.4.1",

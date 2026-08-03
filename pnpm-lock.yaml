@@ -191,6 +191,9 @@ importers:
       '@fitvo/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@fitvo/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@fitvo/queue':
         specifier: workspace:*
         version: link:../../packages/queue

@@ -15,6 +15,14 @@ export interface JobOptions {
    * para `repeat.every` do BullMQ; a fila em memoria (testes) ignora a repeticao.
    */
   repeatEveryMs?: number;
+  /**
+   * Id estavel do job — dedupe nativo (D-083/D-084, regua de treino): enfileirar
+   * duas vezes com o MESMO jobId nao duplica (BullMQ ignora se o job ainda existe;
+   * a fila em memoria replica o mesmo comportamento). Usar quando a varredura pode
+   * rodar mais de uma vez sobre o mesmo estado sem uma transicao que a torne
+   * naturalmente idempotente.
+   */
+  jobId?: string;
 }
 
 export interface Queue<TData> {
@@ -39,11 +47,17 @@ export {
   BILLING_QUEUE,
   BOND_CREATED_EVENT,
   type BondCreatedEvent,
+  PLAN_LIFECYCLE_NOTIFICATION_EVENT,
+  PLAN_LIFECYCLE_TICK_EVENT,
+  type PlanLifecycleNotificationEvent,
+  type PlanLifecycleNotificationKind,
+  type PlanLifecycleTickEvent,
   RULER_TICK_EVENT,
   type RulerTickEvent,
   SHARING_QUEUE,
   SUBSCRIPTION_REMINDER_EVENT,
   type SubscriptionReminderEvent,
   type SubscriptionReminderKind,
+  WORKOUT_QUEUE,
 } from './events';
 export { type CollectedJob, InMemoryQueueFactory } from './in-memory-queue-factory';

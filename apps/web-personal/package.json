@@ -9,7 +9,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@fitvo/brand-tokens": "workspace:*",
@@ -26,14 +27,17 @@
   "devDependencies": {
     "@fitvo/eslint-config": "workspace:*",
     "@fitvo/typescript-config": "workspace:*",
+    "@testing-library/react": "^16.1.0",
     "@types/node": "^26.1.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^10.7.0",
     "globals": "^17.7.0",
+    "jsdom": "^25.0.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "vitest": "^4.1.10"
   }
 }

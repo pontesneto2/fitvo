@@ -248,7 +248,7 @@ efetivamente nasceu no #131 (ADR-0009 / D-089 / D-164) **não tem essas colunas*
 Não é esquecimento do #131 nem erro do ADR-0018: são dois ADRs descrevendo a
 mesma entidade com escopos diferentes, e **ninguém decidiu qual vale**.
 
-**O que o #137 fez, e por que parou aí:** mapeou tudo (o de-para de equipamento
+**O que o #139 fez, e por que parou aí:** mapeou tudo (o de-para de equipamento
 para o catálogo do D-187 está pronto e testado em
 `packages/database/src/seed/exercise-library/equipment-map.ts`), **contou** e
 **reportou** — e não gravou nada. Criar coluna para acomodar dado de terceiro
@@ -272,14 +272,11 @@ coisas de uma vez.
 `docs/adr/0011-modalidade-e-anamnese.md` → D-187.
 `packages/database/seed/free-exercise-db/SOURCE.md`.
 
-## 9. Imagens e tradução das instruções da base comum de exercícios
+## 9. Imagem de exercício na base comum — coluna e origem da mídia
 
 **Status:** `ABERTA` · **Origem:** #139 (seed da biblioteca PLATFORM)
 
-Duas lacunas de **conteúdo** da base comum, distintas entre si e nenhuma
-resolvível pelo agente sozinho:
-
-**a) Imagem de exercício não tem coluna — nem decisão.** A fonte traz 1.746
+**Imagem de exercício não tem coluna — nem decisão.** A fonte traz 1.746
 imagens (2 por exercício, demonstrando início e fim do movimento). O schema só
 tem `videoStorageKey` (D-091: vídeo é **referência**, não obrigatório). O seed
 **não importou nenhuma** e **não hotlinka** `raw.githubusercontent.com` — servir
@@ -290,22 +287,56 @@ migração das 1.746 para o nosso storage, que o `packages/storage` já suporta)
 mídia? A referência de origem está preservada no mapeamento para o caso de a
 migração ser aprovada.
 
-**b) As instruções de execução estão TODAS em inglês.** 865 dos 870 exercícios
-têm instruções, e nenhuma foi traduzida. O nome foi (543 dos 870 em pt-BR); o
-texto corrido não. **Não foi escolha de escopo, foi ausência de caminho:** não
-há `ANTHROPIC_API_KEY` neste repositório e chamar API paga não foi autorizado.
-Traduzir frase corrida por dicionário de termos produz português ruim em massa
-— pior que o inglês, porque parece revisado. Falta decidir **como** traduzir:
-passe de IA autorizado (custo pontual, ~870 chamadas), tradução humana da
-curadoria, ou aceitar instrução em inglês na base comum.
+**Contexto:** `packages/database/seed/free-exercise-db/SOURCE.md`.
+`packages/storage`.
+
+## 10. Passe de tradução por IA da biblioteca de exercícios
+
+**Status:** `ABERTA — GATED` (credencial: chave de API de IA) ·
+**Origem:** #139 (seed da biblioteca PLATFORM)
+
+A base comum entrou com **327 nomes ainda em inglês** (a cauda longa: strongman,
+pliometria, alongamento) e com **as instruções de execução de todos os 865
+exercícios que as têm em inglês**. Falta um **passe de tradução por IA**, em
+**slice próprio**, com script dedicado.
+
+**A abordagem já está decidida — o que falta é a credencial.** O responsável
+confirmou (ago/2026) que vai configurar a chave de API e que o passe roda como
+script dedicado. Ou seja: isto **não é** uma pergunta de produto em aberto, é
+trabalho pronto para ser feito assim que houver `ANTHROPIC_API_KEY` (ou
+equivalente) no ambiente. Fica catalogado aqui porque, sem a credencial, o
+agente **não pode** executá-lo — e porque a lacuna é visível no produto.
+
+**Por que não foi feito no #139, e por que isso foi o certo:** não havia chave de
+API no repositório e chamar API paga não estava autorizado. A alternativa
+disponível — traduzir frase corrida por dicionário de termos — produz português
+ruim em massa, que é **pior que o inglês**: o profissional confia no texto
+errado porque ele parece revisado, e não confia no inglês porque sabe que não é
+tradução. Por isso o tradutor do #139 **se recusa a chutar**: só devolve pt-BR
+quando reconhece todos os tokens do nome e há exatamente um núcleo de
+movimento; fora disso mantém o inglês e conta.
 
 **Onde morde:** a instrução é a **única orientação de execução** que a base comum
 oferece. Um aluno brasileiro lendo "Lie down on the floor and secure your feet"
 é fricção real no app do aluno, não detalhe de catálogo.
 
-**Já preparado para a decisão:** cada exercício mapeado carrega
-`descriptionLocale: 'en'`, exatamente para que o passe de tradução futuro saiba
-o que reprocessar sem re-derivar nada.
+**O rastro já existe — o passe não precisa re-derivar nada:**
+- `descriptionLocale: 'en'` em cada exercício mapeado marca exatamente o que
+  reprocessar.
+- `translateExerciseName` devolve a estratégia usada (`CURATED`,
+  `COMPOSITIONAL`, `UNTRANSLATED`), então a cauda de 327 nomes é uma consulta,
+  não uma inspeção manual.
+- A tabela curada (156 nomes de alta frequência, revisados no vocabulário de
+  academia do Brasil) **tem precedência** e não deve ser sobrescrita pela IA:
+  ela é a referência de qualidade, não o alvo do passe.
 
-**Contexto:** `packages/database/seed/free-exercise-db/SOURCE.md`.
-`packages/database/src/seed/exercise-library/translate-exercise-name.ts`.
+**Cuidado ao executar:** o seed é idempotente e **só INSERE** — nunca sobrescreve
+(para não desfazer curadoria humana). Um passe de tradução **atualiza linha
+existente**, que é operação diferente da do seed: precisa decidir se reescreve
+`name` (e portanto `nameNormalized`, com risco de colidir com item já existente
+pela anti-duplicação do D-169) ou só `description`. Reescrever nome na base
+PLATFORM **mexe em dado que todos os profissionais veem** — área sensível.
+
+**Contexto:** `packages/database/src/seed/exercise-library/translate-exercise-name.ts`.
+`packages/database/src/seed/exercise-library/translation-curated.ts`.
+`packages/database/seed/free-exercise-db/SOURCE.md`.

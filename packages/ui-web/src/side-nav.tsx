@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 
 import { cn } from './cn';
+import { Tooltip } from './tooltip';
 
 /**
  * Menu lateral / Navegacao WEB (design-system-components.md §10). Lista vertical de
@@ -15,6 +16,11 @@ import { cn } from './cn';
  * acento de ambiente. O icone e um slot (`ReactNode`, SVG inline via `currentColor`)
  * ja que a familia lucide segue travada (§19). Itens com `href` viram `<a>`; sem
  * href, `<button>`. Controlavel (usa `value` se dado, senao estado interno).
+ *
+ * RAIL (`collapsed`): no desktop o menu encolhe para a coluna de icones, nunca
+ * para hamburguer — a navegacao decidida exige o icone SEMPRE visivel. Os
+ * estados da §10 nao mudam no rail; so o rotulo sai do fluxo visual (vira
+ * `sr-only` + Tooltip lateral).
  *
  * Inferencia dark (§10/§21 nao especificam): hover sobe um stop
  * (`neutral-100`->`neutral-800`, regra §21); o estado ativo (`brand-50`/`brand-700`/
@@ -35,6 +41,14 @@ export interface SideNavProps {
   readonly value?: string;
   readonly defaultValue?: string;
   readonly onValueChange?: (value: string) => void;
+  /**
+   * Modo RAIL: o menu encolhe para a coluna de icones, sem virar hamburguer.
+   * O rotulo continua no DOM em `sr-only` (leitor de tela e teste seguem
+   * achando o item) e ganha um Tooltip lateral para quem enxerga o icone
+   * sozinho — esconder o texto de todo mundo deixaria o rail inutilizavel.
+   * Item sem `icon` mantem o rotulo visivel: um alvo em branco nao e navegacao.
+   */
+  readonly collapsed?: boolean;
   readonly 'aria-label'?: string;
   readonly className?: string;
 }
@@ -56,6 +70,7 @@ export function SideNav({
   value,
   defaultValue,
   onValueChange,
+  collapsed = false,
   'aria-label': ariaLabel,
   className,
 }: SideNavProps): ReactNode {
@@ -73,6 +88,8 @@ export function SideNav({
     <nav aria-label={ariaLabel} className={cn('flex flex-col gap-1', className)}>
       {items.map((item): ReactNode => {
         const isActive = item.value === active;
+        // O rotulo so some visualmente quando ha icone para ocupar o lugar dele.
+        const hideLabel = collapsed && item.icon != null;
         const inner = (
           <>
             {isActive ? (
@@ -86,34 +103,44 @@ export function SideNav({
                 {item.icon}
               </span>
             ) : null}
-            <span className="truncate">{item.label}</span>
+            <span className={hideLabel ? 'sr-only' : 'truncate'}>{item.label}</span>
           </>
         );
 
-        if (item.href != null && !item.disabled) {
-          return (
+        const itemClasses = cn(
+          itemBase,
+          hideLabel && 'justify-center px-0',
+          itemStateClasses(isActive, item.disabled ?? false),
+        );
+
+        const control =
+          item.href != null && !item.disabled ? (
             <a
-              key={item.value}
               href={item.href}
               aria-current={isActive ? 'page' : undefined}
               onClick={() => select(item)}
-              className={cn(itemBase, itemStateClasses(isActive, false))}
+              className={itemClasses}
             >
               {inner}
             </a>
+          ) : (
+            <button
+              type="button"
+              disabled={item.disabled}
+              aria-current={isActive ? 'page' : undefined}
+              onClick={() => select(item)}
+              className={itemClasses}
+            >
+              {inner}
+            </button>
           );
-        }
-        return (
-          <button
-            key={item.value}
-            type="button"
-            disabled={item.disabled}
-            aria-current={isActive ? 'page' : undefined}
-            onClick={() => select(item)}
-            className={cn(itemBase, itemStateClasses(isActive, item.disabled ?? false))}
-          >
-            {inner}
-          </button>
+
+        return hideLabel ? (
+          <Tooltip key={item.value} content={item.label} side="right">
+            {control}
+          </Tooltip>
+        ) : (
+          <Fragment key={item.value}>{control}</Fragment>
         );
       })}
     </nav>

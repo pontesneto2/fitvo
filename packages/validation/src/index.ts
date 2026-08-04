@@ -23,3 +23,4 @@ export * from './reception';
 export * from './specialty';
 export * from './terms';
 export * from './workout';
+export * from './workout-execution';

@@ -20,6 +20,7 @@ import { patientRoutes } from './modules/patient/patient-routes';
 import { receptionRoutes } from './modules/reception/reception-routes';
 import { specialtyRoutes } from './modules/specialty/specialty-routes';
 import { termsRoutes } from './modules/terms/terms-routes';
+import { workoutExecutionRoutes } from './modules/workout/workout-execution-routes';
 import { workoutRoutes } from './modules/workout/workout-routes';
 import { registerErrorHandler } from './shared/error-handler';
 import { zodAwareTransform } from './shared/openapi-transform';
@@ -112,6 +113,12 @@ export async function buildApp(
     prefix: '/v1/exercise-library',
   });
   await app.register(workoutRoutes(deps.workoutService), { prefix: '/v1/workout' });
+  // Execucao (Bloco 3 — ADR-0009) tem prefixo PROPRIO: e outra superficie (quem
+  // escreve e o ALUNO, nao o profissional) e outro ciclo de vida. Compartilhar
+  // /v1/workout misturaria as duas no mesmo espaco de rota.
+  await app.register(workoutExecutionRoutes(deps.workoutExecutionService), {
+    prefix: '/v1/workout-execution',
+  });
 
   if (deps.onClose) {
     const { onClose } = deps;

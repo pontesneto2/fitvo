@@ -33,8 +33,10 @@ import { InMemorySpecialtyRepository } from '../modules/specialty/in-memory-spec
 import { SpecialtyApplicationService } from '../modules/specialty/specialty-application-service';
 import { InMemoryTermsRepository } from '../modules/terms/in-memory-terms-repository';
 import { TermsApplicationService } from '../modules/terms/terms-application-service';
+import { InMemoryWorkoutExecutionRepository } from '../modules/workout/in-memory-workout-execution-repository';
 import { InMemoryWorkoutRepository } from '../modules/workout/in-memory-workout-repository';
 import { WorkoutApplicationService } from '../modules/workout/workout-application-service';
+import { WorkoutExecutionApplicationService } from '../modules/workout/workout-execution-application-service';
 import { FakeAuthEmailSender } from './fake-auth-email-sender';
 
 /** Dependências in-memory + os repositórios expostos para arranjo nos testes. */
@@ -54,6 +56,7 @@ export interface TestDependencies {
   nutrition: InMemoryNutritionRepository;
   exerciseLibrary: InMemoryExerciseLibraryRepository;
   workout: InMemoryWorkoutRepository;
+  workoutExecution: InMemoryWorkoutExecutionRepository;
   queue: InMemoryQueueFactory;
 }
 
@@ -86,6 +89,8 @@ export interface TestHarness {
   exerciseLibrary: InMemoryExerciseLibraryRepository;
   /** Prescricao de treino em memoria (ADR-0009) — expoe `seedProfessional`/`seedPatient`/`seedBond`. */
   workout: InMemoryWorkoutRepository;
+  /** Execucao de treino em memoria (ADR-0009, Bloco 3) — expoe `seedBond`/`seedWorkout`. */
+  workoutExecution: InMemoryWorkoutExecutionRepository;
   /** Fabrica de filas em memoria — coleta os eventos publicados (ex.: bond.created). */
   queue: InMemoryQueueFactory;
 }
@@ -211,6 +216,13 @@ export function buildTestDependencies(): TestDependencies {
   // (profissional/paciente/vinculo), isolado do modulo patient.
   const workout = new InMemoryWorkoutRepository();
   const workoutService = new WorkoutApplicationService(workout, authCore);
+  // Execucao (Bloco 3) — mundo proprio: o aluno e quem escreve, e o double
+  // semeia vinculo/treino sem depender da prescricao do Bloco 2.
+  const workoutExecution = new InMemoryWorkoutExecutionRepository();
+  const workoutExecutionService = new WorkoutExecutionApplicationService(
+    workoutExecution,
+    authCore,
+  );
   return {
     deps: {
       logLevel: 'silent',
@@ -228,6 +240,7 @@ export function buildTestDependencies(): TestDependencies {
       nutritionService,
       exerciseLibraryService,
       workoutService,
+      workoutExecutionService,
     },
     emails,
     accounts,
@@ -243,6 +256,7 @@ export function buildTestDependencies(): TestDependencies {
     nutrition,
     exerciseLibrary,
     workout,
+    workoutExecution,
     queue,
   };
 }
@@ -266,6 +280,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     nutrition,
     exerciseLibrary,
     workout,
+    workoutExecution,
     queue,
   } = buildTestDependencies();
   const app = await buildApp(deps);
@@ -285,6 +300,7 @@ export async function buildTestHarness(): Promise<TestHarness> {
     nutrition,
     exerciseLibrary,
     workout,
+    workoutExecution,
     queue,
   };
 }

@@ -50,6 +50,78 @@ export function planAppliesOnWeekday(plan: PlanFixedSchedule, day: Weekday): boo
   return plan.fixedWeekdays.length === 0 || plan.fixedWeekdays.includes(day);
 }
 
+/** Um CHECK-IN no período, reduzido ao que a aderência precisa (D-092). */
+export interface AdherenceCheckIn {
+  planId: string;
+  /** Do PLANO da sessão — a fonte do D-105; nunca uma cópia na execução. */
+  planIsFixed: boolean;
+  performedAt: Date;
+}
+
+export interface AdherencePlanBreakdown {
+  planId: string;
+  isFixed: boolean;
+  countsTowardAdherence: boolean;
+  completedSessions: number;
+}
+
+export interface AdherenceSummary {
+  completedSessions: number;
+  adherenceSessions: number;
+  daysTrained: number;
+  byPlan: AdherencePlanBreakdown[];
+}
+
+/** Dia civil em UTC (D-067) — a conversão para o fuso do usuário é exibição. */
+function utcDayKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * D-092 — os indicadores de aderência, DERIVADOS dos check-ins. Função pura:
+ * não há entidade de agregação, e por isso não há um segundo lugar onde este
+ * número possa divergir do histórico.
+ *
+ * D-105 aplicado aqui, e via `planCountsTowardAdherence` — a MESMA função que o
+ * contrato do plano usa (Bloco 2). Reimplementar "fixo não conta" com um
+ * `!isFixed` local criaria duas leituras da mesma regra, que é exatamente o que
+ * derivar em vez de armazenar existe para evitar.
+ *
+ * O plano fixo NÃO é apagado do resultado: ele soma em `completedSessions` (o
+ * aluno alongou, isso aconteceu) e aparece no `byPlan` com
+ * `countsTowardAdherence: false`. Só fica fora de `adherenceSessions` e de
+ * `daysTrained` — os dois números que respondem "o aluno fez o treino?".
+ */
+export function summarizeAdherence(checkIns: AdherenceCheckIn[]): AdherenceSummary {
+  const byPlan = new Map<string, AdherencePlanBreakdown>();
+  const days = new Set<string>();
+  let adherenceSessions = 0;
+
+  for (const checkIn of checkIns) {
+    const counts = planCountsTowardAdherence({ isFixed: checkIn.planIsFixed });
+    if (counts) {
+      adherenceSessions += 1;
+      days.add(utcDayKey(checkIn.performedAt));
+    }
+
+    const current = byPlan.get(checkIn.planId) ?? {
+      planId: checkIn.planId,
+      isFixed: checkIn.planIsFixed,
+      countsTowardAdherence: counts,
+      completedSessions: 0,
+    };
+    current.completedSessions += 1;
+    byPlan.set(checkIn.planId, current);
+  }
+
+  return {
+    completedSessions: checkIns.length,
+    adherenceSessions,
+    daysTrained: days.size,
+    byPlan: [...byPlan.values()],
+  };
+}
+
 /**
  * D-083 — validade do plano. 30 dias por padrão, configurável; o vencimento é
  * contado a partir de QUANDO O PLANO PASSA A VALER: `releaseAt` quando há

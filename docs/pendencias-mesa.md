@@ -233,3 +233,79 @@ fallback, que é exatamente o que a decisão eliminou.
 indicador que eles alimentam). `docs/adr/0011-modalidade-e-anamnese.md` → D-192,
 D-188.
 
+## 8. Atributos de exercício que a fonte tem e o schema não guarda (D-158 × D-187)
+
+**Status:** `ABERTA` · **Origem:** #139 (seed da biblioteca PLATFORM)
+
+O seed da base comum importou 870 exercícios da free-exercise-db. A fonte traz
+**cinco atributos por exercício que não têm onde ser gravados** hoje:
+`equipment`, `level` (iniciante/intermediário/avançado), `force` (empurrar /
+puxar / isométrico), `mechanic` (composto/isolado) e `category`.
+
+**Onde está a divergência:** o **ADR-0018 (D-158) descreve** `Exercise` com
+"equipamento, padrão de movimento, dificuldade, mídia" — mas o schema que
+efetivamente nasceu no #131 (ADR-0009 / D-089 / D-164) **não tem essas colunas**.
+Não é esquecimento do #131 nem erro do ADR-0018: são dois ADRs descrevendo a
+mesma entidade com escopos diferentes, e **ninguém decidiu qual vale**.
+
+**O que o #137 fez, e por que parou aí:** mapeou tudo (o de-para de equipamento
+para o catálogo do D-187 está pronto e testado em
+`packages/database/src/seed/exercise-library/equipment-map.ts`), **contou** e
+**reportou** — e não gravou nada. Criar coluna para acomodar dado de terceiro
+seria decidir por conta própria que o D-158 vence o schema atual.
+
+**Por que importa e não é cosmético:** o próprio D-187 diz que "na prescrição,
+cada `Workout` é alocado a um contexto, e **só usa exercícios possíveis naquele
+local/equipamento**". Essa regra é **inexequível** enquanto o exercício não
+souber que equipamento exige. Filtrar a biblioteca por "o que dá para fazer em
+casa" — que é o valor prático da base comum para o aluno sem academia —
+depende desta decisão.
+
+**Dependência de ordem:** o catálogo de equipamentos do D-187 também **ainda não
+existe em tabela** (a anamnese tipada não chegou nos contextos de treino). Os
+códigos usados no de-para do seed são **provisórios**, transcritos do texto do
+ADR-0011; quem manda quando o D-187 for implementado é a tabela que nascer lá.
+Decidir a coluna de equipamento **antes** do catálogo existir é decidir duas
+coisas de uma vez.
+
+**Contexto:** `docs/adr/0018-dominio-treino.md` → D-158.
+`docs/adr/0011-modalidade-e-anamnese.md` → D-187.
+`packages/database/seed/free-exercise-db/SOURCE.md`.
+
+## 9. Imagens e tradução das instruções da base comum de exercícios
+
+**Status:** `ABERTA` · **Origem:** #139 (seed da biblioteca PLATFORM)
+
+Duas lacunas de **conteúdo** da base comum, distintas entre si e nenhuma
+resolvível pelo agente sozinho:
+
+**a) Imagem de exercício não tem coluna — nem decisão.** A fonte traz 1.746
+imagens (2 por exercício, demonstrando início e fim do movimento). O schema só
+tem `videoStorageKey` (D-091: vídeo é **referência**, não obrigatório). O seed
+**não importou nenhuma** e **não hotlinka** `raw.githubusercontent.com` — servir
+mídia de repositório de terceiro em produção é dependência silenciosa que quebra
+sem aviso. Falta decidir: **imagem estática entra no modelo** (coluna nova +
+migração das 1.746 para o nosso storage, que o `packages/storage` já suporta) ou
+**o produto fica só com vídeo** (D-091) e a demonstração da base comum fica sem
+mídia? A referência de origem está preservada no mapeamento para o caso de a
+migração ser aprovada.
+
+**b) As instruções de execução estão TODAS em inglês.** 865 dos 870 exercícios
+têm instruções, e nenhuma foi traduzida. O nome foi (543 dos 870 em pt-BR); o
+texto corrido não. **Não foi escolha de escopo, foi ausência de caminho:** não
+há `ANTHROPIC_API_KEY` neste repositório e chamar API paga não foi autorizado.
+Traduzir frase corrida por dicionário de termos produz português ruim em massa
+— pior que o inglês, porque parece revisado. Falta decidir **como** traduzir:
+passe de IA autorizado (custo pontual, ~870 chamadas), tradução humana da
+curadoria, ou aceitar instrução em inglês na base comum.
+
+**Onde morde:** a instrução é a **única orientação de execução** que a base comum
+oferece. Um aluno brasileiro lendo "Lie down on the floor and secure your feet"
+é fricção real no app do aluno, não detalhe de catálogo.
+
+**Já preparado para a decisão:** cada exercício mapeado carrega
+`descriptionLocale: 'en'`, exatamente para que o passe de tradução futuro saiba
+o que reprocessar sem re-derivar nada.
+
+**Contexto:** `packages/database/seed/free-exercise-db/SOURCE.md`.
+`packages/database/src/seed/exercise-library/translate-exercise-name.ts`.

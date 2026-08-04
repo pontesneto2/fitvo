@@ -35,6 +35,7 @@ RESPONSÁVEL** (decisão que só você pode tomar), **BLOQUEADO — TERCEIROS**
 | 14 | Bloco 1 de treino — taxonomia de grupo muscular (`MuscleGroup`, D-164), retrofit de `tenantId` nas tabelas do domínio e biblioteca de exercícios comum vs. sensível (D-168–D-171 — **ADR-0009**) | #131 | Schema + retrofit; segue a ordem "tenant isolation antes de treino" (D-166). |
 | 15 | Réguas de plano de treino no worker — vencimento (D-083: avisa o profissional em D-3, transiciona `ACTIVE`→`EXPIRED` e avisa o aluno) e liberação agendada (D-084: `SCHEDULED`→`ACTIVE` no `releaseAt`) | #132 | Primeira **entrega real** pelo `@fitvo/notifications` (canal in-app, mock) em vez de só log. Idempotência via `jobId` de dedupe (extensão nova em `@fitvo/queue`). Enum `NotificationType` ganhou `NEW_PLAN_AVAILABLE` (aditivo). |
 | 16 | Bloco 2 de treino — camada de aplicação da **prescrição**: plano, treino, item, série-linha (D-081), conjugados (D-082), coerência organização↔slot (D-080), validade derivada (D-083), **clonagem** profunda entre vínculos (D-090), plano fixo `isFixed`/`fixedWeekdays` + `countsTowardAdherence` derivado (D-105), aluno nunca vê `DRAFT` (D-165) | #133 | Contrato + repositório + domínio + serviço + rotas. 47 testes unit/fluxo HTTP + 17 de integração contra Postgres real + pass de mutação (13 mutantes, todos mortos). OpenAPI 100% aditivo. **A clonagem (D-090) entrou aqui** — não é item futuro. |
+| 17 | Seed da **base comum de exercícios** — 870 itens da free-exercise-db (Unlicense/domínio público, commit fixado e JSON versionado no repo) importados como `PLATFORM`/`tenantId` NULL (D-089), com de-para de músculo para `MuscleGroup` (D-164), tradução pt-BR (curada + composicional) e idempotência por nome normalizado (D-169) | #139 | 543/870 nomes em pt-BR; o restante e **todas** as instruções seguem em inglês — sem `ANTHROPIC_API_KEY` no repo não há caminho de tradução automática, e não se chuta tradução em massa. Equipamento, nível, force, mechanic e as 1.746 imagens foram mapeados mas **não gravados**: não existe coluna (D-158 × schema do #131). Ver `docs/pendencias-mesa.md` §8 e §9. |
 
 ## EM ANDAMENTO
 
@@ -215,6 +216,7 @@ pergunta "treino está pronto?" não tem resposta verificável.
 | Réguas | Worker: vencimento (D-083) e liberação agendada (D-084) do plano | **FEITO** — #132 |
 | 2 | Prescrição — plano/treino/item/série-linha, conjugados, validade derivada, **clonagem (D-090)**, plano fixo (D-105) | **FEITO** — #133 |
 | 3 | **Execução** — `SetLog`, conclusão como check-in (D-086), `WorkoutRating` (D-087), indicadores de adesão (D-092) | **EM ANDAMENTO** — ver acima |
+| Seed | Base **PLATFORM** de exercícios — 870 itens da free-exercise-db (domínio público), traduzidos, mapeados para `MuscleGroup` (D-164), idempotentes por nome normalizado (D-169) | **FEITO** — #139 |
 
 **Slices futuros do domínio (nenhum iniciado, todos dependem do Bloco 3):**
 

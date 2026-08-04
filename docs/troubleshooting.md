@@ -943,3 +943,74 @@ setada, em vez de quebrar quem não precisa deles.
 **Se um teste/fluxo quebrar depois de trocar para `fitvo_app`:** é o role
 revelando onde o código assumia privilégio de superuser — reporte e conceda o
 GRANT específico que faltou. Nunca volte pro role privilegiado como atalho.
+
+---
+
+## 21. Agentes em paralelo: território disjunto, schema serializado, `pnpm install` antes do gate
+
+**Sintoma**
+
+Três coisas que aparecem quando mais de uma sessão trabalha no repo ao mesmo
+tempo, e que parecem bugs mas são coordenação faltando:
+
+1. Dois agentes editam o mesmo arquivo em worktrees diferentes; o segundo PR
+   nasce com conflito que ninguém pediu.
+2. Duas migrations do Prisma criadas em paralelo. Cada uma aplica sozinha; a
+   segunda a mergear falha ou gera **drift**, porque foi gerada contra um schema
+   que não incluía a primeira.
+3. Depois de mergear, a `main` "fica vermelha": `pnpm typecheck`/`test` quebra
+   com módulo não encontrado, num pacote que a sua mudança nem tocou.
+
+**Causa**
+
+Os três têm a mesma raiz — **estado compartilhado que o git não versiona**.
+
+1. Worktree isola o **checkout**, não o **arquivo lógico**. Dois agentes no
+   mesmo arquivo colidem exatamente como colidiriam sem worktree.
+2. A migration do Prisma é gerada **contra o schema atual**, e o nome carrega
+   ordem (`<timestamp>_nome`). Duas geradas em paralelo produzem duas cadeias
+   que nunca se viram. Não é conflito de texto — o git **mergeia limpo** os dois
+   arquivos e o estrago só aparece ao aplicar.
+3. O terceiro é o que mais engana. Quando **outro** merge adiciona um pacote ou
+   uma dependência entre pacotes do workspace, o `node_modules` do **seu**
+   worktree não ganha o symlink correspondente — `pnpm-lock.yaml` mudou, seu
+   `node_modules` não. O gate falha por **ambiente desatualizado**, não por
+   código quebrado. Ler isso como "a `main` está quebrada" (ou pior, como
+   colisão com o outro agente) leva a investigar o lugar errado por meia hora.
+
+**Regra**
+
+> **1. Território disjunto, declarado antes de começar.** Cada sessão paralela
+> recebe branch própria, worktree própria e um **conjunto de caminhos** que só
+> ela toca. Divisão que funciona na prática: `apps/api` × `apps/worker` ×
+> `packages/*` × `docs/`. Se dois territórios precisam do mesmo arquivo, não são
+> disjuntos — **serialize ou repense a divisão**, não "tome cuidado".
+>
+> **2. Migração de schema SERIALIZA — um dono de schema por vez.** Não importa
+> quantos agentes estejam ativos: só **um** tem permissão de gerar migration em
+> `packages/database/prisma` num dado momento. Os demais **esperam o merge** e
+> então **rebasam** antes de gerar a sua. Não há divisão de território que torne
+> duas migrations concorrentes seguras — a cadeia é linear por construção.
+>
+> **3. `pnpm install` ANTES do gate, sempre que a base mudou.** Depois de
+> rebasar ou de mergear outra branch, rode `pnpm install` **antes** de
+> `typecheck`/`lint`/`test`. Gate vermelho sem `pnpm install` na base nova não é
+> evidência de nada — não abra investigação, não culpe o outro agente, e não
+> reporte a `main` como quebrada até ter reinstalado.
+
+**Ordem prática, quando dois agentes trabalham ao mesmo tempo**
+
+```bash
+# antes de começar: worktree própria, a partir da main de verdade
+git fetch origin
+git worktree add ../fitvo-worktrees/<slice> -b <tipo>/<slice> origin/main
+
+# depois que o OUTRO agente mergear (ou antes de abrir o seu PR)
+git fetch origin && git rebase origin/main
+pnpm install          # <- o passo que todo mundo pula
+pnpm typecheck && pnpm lint && pnpm test
+```
+
+**Reflexo a treinar:** gate vermelho logo após rebase/merge → primeira hipótese
+é **`node_modules` desatualizado**, não regressão. Só depois de `pnpm install`
+o vermelho vira sinal.

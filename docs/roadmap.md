@@ -3,8 +3,10 @@
 > Fonte única do plano de execução. Substitui qualquer backlog interno de
 > sessão — o backlog do agente deve espelhar este documento, nunca o
 > contrário. Atualizar sempre que uma fase mudar de status. As decisões de
-> arquitetura por trás de cada item vivem em `docs/adr/` (D-001 a D-132); a
-> identidade visual em `docs/design-system.md`.
+> arquitetura por trás de cada item vivem em `docs/adr/` (mapa D→ADR em
+> `docs/adr/README.md`); a identidade visual em `docs/design-system.md`. As
+> decisões que ainda **não foram tomadas** — e que o agente não deve inventar —
+> estão catalogadas em `docs/pendencias-mesa.md`.
 
 Convenção de status: **FEITO** (mergeado em `main`, com PR), **EM ANDAMENTO**,
 **PENDENTE** (planejado, ordem de execução pretendida), **BLOQUEADO —
@@ -26,30 +28,28 @@ RESPONSÁVEL** (decisão que só você pode tomar), **BLOQUEADO — TERCEIROS**
 | 7 | Esqueletos de conteúdo (Exercise/Workout, Food/MealPlan, Encounter/MedicalRecord/Prescription, Assessment — ADR-0006) | #14 | SÓ schema. Campos finos deferidos (`detail Json?` + TODO(D-063)). Sem slice de API. **`MedicalRecord` foi um erro do esqueleto e morre no item 5b** (D-122 — o prontuário É o vínculo). |
 | 8 | Adapters das abstrações (observability/pino, cache/Redis, storage/S3, notifications, ai/Anthropic — ADR-0005) | #15 | Todos com fake/mock testável + gate para uso ao vivo. |
 | 9 | Upgrade de infra (Node 22, eslint 10, commitlint 21, vitest 4) | #16 | TypeScript e Prisma majors deliberadamente NÃO subiram (ver PENDENTE). |
-| 10 | Design tokens (`brand-tokens` populado: cor, tipografia, elevação, ícones Lucide, densidade) | #18 (aberto) | Ver EM ANDAMENTO — aguardando revisão/merge. |
-| 11 | Cola de framework (`ui-web` preset Tailwind + CSS vars; `ui-mobile` ThemeProvider) | #18 (aberto) | |
-| 12 | Primitivos de UI §1–§18 (Button, Input/Field/Textarea, Checkbox/Radio/Switch, Select/Combobox, Card, Badge, Tabs, Menu lateral, Breadcrumb, Modal, Toast, Tooltip, estados de tela, Tabela, Avatar) + `Logo` (wordmark fechado, mark provisório) | #18 (aberto) | 227 testes (`brand-tokens` 18 + `ui-web` 127 + `ui-mobile` 82). Consolidado de uma branch de trabalho local que não tinha PR nem push — risco de perda eliminado. |
+| 10 | Design tokens (`brand-tokens` populado: cor, tipografia, elevação, ícones Lucide, densidade) | #19 | Ver EM ANDAMENTO — aguardando revisão/merge. |
+| 11 | Cola de framework (`ui-web` preset Tailwind + CSS vars; `ui-mobile` ThemeProvider) | #19 | |
+| 12 | Primitivos de UI §1–§18 (Button, Input/Field/Textarea, Checkbox/Radio/Switch, Select/Combobox, Card, Badge, Tabs, Menu lateral, Breadcrumb, Modal, Toast, Tooltip, estados de tela, Tabela, Avatar) + `Logo` (wordmark fechado, mark provisório) | #19 | 227 testes (`brand-tokens` 18 + `ui-web` 127 + `ui-mobile` 82). **O PR #18 foi FECHADO sem merge e substituído pelo #19** — se você procurar o #18 no histórico, ele não está lá; o conteúdo entrou pelo #19. |
 | 13 | Isolamento de tenant sistêmico — as 3 camadas (D-150 AsyncLocalStorage, D-151 Prisma Client extension, D-152 Postgres RLS seletivo — **ADR-0017**) | #121, #122, #127 | Fecha o achado #1 (mais grave) do inventário de promessas-sem-gate — vazamento cross-tenant agora tem gate sistêmico, não só disciplina manual. |
 | 14 | Bloco 1 de treino — taxonomia de grupo muscular (`MuscleGroup`, D-164), retrofit de `tenantId` nas tabelas do domínio e biblioteca de exercícios comum vs. sensível (D-168–D-171 — **ADR-0009**) | #131 | Schema + retrofit; segue a ordem "tenant isolation antes de treino" (D-166). |
+| 15 | Réguas de plano de treino no worker — vencimento (D-083: avisa o profissional em D-3, transiciona `ACTIVE`→`EXPIRED` e avisa o aluno) e liberação agendada (D-084: `SCHEDULED`→`ACTIVE` no `releaseAt`) | #132 | Primeira **entrega real** pelo `@fitvo/notifications` (canal in-app, mock) em vez de só log. Idempotência via `jobId` de dedupe (extensão nova em `@fitvo/queue`). Enum `NotificationType` ganhou `NEW_PLAN_AVAILABLE` (aditivo). |
+| 16 | Bloco 2 de treino — camada de aplicação da **prescrição**: plano, treino, item, série-linha (D-081), conjugados (D-082), coerência organização↔slot (D-080), validade derivada (D-083), **clonagem** profunda entre vínculos (D-090), plano fixo `isFixed`/`fixedWeekdays` + `countsTowardAdherence` derivado (D-105), aluno nunca vê `DRAFT` (D-165) | #133 | Contrato + repositório + domínio + serviço + rotas. 47 testes unit/fluxo HTTP + 17 de integração contra Postgres real + pass de mutação (13 mutantes, todos mortos). OpenAPI 100% aditivo. **A clonagem (D-090) entrou aqui** — não é item futuro. |
 
 ## EM ANDAMENTO
 
-- **PR (branch `docs/repo-standardization`)** — Padronização do repositório para
-  nível de sistema grande: README raiz reescrito como vitrine (o índice de ADR +
-  mapa D→ADR migrou para `docs/adr/README.md`), metadados do GitHub (description,
-  topics), templates de PR (com campo de área crítica da Política de Merge) e de
-  issue (bug/feature), `LICENSE` proprietária (all rights reserved — repo público
-  para avaliação), CODEOWNERS mapeando as áreas críticas, e **gate de commitlint
-  no CI** (fecha o furo: antes só rodava local, bypassável com `--no-verify`).
-  Docs/infra, baixo risco pela Política de Merge.
-- **PR #17** (`docs/politica-de-merge`) — Política de Merge + este roadmap.
-  Este próprio commit ajusta a ordem do PENDENTE abaixo, a pedido do
-  responsável, antes do merge.
-- **PR #18** (`feat/ui-primitivos`) — consolida `brand-tokens` + `ui-web` +
-  `ui-mobile` (primitivos §1–§18 + `Logo`) em `main`. Verificado localmente
-  (typecheck/lint/test/build 100% verdes, monorepo inteiro); aguardando
-  revisão antes do merge (volume grande, mesmo sendo área de baixo risco pela
-  Política de Merge).
+- **Bloco 3 de treino — execução (D-086/D-087/D-092, ADR-0009 + ADR-0010).** O
+  lado do **aluno**: `SetLog` (registro de série executada), conclusão de treino
+  como check-in (D-086), `WorkoutRating` (D-087) e os indicadores de adesão
+  derivados (D-092). O schema já existe desde o esqueleto (#14) e ganhou
+  `tenantId` no Bloco 1 (#131); a prescrição que será executada existe desde o
+  Bloco 2 (#133). **É o que falta para o domínio de treino fechar ponta a ponta.**
+  Carrega junto a decisão pendente do gap **D-085 × D-100** (editar série de item
+  já executado — hoje `409` provisório; ver `docs/pendencias-mesa.md`).
+
+> As três entradas anteriores desta seção (repo standardization, PR #17, PR #18)
+> já foram fechadas: `docs/repo-standardization` entrou pelo **#67**, o **#17**
+> mergeou e o **#18** foi fechado sem merge, substituído pelo **#19**.
 
 ## PENDENTE (ordem de execução pretendida)
 
@@ -88,9 +88,18 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
 4. **Anamnese tipada + modalidade** (D-101 a D-103, **ADR-0011**): modalidade do
    vínculo (`ONLINE`/`PRESENCIAL`/`HIBRIDO`) no `Bond` e no `PatientInvite`,
    anamnese em colunas tipadas com **autoria por seção**, núcleo + módulo treino.
-   **Em andamento** — ver EM ANDAMENTO. Dado clínico → **revisão humana
-   obrigatória**.
-5. **Domínio de nutrição** (D-112 a D-121, **ADR-0013**) — o D-063 fecha para
+   **Decisão de campo FECHADA, implementação NÃO iniciada:** os campos do módulo
+   treino fecharam em D-187–D-190 (#130) e não há módulo `anamnese` em
+   `apps/api/src/modules/` nem colunas tipadas no schema — resta schema + telas.
+   Os campos dos módulos de **nutrição** e **nutrologia** continuam abertos (ver
+   `docs/pendencias-mesa.md`). Dado clínico → **revisão humana obrigatória**.
+5. **Domínio de nutrição** (D-112 a D-121, **ADR-0013**) — ⚠️ **PARCIALMENTE
+   FEITO, listado errado como pendente até aqui.** O schema fechou (`Food`,
+   `FoodGroup`/`FoodGroupMember`, `MealPlan`→`Meal`→`MealPlanItem`,
+   `MealLog`/`MealLogItem` — o `detail Json?` de nutrição morreu) e o módulo
+   `apps/api/src/modules/nutrition` expõe a montagem do plano alimentar (#99).
+   **Falta auditar item a item** o que dos sub-bullets abaixo já está coberto
+   pelas rotas existentes antes de reabrir trabalho — o D-063 fecha para
    nutrição:
    - Cria o nível **`Meal`** que falta (`MealPlan → Meal → MealPlanItem`) e
      **destrava o D-118/D-104**; mata o `detail Json?` de nutrição.
@@ -186,14 +195,49 @@ dashboard/IA, porque dashboard sem conteúdo é gráfico de tabela vazia.
     sincronizáveis. **Exige development build** (adeus Expo Go). Depende do item
     12 (mobile) e do domínio de treino ter dado tipado, não `Json`, para o merge
     por campo funcionar — colunas tipadas já existem (`WorkoutPlan`/`WorkoutSet`,
-    D-081, ver FEITO #14); resta a API/slice de execução.
+    D-081, ver FEITO #14) e a **prescrição** tem API desde o #133 (FEITO #16);
+    resta o slice de **execução** (Bloco 3, ver EM ANDAMENTO), que é justamente o
+    que o app do aluno sincroniza.
 13. **Testes ao vivo das integrações** (Asaas sandbox, IA real, FCM, e-mail,
     SMS, Daily) — hoje todos gated por ausência de credenciais no ambiente.
     Rodar exige as credenciais reais (ver BLOQUEADO — TERCEIROS).
 14. **Deploy** (Vercel + Railway) — infraestrutura de deploy ainda não
     configurada; requer credenciais + ordem explícita de publicação.
 
-### Fluxo de validação do trabalho do estagiário — BLOQUEADO no domínio de treino
+### Domínio de treino — mapa do que entrou e do que falta
+
+Consolidado aqui porque o domínio saiu em **blocos**, e sem este mapa a
+pergunta "treino está pronto?" não tem resposta verificável.
+
+| Bloco | Escopo | Status |
+|-------|--------|--------|
+| 1 | Schema — `MuscleGroup` (D-164), retrofit de `tenantId` (D-166), biblioteca de exercícios comum vs. sensível (D-168–D-171) | **FEITO** — #131 |
+| Réguas | Worker: vencimento (D-083) e liberação agendada (D-084) do plano | **FEITO** — #132 |
+| 2 | Prescrição — plano/treino/item/série-linha, conjugados, validade derivada, **clonagem (D-090)**, plano fixo (D-105) | **FEITO** — #133 |
+| 3 | **Execução** — `SetLog`, conclusão como check-in (D-086), `WorkoutRating` (D-087), indicadores de adesão (D-092) | **EM ANDAMENTO** — ver acima |
+
+**Slices futuros do domínio (nenhum iniciado, todos dependem do Bloco 3):**
+
+- **Progressão sugerida (D-167)** — **mesa própria, não é o Bloco 3.** O D-167
+  complementa o D-085 sem substituí-lo: o sistema pré-preenche uma sugestão de
+  progressão (ex.: +carga quando o aluno bateu todas as repetições prescritas) e
+  o profissional **aceita, edita ou ignora**. Nunca prescreve sozinho. Só faz
+  sentido depois de existir execução registrada para ler — é camada de aplicação
+  **sobre** os dados do Bloco 3, não parte dele.
+- **Análise de forma por IA (D-088)** — o modelo `FormAnalysis` **já existe no
+  schema**; falta o worker de pré-análise (assíncrono, com validação
+  profissional obrigatória antes de chegar ao aluno — D-023). Depende de vídeo
+  de execução, logo do Bloco 3. Ver também o item 7 do PENDENTE (IA).
+- **Fluxo de validação do trabalho do estagiário** — **destravado pelo Bloco 2**
+  (ver abaixo).
+- ~~Clonagem de plano entre vínculos (D-090)~~ — **entrou no Bloco 2 (#133)**,
+  com linhagem em `clonedFromWorkoutPlanId`. Não é mais item futuro.
+
+**Gaps já registrados no ADR-0009 (decisão de produto pendente, não modelar):**
+blocos com teto de tempo (AMRAP/EMOM) e a promoção `PRIVATE`→`PLATFORM` da
+biblioteca — catalogados em `docs/pendencias-mesa.md`.
+
+### Fluxo de validação do trabalho do estagiário — DESTRAVADO pelo Bloco 2
 
 **O que é:** o estagiário produz um treino/prescrição → **envia** → fica
 **pendente** → o **supervisor revisa/ajusta/valida** → só então **chega ao
@@ -201,10 +245,13 @@ aluno**. Estagiário **nunca** entrega direto ao aluno: a validação do
 responsável é o que torna o trabalho dele legítimo (D-142; art. 47, DL
 3.688/1941).
 
-**Por que está parado:** depende do **domínio de treino/prescrição**, que ainda
-**não existe**. Não há o que submeter a validação enquanto não houver o objeto
-"treino prescrito". Adiantar isso seria construir uma fila de aprovação sem
-nada para aprovar.
+**Por que estava parado, e por que não está mais:** dependia do **domínio de
+treino/prescrição**, que não existia. **O Bloco 2 (#133) criou o objeto que
+faltava** — há `WorkoutPlan` com ciclo `DRAFT`/`ISSUED` (D-165) e "o aluno nunca
+vê `DRAFT`" já é regra do repositório. O fluxo do estagiário pendura exatamente
+aí: a transição `DRAFT`→`ISSUED` de um plano criado por estagiário passa pelo
+supervisor. **Não é mais bloqueio de ordem de construção — é slice pronto para
+ser feito.**
 
 **Onde engata (já pronto):** a relação
 `ProfessionalProfile.supervisedInterns` ⇄ `InternProfile.supervisor` — vínculo
@@ -400,7 +447,8 @@ tratar os dois no mesmo slice, já que o trabalho difícil é o mesmo.
   **destinatário não está decidido** (quem recebe a sugestão de sobreposição:
   paciente ou profissional? quem recebe o lembrete de cobrança: qual conta do
   tenant?). Não é bloqueio de credencial nestes dois — é decisão de produto que
-  o agente não deve inventar; plugar exige essa resposta primeiro.
+  o agente não deve inventar; plugar exige essa resposta primeiro. **Catalogado
+  como pendência de mesa** em `docs/pendencias-mesa.md`.
 - **Campos clínicos `detail Json?` — decisão de produto ainda aberta (D-063).**
   Diferente da nutrição (**D-063 FECHADO** ali — ver ADR-0013), os domínios de
   atendimento/prontuário/receita/avaliação ainda guardam conteúdo fino num `Json?`
@@ -582,10 +630,14 @@ tratar os dois no mesmo slice, já que o trabalho difícil é o mesmo.
 ## Notas de processo
 
 - Cada item de PENDENTE vira 1 branch → 1 PR → merge conforme a **Política de
-  Merge** (seção acima no CLAUDE.md): baixo risco segue `--admin` no CI verde;
-  áreas críticas (financeiro, consentimento, auth/tenant, dado clínico,
-  migrations destrutivas) esperam aprovação humana explícita.
+  Merge** (seção acima no CLAUDE.md): baixo risco segue com a **suíte local
+  completa verde** (o CI remoto está desativado por billing lock, #101) e
+  **sem `--admin`**; áreas críticas (financeiro, consentimento, auth/tenant,
+  dado clínico, migrations destrutivas) esperam revisão humana explícita do diff
+  + "pode ir" no chat.
 - Isolamento: trabalho de execução sempre em worktree isolado, nunca no tree
-  principal — exceto commits de documentação como este.
+  principal — exceto commits de documentação como este. Quando houver **mais de
+  um agente em paralelo**, os territórios têm que ser disjuntos e a migração de
+  schema **serializa** — regra completa em `docs/troubleshooting.md` §21.
 - Este documento é atualizado a cada fase concluída ou decisão nova; não deixe
   memória de sessão divergir dele.

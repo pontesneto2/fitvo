@@ -1,8 +1,9 @@
 # ADR-0011 — Modalidade de Atendimento e Anamnese
 
 **Status:** Aceito (adendo jul/2026 — regras e fluxos transversais, D-172 a
-D-178; adendo jul/2026 — campos do módulo treino, D-187 a D-190)
-**Decisões cobertas:** D-101 a D-104, D-172 a D-178, D-187 a D-190
+D-178; adendo jul/2026 — campos do módulo treino, D-187 a D-190; adendo jul/2026
+— aderência ancorada na disponibilidade, D-192, que eleva o D-188)
+**Decisões cobertas:** D-101 a D-104, D-172 a D-178, D-187 a D-190, D-192
 **Revisa:** D-094 (ADR-0010) — ver D-102
 
 ## Contexto
@@ -532,6 +533,13 @@ treino (ADR-0009) depois aloca cada sessão a um contexto.
 
 ### D-188 — Orçamento de treino: frequência semanal + tempo por sessão
 
+> **Elevado pelo D-192 (adendo jul/2026).** O texto original abaixo permanece
+> como registrado — nada aqui é reescrito. O que mudou é o **grau**: a
+> frequência semanal deixou de ser apenas **capturada** e passou a ser
+> **obrigatória**, sem a opção "não se aplica" (ver [D-192](#d-192--disponibilidade-de-treino-é-campo-obrigatório-sem-não-se-aplica-exceção-consciente-ao-d-173)).
+> Motivo: ela virou também o **denominador da aderência**
+> ([ADR-0009](0009-dominio-treino.md), D-191), não só insumo de prescrição.
+
 O volume prescritível depende de quanto tempo o aluno tem — captura os dois
 juntos, um sem o outro não basta:
 
@@ -571,6 +579,46 @@ Relevante ao nutricionista (mais que ao personal) e à segurança
     profissional recebe o sinal onde é clinicamente relevante.
 - Isso fecha o item "uso de esteroides anabólicos" que o D-103 listava no
   módulo treino: tratado como sinal, não como campo isolado e acusatório.
+
+---
+
+> A decisão a seguir entrou como **adendo de aderência ancorada na
+> disponibilidade do aluno** (jul/2026, decisão de mesa). É a parte do adendo que
+> mora **aqui**, porque mexe na obrigatoriedade de um campo da anamnese; as
+> outras duas decisões do mesmo adendo — o denominador da aderência (**D-191**) e
+> a irrepresentabilidade do estado "sem denominador" (**D-193**) — vivem no
+> [ADR-0009](0009-dominio-treino.md), onde o indicador tem casa (D-092).
+
+### D-192 — Disponibilidade de treino é campo OBRIGATÓRIO, sem "não se aplica" (exceção consciente ao D-173)
+
+O aluno **não pode pular** a disponibilidade (dias/semana, D-188) ao preencher a
+anamnese de treino. Sem ela, a anamnese **não pode ser enviada** ao profissional.
+
+- **Exceção consciente ao D-173.** A regra geral da anamnese admite "não se
+  aplica" como resposta válida justamente para **não mascarar dado**. A
+  disponibilidade de treino **não admite** essa resposta: não existe aluno de
+  treino com disponibilidade zero — se treina, tem alguma frequência, nem que
+  seja 1x/semana. O risco que o D-173 combate (forçar resposta onde o campo não
+  se aplica ao perfil, poluindo o dado) **não existe aqui**, porque o campo se
+  aplica a 100% dos alunos do módulo. Por isso é obrigatório **sem** a saída "não
+  se aplica" — e por isso é **exceção nomeada**, não revogação: o D-173 continua
+  sendo a regra para todo o resto.
+- **Duplo ancoramento — é o que justifica a exceção.** A disponibilidade ancora
+  as **duas** pontas: a **prescrição** (o profissional monta o treino dentro
+  dela — D-188) e a **aderência** (é o denominador do indicador —
+  [ADR-0009](0009-dominio-treino.md), D-191). Um campo que sustenta os dois lados
+  não pode ser opcional sem derrubar um deles.
+- **Eleva o D-188 de "capturado" para "obrigatório"** — sem reescrevê-lo (ver a
+  nota no próprio D-188). O **tempo médio por sessão** do D-188 **não** é
+  alcançado por esta elevação: segue como está. A **disponibilidade por contexto**
+  do D-187 também **segue opcional** — ela distribui o plano entre locais, não é
+  o total; o obrigatório é a frequência semanal do D-188.
+- **Combinado com a trava de entrada (D-172), torna o estado ruim
+  irrepresentável** — é exatamente disso que o D-193 (ADR-0009) depende.
+- **Consequência de implementação:** o schema/validação da anamnese de treino
+  deve marcar a frequência semanal como obrigatória e **não oferecer** a opção
+  "não se aplica" nesse campo — ajuste a fazer quando o módulo for implementado
+  (registrado em `docs/pendencias-mesa.md`).
 
 ## Impacto de modelagem
 
@@ -739,3 +787,14 @@ Sinalizado para decisão de sequenciamento — **nada implementado por este ADR*
 - A anamnese tipada + o adendo continuam sendo **dado clínico**: qualquer
   implementação exige revisão humana obrigatória (Política de Merge,
   CLAUDE.md), como o resto do domínio clínico.
+- **O D-192 cria a primeira exceção nomeada ao D-173.** A regra "não se aplica é
+  resposta válida" continua sendo o padrão; o que passa a existir é o precedente
+  de que um campo **universal ao módulo** e que **ancora um indicador** pode ser
+  obrigatório sem essa saída. Exceção nova exige o mesmo par de justificativas
+  (universalidade + ancoramento) — não é porta aberta para tornar campo
+  obrigatório por conveniência de formulário.
+- **A anamnese vira dependência de leitura do domínio de treino.** Com o D-191
+  (ADR-0009), o cálculo de aderência passa a **ler** a disponibilidade da
+  anamnese ativa do vínculo (D-175). É acoplamento novo entre módulos que antes
+  não existia: mudança na forma de guardar a frequência semanal quebra o
+  indicador de treino.

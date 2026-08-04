@@ -1,7 +1,7 @@
 # ADR-0009 — Domínio de Treino
 
-**Status:** Aceito (revisado jul/2026 — incorpora contribuições do ADR-0018, superseded; adendo de biblioteca de catálogo D-168 a D-171)
-**Decisões cobertas:** D-079 a D-092, D-105, D-164 a D-171
+**Status:** Aceito (revisado jul/2026 — incorpora contribuições do ADR-0018, superseded; adendo de biblioteca de catálogo D-168 a D-171; adendo de aderência ancorada na disponibilidade D-191 e D-193)
+**Decisões cobertas:** D-079 a D-092, D-105, D-164 a D-171, D-191, D-193
 
 > **Revisão de jul/2026.** O [ADR-0018](0018-dominio-treino.md) redecidiu este mesmo
 > domínio sem consultar este ADR, gerando conflito de filosofia (prescrição por
@@ -418,6 +418,67 @@ há entidade nova de indicador, há índices planejados.
   seus profissionais, distinta da base global `PLATFORM`), isso é uma dimensão a
   mais — **decisão futura em adendo próprio**, não redecidida aqui.
 
+---
+
+> As duas decisões a seguir entraram como **adendo de aderência ancorada na
+> disponibilidade do aluno** (jul/2026, decisão de mesa). **Estendem o D-092 —
+> não o reescrevem:** o D-092 continua valendo integralmente (a aderência é um
+> indicador **derivado**, sem entidade própria). O que faltava era a **fonte do
+> denominador**: o Bloco 3 da execução (#136) entregou os numeradores (sessões
+> concluídas, dias treinados) mas não o percentual, porque "quantos treinos eram
+> esperados" não estava decidido em lugar nenhum. Este adendo fixa essa fonte.
+> A terceira decisão do mesmo adendo — disponibilidade como campo **obrigatório**
+> na anamnese — vive no [ADR-0011](0011-modalidade-e-anamnese.md) (**D-192**),
+> onde a anamnese tem casa.
+
+### D-191 — O denominador da aderência é a disponibilidade declarada pelo ALUNO
+
+A aderência é calculada contra a **disponibilidade de dias/semana que o próprio
+aluno declara** na anamnese de treino ([ADR-0011](0011-modalidade-e-anamnese.md),
+D-188/D-192), **não** contra uma meta imposta pelo profissional.
+
+```
+aderência = sessões concluídas ÷ dias disponíveis declarados pelo aluno
+```
+
+- **Uniforme para `LETTER` e `WEEKDAY`** — a organização do plano (D-080) **não
+  afeta** o cálculo. Seja A/B/C livre ou treino-por-dia, o esperado é sempre a
+  disponibilidade do aluno. Declarou 4x/semana, o denominador é 4,
+  independentemente de como o plano está organizado. Isso resolve o problema que
+  travava o cálculo: o `LETTER` é executado "na ordem que o aluno quiser" e
+  portanto **não tem dia esperado** — sem uma fonte única de denominador, o % do
+  plano `LETTER` seria inventado.
+- **Fundamento de produto:** a frequência **sempre parte do aluno**; o
+  profissional se **adapta** a ela. O profissional nunca impõe "você vai treinar
+  Nx" — ele monta o treino **dentro** da disponibilidade informada. Medir a
+  aderência contra a disponibilidade do aluno é medi-la contra aquilo com que ele
+  mesmo se comprometeu — honesto, e coerente com a filosofia do FITVO (o
+  profissional serve o aluno).
+- **O plano fixo (D-105) continua fora da aderência** — não conta, como já
+  decidido. Este D trata do denominador dos planos que **contam**.
+- Não cria entidade nova: o denominador é **lido** da anamnese ativa do vínculo
+  (D-175), do mesmo jeito que os numeradores são derivados das execuções. O D-092
+  segue valendo — indicador é derivado, não persistido.
+
+### D-193 — O estado "aderência sem denominador" é irrepresentável por construção
+
+Como a anamnese é **trava de entrada** ([ADR-0011](0011-modalidade-e-anamnese.md),
+D-172) e a disponibilidade é **obrigatória sem "não se aplica"** (D-192), é
+**impossível** existir um treino cujo aluno não tenha disponibilidade declarada.
+Logo, **todo treino sempre tem denominador de aderência** — o caso "aderência sem
+%" não pode acontecer.
+
+- **Não há fallback, e isso é intencional:** não se define default de
+  denominador, nem estado de UI "aderência indisponível", porque o estado ruim é
+  **irrepresentável**, não apenas improvável. `construir > validar`.
+- **Consequência de UI:** existe **um só jeito** de mostrar aderência, para
+  qualquer plano e qualquer organização. Some a inconsistência "uns planos têm %,
+  outros não".
+- **Trava de implementação:** se em algum momento aparecer código precisando
+  tratar "sem denominador", isso é sinal de que uma das duas premissas foi
+  quebrada (trava de entrada ou obrigatoriedade do campo) — o conserto é
+  restaurar a premissa, **não** adicionar fallback.
+
 ## Gaps conhecidos (decisão de produto pendente — não modelar sem ADR)
 
 Registrados aqui para ficarem **visíveis, não esquecidos**. Nenhum é bloqueante
@@ -555,3 +616,12 @@ aprovação.
   biblioteca: a **anti-duplicação normalizada** (D-169) é trabalho de
   implementação de verdade (unaccent + lower + trim + colapso de espaço/hífen),
   não checagem de string igual.
+- **Aderência (D-191/D-193):** o % do Bloco 3 da execução (#136) fica
+  **destravado** — os numeradores já entregues passam a ter denominador (a
+  disponibilidade da anamnese), e o percentual pode ser exibido tanto ao aluno
+  quanto ao profissional. Não adiciona entidade nem coluna no domínio de treino:
+  o denominador é lido da anamnese ativa do vínculo. A **dependência nova** é de
+  leitura entre domínios — o cálculo de aderência precisa alcançar a anamnese
+  (ADR-0011), o que antes não era necessário. A **janela de agregação** (semana
+  corrente? últimas N semanas? período do plano?) **não está decidida** e é
+  pendência de implementação registrada em `docs/pendencias-mesa.md`.

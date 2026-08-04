@@ -193,3 +193,43 @@ TERCEIROS (política de estorno, termos de uso, política de privacidade —
 D-021/D-025). Uma conversa com advogado, não quatro.
 
 **Contexto:** `docs/adr/0011-modalidade-e-anamnese.md` → D-178.
+
+## 7. Aderência de treino — ligação com a anamnese e janela de agregação (D-191/D-192)
+
+**Status:** `ABERTA — DEPENDE DE ORDEM` · **Origem:** adendo de aderência
+(jul/2026), sobre o Bloco 3 da execução (#136)
+
+**Atenção — a decisão de mesa já foi tomada; o que sobra aqui é implementação.**
+O denominador da aderência **está decidido**: é a disponibilidade declarada pelo
+aluno (D-191), obrigatória na anamnese (D-192), o que torna o estado "sem
+denominador" irrepresentável (D-193). Esta entrada existe porque a decisão
+**criou trabalho que ainda não tem onde acontecer** — e um dos itens **ainda é
+decisão**, não código. Não confundir os dois:
+
+**(a) Ligar o cálculo de aderência (Bloco 3) à disponibilidade da anamnese —
+item de implementação, não de mesa.** O #136 entregou os **numeradores** (sessões
+concluídas, dias treinados) e parou ali. Falta o join com a disponibilidade
+(D-188) da anamnese ativa do vínculo (D-175) para produzir o **percentual**. É
+acoplamento **novo** entre o domínio de treino e o de anamnese — antes o cálculo
+de aderência não precisava alcançar a anamnese. **Depende de ordem:** o módulo de
+anamnese de treino ainda não foi implementado; não há campo para ler.
+
+**(b) Definir a janela de agregação da aderência — isto ainda é decisão.** O
+denominador é **dias/semana**; a **janela** sobre a qual se agrega **não foi
+decidida**: semana corrente? últimas N semanas (média móvel)? período de validade
+do plano (D-083)? Cada opção conta uma história diferente sobre o mesmo aluno —
+quem faltou nesta semana mas manteve 90% no mês aparece como problema numa e como
+regular na outra. É o número que o profissional usa para decidir "quem está
+sumindo" (D-092), então **não é detalhe de exibição**. O agente não escolhe
+sozinho.
+
+**Também pendente de implementação:** garantir na validação da anamnese que a
+disponibilidade é obrigatória **e sem a opção "não se aplica"** (D-192) — é a
+premissa da qual o D-193 depende. Se essa validação não for construída, o estado
+"sem denominador" deixa de ser irrepresentável e a aderência volta a precisar de
+fallback, que é exatamente o que a decisão eliminou.
+
+**Contexto:** `docs/adr/0009-dominio-treino.md` → D-191, D-193 (e D-092, o
+indicador que eles alimentam). `docs/adr/0011-modalidade-e-anamnese.md` → D-192,
+D-188.
+

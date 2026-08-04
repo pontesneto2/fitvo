@@ -5,12 +5,14 @@ import {
   SupersetSetCountMismatchError,
 } from '../../shared/http-errors';
 import {
+  type AdherenceCheckIn,
   assertSupersetGroupsComplete,
   assertSupersetSetCounts,
   deriveValidUntil,
   planAppliesOnWeekday,
   planCountsTowardAdherence,
   resolveWorkoutSlot,
+  summarizeAdherence,
 } from './workout-domain';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -170,5 +172,88 @@ describe('D-082 — invariante do conjugado', () => {
         { id: 'c', supersetGroup: 7, setCount: 3 },
       ]),
     ).not.toThrow();
+  });
+});
+
+describe('D-092/D-105 — aderencia derivada dos check-ins', () => {
+  const variavel = (day: string): AdherenceCheckIn => ({
+    planId: 'plan_musculacao',
+    planIsFixed: false,
+    performedAt: new Date(`${day}T10:00:00.000Z`),
+  });
+  const fixo = (day: string): AdherenceCheckIn => ({
+    planId: 'plan_mobilidade',
+    planIsFixed: true,
+    performedAt: new Date(`${day}T06:00:00.000Z`),
+  });
+
+  it('sem check-in, tudo zero — periodo vazio nao inventa numero', () => {
+    expect(summarizeAdherence([])).toEqual({
+      completedSessions: 0,
+      adherenceSessions: 0,
+      daysTrained: 0,
+      byPlan: [],
+    });
+  });
+
+  it('check-in de plano VARIAVEL conta na aderencia', () => {
+    const resumo = summarizeAdherence([variavel('2026-08-03'), variavel('2026-08-04')]);
+    expect(resumo.completedSessions).toBe(2);
+    expect(resumo.adherenceSessions).toBe(2);
+    expect(resumo.daysTrained).toBe(2);
+  });
+
+  it('plano FIXO NAO conta na aderencia — o alongamento nao infla quem nao treinou', () => {
+    const resumo = summarizeAdherence([fixo('2026-08-03'), fixo('2026-08-04')]);
+    // O trabalho aconteceu e nao some do historico...
+    expect(resumo.completedSessions).toBe(2);
+    // ...mas nao responde "o aluno fez o treino de hoje?" (D-105).
+    expect(resumo.adherenceSessions).toBe(0);
+    expect(resumo.daysTrained).toBe(0);
+  });
+
+  it('misturando os dois, so o variavel entra na aderencia', () => {
+    const resumo = summarizeAdherence([
+      variavel('2026-08-03'),
+      fixo('2026-08-03'),
+      fixo('2026-08-05'),
+    ]);
+    expect(resumo.completedSessions).toBe(3);
+    expect(resumo.adherenceSessions).toBe(1);
+    expect(resumo.daysTrained).toBe(1);
+  });
+
+  it('duas sessoes no MESMO dia contam 1 dia treinado, 2 check-ins', () => {
+    const resumo = summarizeAdherence([variavel('2026-08-03'), variavel('2026-08-03')]);
+    expect(resumo.adherenceSessions).toBe(2);
+    expect(resumo.daysTrained).toBe(1);
+  });
+
+  it('o dia e UTC (D-067) — 23h e 01h do dia seguinte sao dias diferentes', () => {
+    const resumo = summarizeAdherence([
+      { planId: 'p', planIsFixed: false, performedAt: new Date('2026-08-03T23:00:00.000Z') },
+      { planId: 'p', planIsFixed: false, performedAt: new Date('2026-08-04T01:00:00.000Z') },
+    ]);
+    expect(resumo.daysTrained).toBe(2);
+  });
+
+  it('o byPlan expoe countsTowardAdherence por plano, sem esconder o fixo', () => {
+    const resumo = summarizeAdherence([variavel('2026-08-03'), fixo('2026-08-03')]);
+    expect(resumo.byPlan).toEqual(
+      expect.arrayContaining([
+        {
+          planId: 'plan_musculacao',
+          isFixed: false,
+          countsTowardAdherence: true,
+          completedSessions: 1,
+        },
+        {
+          planId: 'plan_mobilidade',
+          isFixed: true,
+          countsTowardAdherence: false,
+          completedSessions: 1,
+        },
+      ]),
+    );
   });
 });

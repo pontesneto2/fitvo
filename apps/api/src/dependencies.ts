@@ -35,8 +35,10 @@ import { PrismaSpecialtyRepository } from './modules/specialty/prisma-specialty-
 import { SpecialtyApplicationService } from './modules/specialty/specialty-application-service';
 import { PrismaTermsRepository } from './modules/terms/prisma-terms-repository';
 import { TermsApplicationService } from './modules/terms/terms-application-service';
+import { PrismaWorkoutExecutionRepository } from './modules/workout/prisma-workout-execution-repository';
 import { PrismaWorkoutRepository } from './modules/workout/prisma-workout-repository';
 import { WorkoutApplicationService } from './modules/workout/workout-application-service';
+import { WorkoutExecutionApplicationService } from './modules/workout/workout-execution-application-service';
 import type { AccessTokenVerifier } from './shared/auth-context';
 
 /** Dependencias injetadas na app (permite trocar por fakes nos testes). */
@@ -59,6 +61,7 @@ export interface AppDependencies {
   nutritionService: NutritionApplicationService;
   exerciseLibraryService: ExerciseLibraryApplicationService;
   workoutService: WorkoutApplicationService;
+  workoutExecutionService: WorkoutExecutionApplicationService;
   onClose?: () => Promise<void>;
 }
 
@@ -227,6 +230,14 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     authCore,
   );
 
+  // authCore satisfaz AccessTokenVerifier — a execucao reusa o mesmo
+  // verificador. O escopo da ESCRITA e o vinculo do ALUNO (quem treina e ele);
+  // a leitura do profissional carrega tenant + vinculo, como no Bloco 2.
+  const workoutExecutionService = new WorkoutExecutionApplicationService(
+    new PrismaWorkoutExecutionRepository(prisma),
+    authCore,
+  );
+
   return {
     logLevel: env.LOG_LEVEL,
     corsOrigin: env.CORS_ORIGIN,
@@ -243,6 +254,7 @@ export function buildProductionDependencies(env: ApiEnv): AppDependencies {
     nutritionService,
     exerciseLibraryService,
     workoutService,
+    workoutExecutionService,
     onClose: async () => {
       await queueFactory.close();
       await redis.quit();

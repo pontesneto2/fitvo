@@ -331,6 +331,47 @@ export class WorkoutPlanStateConflictError extends AppError {
   }
 }
 
+/**
+ * A sessao de execucao esta num estado que nao aceita a operacao (D-086 —
+ * ADR-0009). Ex.: concluir (check-in) uma sessao ja COMPLETED, ou registrar
+ * serie numa sessao ja fechada. Nao e "nao encontrado" (a sessao existe e e do
+ * aluno) nem falta de permissao — e conflito com o estado atual.
+ *
+ * O check-in e o sinal de PRESENCA que alimenta os indicadores (D-092): deixar
+ * concluir duas vezes contaria o mesmo treino duas vezes na aderencia.
+ */
+export class WorkoutSessionStateConflictError extends AppError {
+  readonly status = 409;
+  readonly problemType = 'https://fitvo.dev/problems/workout-session-state-conflict';
+  readonly title = 'Estado da sessao nao permite a operacao';
+  constructor(message: string) {
+    super(message);
+    this.name = 'WorkoutSessionStateConflictError';
+  }
+}
+
+/**
+ * O `workoutSetId` do registro de carga (D-086) nao pertence ao treino que esta
+ * sendo executado. 422: bem-formado, mas viola pre-condicao de negocio — um log
+ * apontando para a serie de OUTRO treino corromperia a evolucao de carga por
+ * exercicio (D-092) e seria um ponteiro cruzando o isolamento por vinculo.
+ *
+ * Serie LIVRE (sem `workoutSetId`) continua valida: o aluno pode fazer algo que
+ * ninguem prescreveu. O que nao existe e apontar para a prescricao errada.
+ */
+export class SetLogForeignSetError extends AppError {
+  readonly status = 422;
+  readonly problemType = 'https://fitvo.dev/problems/set-log-foreign-set';
+  readonly title = 'Serie prescrita nao pertence a este treino';
+  constructor() {
+    super(
+      'A serie informada nao pertence ao treino desta sessao. Para uma serie fora ' +
+        'da prescricao, envie o registro sem `workoutSetId` (D-086).',
+    );
+    this.name = 'SetLogForeignSetError';
+  }
+}
+
 /** Plano inexistente ou inativo no catalogo da plataforma (Fluxo A — ADR-0004). */
 export class PlanNotFoundError extends AppError {
   readonly status = 404;

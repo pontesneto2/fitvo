@@ -17,9 +17,9 @@
   "dependencies": {
     "@fastify/cors": "^11.3.0",
     "@fastify/helmet": "^13.1.0",
-    "@fastify/rate-limit": "^11.1.0",
+    "@fastify/rate-limit": "^11.2.0",
     "@fastify/swagger": "^9.5.1",
-    "@fastify/swagger-ui": "^6.1.0",
+    "@fastify/swagger-ui": "^6.1.1",
     "@fitvo/auth": "workspace:*",
     "@fitvo/config": "workspace:*",
     "@fitvo/database": "workspace:*",
@@ -27,7 +27,7 @@
     "@fitvo/payments": "workspace:*",
     "@fitvo/queue": "workspace:*",
     "@fitvo/validation": "workspace:*",
-    "fastify": "^5.5.0",
+    "fastify": "^5.11.0",
     "fastify-type-provider-zod": "^7.0.0",
     "ioredis": "^5.11.1",
     "zod": "^4.4.3"

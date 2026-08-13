@@ -20,7 +20,7 @@
   "dependencies": {
     "@fitvo/brand-tokens": "workspace:*",
     "lucide-react": "^0.577.0",
-    "recharts": "^3.10.0"
+    "recharts": "^3.10.1"
   },
   "peerDependencies": {
     "react": ">=18"

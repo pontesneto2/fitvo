@@ -17,7 +17,7 @@
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
     "ioredis": "^5.11.1",
-    "jose": "^6.2.4"
+    "jose": "^6.2.8"
   },
   "devDependencies": {
     "@fitvo/eslint-config": "workspace:*",

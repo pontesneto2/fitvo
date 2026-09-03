@@ -16,7 +16,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "devDependencies": {
     "@fitvo/eslint-config": "workspace:*",

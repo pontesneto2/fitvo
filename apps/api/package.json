@@ -15,11 +15,11 @@
     "gen:openapi": "tsx src/openapi/generate.ts"
   },
   "dependencies": {
-    "@fastify/cors": "^11.3.0",
-    "@fastify/helmet": "^13.1.0",
-    "@fastify/rate-limit": "^11.1.0",
-    "@fastify/swagger": "^9.5.1",
-    "@fastify/swagger-ui": "^6.1.0",
+    "@fastify/cors": "^11.3.1",
+    "@fastify/helmet": "^13.1.2",
+    "@fastify/rate-limit": "^11.2.1",
+    "@fastify/swagger": "^9.9.2",
+    "@fastify/swagger-ui": "^6.1.2",
     "@fitvo/auth": "workspace:*",
     "@fitvo/config": "workspace:*",
     "@fitvo/database": "workspace:*",
@@ -27,10 +27,10 @@
     "@fitvo/payments": "workspace:*",
     "@fitvo/queue": "workspace:*",
     "@fitvo/validation": "workspace:*",
-    "fastify": "^5.5.0",
+    "fastify": "^5.12.5",
     "fastify-type-provider-zod": "^7.0.0",
     "ioredis": "^5.11.1",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@fitvo/eslint-config": "workspace:*",
